@@ -171,7 +171,16 @@ def night_for(day: datetime, site: Site = NERPIO, step_minutes: int = 5) -> Nigh
     A night spans two calendar dates, so it is labelled by the date it started;
     the whole archive follows the same convention.
     """
-    start = day.astimezone(timezone.utc).replace(hour=6, minute=0, second=0,
+    # Anchored at midday, not at 06:00. The old anchor assumed the Sun was
+    # already up when the scan began, which is true in summer and FALSE from
+    # October to March at this latitude: at 06:00 UTC in January it is still
+    # night here, so the first crossing found was a sunrise, the window came
+    # out inverted (end before start) and hours() returned an empty list. Six
+    # months of the year the whole product silently produced nothing.
+    #
+    # Midday is safe year round at 38 N: the Sun is up at 12:00 UTC on every
+    # date, so the first crossing after it is always the sunset we want.
+    start = day.astimezone(timezone.utc).replace(hour=12, minute=0, second=0,
                                                  microsecond=0)
     times = [start + timedelta(minutes=step_minutes * i)
              for i in range(int(36 * 60 / step_minutes))]

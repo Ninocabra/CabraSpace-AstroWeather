@@ -1,0 +1,274 @@
+<html>
+<head>
+<script>
+function hardRefresh() {
+  window.location.href = window.location.href.split('?')[0] + '?_=' + Date.now();
+}
+setTimeout(hardRefresh, 120000); // Refresh every 120 seconds
+  (function () {
+    const BASE = "https://com2.astrocamp.es:85/allsky/public/";
+    const img  = document.getElementById("allsky");
+    const link = document.getElementById("allsky-link");
+    function refresh() {
+      const t = Date.now();
+      if (img)  img.src   = BASE + "AllSkyCurrentImage.JPG?t=" + t;
+      if (link) link.href = BASE + "allsky.gif?t=" + t;
+    }
+    refresh();
+    setInterval(refresh, 60000);
+  })();
+</script>
+
+<style type="text/css">
+body {background-color:black;color:white;}
+.tab1 th { background-color:#333333;color:yellow;}
+.tab1 td { background-color:#222222;color:white;text-align: right;}
+.tab2 th { background-color:#333333;color:yellow;}
+.tab2 td { background-color:#222222;color:white;text-align: left;}
+.myTable { background-color:#cloud;border-collapse:collapse;color:black; }
+.myTable th { background-color:#FEAB4D; color:black; }
+.myTable th { padding:5px;border:1px solid #FEAB4D }
+.myTable td { padding:5px;border:1px solid color:white; }
+ a:link {
+    color: yellow;
+    background-color: transparent;
+    text-decoration: none;
+  }
+  a:visited {
+    color: orange;
+    background-color: transparent;
+    text-decoration: none;
+  }
+</style>
+</head>
+<body onload="JavaScript:timeRefresh(60000); "><table class='myTable'><tr><th>Humidity (1)</th><td bgcolor=green>Dry</td><th>Humidity (2)</th><td bgcolor=green>Dry</td><th>Internet (1)</th><td bgcolor=green>Online</td><th>Mains (1)</th><td bgcolor=green>Mains OK</td><th>Sky (4)</th><td bgcolor=green>Clear</td><th>Sky (3)</th><td bgcolor=green>Clear</td><th>SunAlt (1)</th><td bgcolor=green>Night</td><th>Temperature (1)</th><td bgcolor=green>Warm</td><th>Temperature (2)</th><td bgcolor=green>Warm</td></tr></table><table class=trass><tr><td><table class=tab1><tr><th>Cloud<th>Date time<th>SkyTemp<th>Temp<th>S.I.</tr><tr><td>3<td>2026-08-22 16:07:29<td>-9.62<td>41.93<td>3.1</tr><tr><td>4<td>2026-08-27 22:10:56<td>-14.73<td>12.95<td>0.6</tr><tr><td>5<td>2026-07-21 21:12:45<td>-6.21<td>26.99<td>2.1</tr></tr></table></td><td></td><td><table class=tab1><tr><th>Meteo<th>Date time<th>Temp Out<th>Hum.Out<th>Dew<th>Wind(km/h)<th>Dir(deg)<th>Temp In<th>Hum.In<th>Pressure<th>Rain</tr><tr><td>1<td>2026-08-27 22:10:04<td>13.3<td>68<td>7.52<td>20<td>285<td>20.2<td>51<td>846.2<td></td></tr><tr><td>2<td>2026-08-27 22:10:08<td>12.5<td>65<td>6.1<td>20<td>285<td>20.2<td>51<td>846.2<td></td></tr><tr><td>3<td>2025-04-06 07:44:12<td>18<td>32.4<td>1.23<td>4<td>300<td>9.2<td>70<td>840.4<td>0</td></tr></table></td></tr></table></tr></table><table class='myTable'><tr><th>S1R1</th><td bgcolor=green>Open</td><th>S1R2</th><td bgcolor=green>Open</td><th>S1R3</th><td bgcolor=green>Open</td><th>S2R1</th><td bgcolor=green>Open</td><th>S2R2</th><td bgcolor=green>Open</td><th>S2R3</th><td bgcolor=green>Open</td><th>S2R4</th><td bgcolor=green>Open</td><th>S2R5</th><td bgcolor=green>Open</td></tr><tr><th>S2R6</th><td bgcolor=green>Open</td><th>Igloo_2</th><td bgcolor=green>Open</td><th>S4RE</th><td bgcolor=green>Open</td><th>S4RW</th><td bgcolor=green>Open</td><th>S3R1</th><td bgcolor=green>Open</td><th>Igloo_3</th><td bgcolor=green>Open</td><th>S5RE</th><td bgcolor=green>Open</td><th>S5RW</th><td bgcolor=green>Open</td><th>S6RE</th><td bgcolor=green>Open</td></tr><tr><th>S6RW</th><td bgcolor=green>Open</td></tr></table><table><tr><td><table class=tab2><tr><th>Date time<th>AstroCamp Safety log</tr><tr><td>2026-08-27 18:24:11<td>Status: Safe.  SunAlt(1) is Night.. <tr><td>2026-08-27 17:51:43<td>Status: Unsafe.  Sky1(4) is Clear.. <tr><td>2026-08-27 17:50:36<td>Status: Unsafe.  Sky1(4) is Cloudy.. <tr><td>2026-08-27 17:48:32<td>Status: Unsafe.  Sky1(4) is Clear.. </td></tr></table></td><td><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Astrocamp Meteo</title>
+    <style type="text/css"> 
+	body {background-color:black;color:yellow;} 
+.tab1 th { background-color:#333333;color:yellow;}
+.tab1 td { background-color:#222222;color:white;text-align: right;}
+.tab2 th { background-color:#333333;color:yellow;}
+.tab2 td { background-color:#222222;color:white;text-align: left;}
+.myTable { background-color:#cloud;border-collapse:collapse;color:black; }
+.myTable th { background-color:#FEAB4D; color:black; }
+.myTable th { padding:5px;border:1px solid #FEAB4D }
+.myTable td { padding:5px;border:1px solid color:white; }
+ a:link {
+    color: yellow;
+    background-color: transparent;
+    text-decoration: none;
+  }
+  a:visited {
+    color: orange;
+    background-color: transparent;
+    text-decoration: none;
+  }
+    </style>
+</head>
+<body>
+  <table class=tab1>
+    <th colspan=2>Astrocamp Countdowns</th>
+    <div class="countdown-container">
+        <div class="countdown-box sunset">
+            <tr><td>Next Sunset: </td><td><div id="sunset-countdown" class="time">Loading...</div></td></tr>
+        </div>
+        <div class="countdown-box sunrise">
+            <tr><td>Next Sunrise: </td><td><div id="sunrise-countdown" class="time">Loading...</div></td></tr>
+        </div>
+        <div class="countdown-box moonset">
+            <tr><td>Next Moonset: </td><td><div id="moonset-countdown" class="time">Loading...</div></td></tr>
+        </div>
+        <div class="countdown-box moonrise">
+            <tr><td>Next Moonrise: </td><td><div id="moonrise-countdown" class="time">Loading...</div></td></tr>
+        </div>
+    </div>
+  </table>
+    
+    <script>
+        // Paths to your .par files (update these to match your server paths)
+        const SUNSET_FILE = '/sunsetms.par';
+        const SUNRISE_FILE = '/sunrisems.par';
+        const MOONSET_FILE = '/moonsetms.par';
+        const MOONRISE_FILE = '/moonrisems.par';
+        
+        // Countdown targets
+        let sunsetTarget = null;
+        let sunriseTarget = null;
+        let moonsetTarget = null;
+        let moonriseTarget = null;
+        let lastUpdated = null;
+        
+        // Fetch countdown data from server
+        async function fetchCountdownData() {
+            try {
+                // Fetch both files in parallel
+                const responses = await Promise.all([
+                    fetch(SUNSET_FILE),
+                    fetch(SUNRISE_FILE),
+                    fetch(MOONSET_FILE),
+                    fetch(MOONRISE_FILE)
+                ]);
+                
+                // Get text from responses
+                const texts = await Promise.all([
+                    responses[0].text(),
+                    responses[1].text(),
+                    responses[2].text(),
+                    responses[3].text()
+                ]);
+                
+                // Update targets
+                const now = Date.now();
+                sunsetTarget = now + parseInt(texts[0]);
+                sunriseTarget = now + parseInt(texts[1]);
+                moonsetTarget = now + parseInt(texts[2]);
+                moonriseTarget = now + parseInt(texts[3]);
+                lastUpdated = new Date();
+                
+                updateLastUpdatedDisplay();
+                
+                console.log('Successfully updated countdown data');
+            } catch (error) {
+                console.error('Error fetching countdown data:', error);
+            }
+        }
+        
+        // Update the countdown displays every second
+        function updateCountdowns() {
+            const now = new Date().getTime();
+            
+            // Update sunset countdown
+            if (sunsetTarget) {
+                const sunsetDistance = sunsetTarget - now;
+                if (sunsetDistance > 0) {
+                    document.getElementById('sunset-countdown').innerHTML = 
+                        formatTime(sunsetDistance);
+                } else {
+                    document.getElementById('sunset-countdown').innerHTML = "Happening now!";
+                }
+            }
+            
+            // Update sunrise countdown
+            if (sunriseTarget) {
+                const sunriseDistance = sunriseTarget - now;
+                if (sunriseDistance > 0) {
+                    document.getElementById('sunrise-countdown').innerHTML = 
+                        formatTime(sunriseDistance);
+                } else {
+                    document.getElementById('sunrise-countdown').innerHTML = "Happening now!";
+                }
+            }
+
+            // Update moonset countdown
+            if (moonsetTarget) {
+                const moonsetDistance = moonsetTarget - now;
+                if (moonsetDistance > 0) {
+                    document.getElementById('moonset-countdown').innerHTML = 
+                        formatTime(moonsetDistance);
+                } else {
+                    document.getElementById('moonset-countdown').innerHTML = "Happening now!";
+                }
+            }
+            
+            // Update moonrise countdown
+            if (moonriseTarget) {
+                const moonriseDistance = moonriseTarget - now;
+                if (moonriseDistance > 0) {
+                    document.getElementById('moonrise-countdown').innerHTML = 
+                        formatTime(moonriseDistance);
+                } else {
+                    document.getElementById('moonrise-countdown').innerHTML = "Happening now!";
+                }
+            }
+        }
+        
+        // Format milliseconds to HH:MM:SS
+        function formatTime(milliseconds) {
+            const totalSeconds = Math.floor(milliseconds / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = Math.floor(totalSeconds % 60);
+            
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        // Initialize and set up intervals
+        async function init() {
+            // Initial data load
+            await fetchCountdownData();
+            
+            // Update countdown displays every second
+            setInterval(updateCountdowns, 1000);
+            
+            // Refresh data from server every hour
+            setInterval(fetchCountdownData, 60 * 60 * 1000);
+            
+            // Start the countdown updates
+            updateCountdowns();
+        }
+        
+        // Start the application
+        init();
+    </script>
+</body>
+</html>
+</td></tr></table><table class=tab1><tr><td><a href='img/wind.png' height=100%><img src=img/wind.png width=360 height=280 id=wind></a></td><td><a href='img/cloud.png' height=100%><img src=img/cloud.png width=360 height=280 id=cloud></a></td><td><iframe src='https://tess.dashboards.stars4all.eu/d-solo/datasheet_stars289/stars289?orgId=1&panelId=37' width='360' height='280' frameborder='0'></iframe></td></tr><tr><td><a href='img/temp.png' height=100%><img src=img/temp.png width=360 height=280 id=temp></a></td><td><a href='img/humid.png' height=100%><img src=img/humid.png width=360 height=280 id=humid></a></td><td><a href='img/dust.png' height=100%><img src=img/dust.png width=360 height=280 id=dust title='Astrocamp Air Quality. Click to enlarge' ></a></td></tr></table><table class=tab1><td><a id='allsky-link' href='https://com2.astrocamp.es:85/allsky/public/allsky.gif' height=100%><img width=540 src='https://com2.astrocamp.es:85/allsky/public/AllSkyCurrentImage.JPG' title='AstroCamp AllSky. CLICK to animate' id='allsky'></a></td><td><a href='acsudeast.gif' height=100%><img width=540 src='acsudeast.jpg' title='Astrocamp sudeast. CLICK to animate' id='wc4'></a></td></tr><tr><td align='center'><a href='https://com2.astrocamp.es:85/indi-allsky/videoviewer'>allsky timelapses any day</a></td><td align='center'><a href='/acsudeast'>sudeast 24h timelapses for last week</a></td></tr><tr><td><a href='acwest.gif' height=100%><img width=540 src='acwest.jpg' title='AstroCamp West. CLICK to animate' id='wc2'></a></td><td><a href='aceast.gif' height=100%><img width=540 src='aceast.jpg' title='AstroCamp East. CLICK to animate' id='wc3'></a></td></tr><tr><td align='center'><a href='/acwest'>acwest 24h timelapses from last weeks</a></td><td align='center'><a href='/aceast'>aceast 24h timelapses from last weeks</a></td></tr></table><h3 style='color:yellow;'>Weather Forecast</h3><table class=tab1><tr><td rowspan=2><iframe src="https://www.meteoblue.com/es/tiempo/widget/seeing/38.1655721N-2.3265774E1650_Europe%2FMadrid?geoloc=fixed&noground=0"  frameborder="0" scrolling="NO" allowtransparency="true" sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox" style="width: 520px; height: 774px"></iframe><div><!-- DO NOT REMOVE THIS LINK --><a href="https://www.meteoblue.com/es/tiempo/pronostico/seeing/38.1655721N-2.3265774E1650_Europe%2FMadrid?utm_source=seeing_widget&utm_medium=linkus&utm_content=seeing&utm_campaign=Weather%2BWidget" target="_blank" rel="noopener">meteoblue</a></div> </td><td><embed src="http://web.astrocamp.es/meteo/" style="width:660px; height: 480px;"></td></tr><tr><td><img src=img/press.png width=360 height=280 id=press><br><a href='https://www.meteoblue.com/es/tiempo/pronostico/meteogramone/nerpio_espa%C3%B1a_2513238'>Click for Nerpio Meteogram</a></td></tr></table><table class=tab1><tr><td><h3 style='color:yellow;' align='center'>Observatory Open Dark Time Statistics</h3><table class='tab1'><tr><th>Night<br>Open<br>Hours</th><td>Jan</td><td>Feb</td><td>Mar</td><td>Abr</td><td>May</td><td>Jun</td><td>Jul</td><td>Aug</td><td>Sep</td><td>Oct</td><td>Nov</td><td>Dec</td><th>Total<br>Hours</th><th>Open<br>Days</th></tr><tr><th>2012</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>133</td><td>133</td><td>11</td></tr><tr><th>2013</th><td>111</td><td>122</td><td>56</td><td>151</td><td>163</td><td>238</td><td>265</td><td>269</td><td>278</td><td>282</td><td>290</td><td>222</td><td>2446</td><td>278</td></tr><tr><th>2014</th><td>71</td><td>100</td><td>169</td><td>169</td><td>205</td><td>178</td><td>249</td><td>299</td><td>209</td><td>301</td><td>145</td><td>257</td><td>2354</td><td>287</td></tr><tr><th>2015</th><td>248</td><td>26</td><td>228</td><td>143</td><td>182</td><td>177</td><td>257</td><td>189</td><td>248</td><td>218</td><td>306</td><td>293</td><td>2516</td><td>301</td></tr><tr><th>2016</th><td>126</td><td>67</td><td>168</td><td>128</td><td>189</td><td>234</td><td>249</td><td>267</td><td>291</td><td>280</td><td>163</td><td>196</td><td>2359</td><td>292</td></tr><tr><th>2017</th><td>170</td><td>133</td><td>166</td><td>195</td><td>204</td><td>170</td><td>259</td><td>217</td><td>291</td><td>316</td><td>254</td><td>131</td><td>2505</td><td>292</td></tr><tr><th>2018</th><td>167</td><td>54</td><td>61</td><td>72</td><td>94</td><td>166</td><td>288</td><td>231</td><td>197</td><td>128</td><td>85</td><td>317</td><td>1860</td><td>236</td></tr><tr><th>2019</th><td>221</td><td>277</td><td>230</td><td>98</td><td>164</td><td>201</td><td>197</td><td>235</td><td>155</td><td>230</td><td>80</td><td>192</td><td>2278</td><td>279</td></tr><tr><th>2020</th><td>210</td><td>243</td><td>107</td><td>22</td><td>138</td><td>188</td><td>233</td><td>273</td><td>219</td><td>251</td><td>157</td><td>121</td><td>2163</td><td>281</td></tr><tr><th>2021</th><td>97</td><td>100</td><td>142</td><td>42</td><td>104</td><td>141</td><td>226</td><td>174</td><td>183</td><td>174</td><td>131</td><td>115</td><td>1630</td><td>230</td></tr><tr><th>2022</th><td>200</td><td>211</td><td>35</td><td>55</td><td>197</td><td>239</td><td>229</td><td>276</td><td>146</td><td>183</td><td>174</td><td>149</td><td>2092</td><td>262</td></tr><tr><th>2023</th><td>125</td><td>133</td><td>237</td><td>243</td><td>124</td><td>90</td><td>256</td><td>306</td><td>170</td><td>212</td><td>203</td><td>266</td><td>2365</td><td>277</td></tr><tr><th>2024</th><td>194</td><td>157</td><td>88</td><td>189</td><td>244</td><td>149</td><td>262</td><td>272</td><td>203</td><td>92</td><td>119</td><td>312</td><td>2281</td><td>283</td></tr><tr><th>2025</th><td>226</td><td>248</td><td>54</td><td>137</td><td>195</td><td>204</td><td>240</td><td>285</td><td>257</td><td>177</td><td>265</td><td>109</td><td>2398</td><td>279</td></tr><tr><th>2026</th><td>116</td><td>109</td><td>181</td><td>185</td><td>206</td><td>220</td><td>204</td><td>212</td><td></td><td></td><td></td><td></td><td>1434</td><td>162</td></tr></table>
+</td><td><h3 style='color:yellow;' align='center'>Astrocamp Observatory Ephemerids</h3><!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nerpio Ephemerids</title>
+<script>
+function hardRefresh() {
+  window.location.href = window.location.href.split('?')[0] + '?_=' + Date.now();
+}
+setTimeout(hardRefresh, 120000); // Refresh every 120 seconds
+</script>
+<style type="text/css">
+body {background-color:black;color:white;}
+.tab1 th { background-color:#333333;color:yellow;}
+.tab1 td { background-color:#222222;color:white;text-align: right;}
+.tab2 th { background-color:#333333;color:yellow;}
+.tab2 td { background-color:#222222;color:white;text-align: left;}
+.myTable { background-color:#cloud;border-collapse:collapse;color:black; }
+.myTable th { background-color:#FEAB4D; color:black; }
+.myTable th { padding:5px;border:1px solid #FEAB4D }
+.myTable td { padding:5px;border:1px solid color:white; }
+ a:link {
+    color: yellow;
+    background-color: transparent;
+    text-decoration: none;
+  }
+  a:visited {
+    color: orange;
+    background-color: transparent;
+    text-decoration: none;
+  }
+</style>
+</head>
+<body onload="JavaScript:timedRefresh(60000); ">
+ 
+<table class='tab1'>
+<tr><th colspan=4>MPC=I79 lon=357.6733 cos=0.78743  sin=+0.61474  name=AstroCamp, Nerpio</th></tr>
+<tr><th>Lat</th><td>38:09:56.4</td><th>Lon</th><td>-2:19:36.2</td></tr>
+<tr><th>UT</th><td>2026/8/27 22:11:01</td><th>LST</th><td>20:26:20.61</td></tr>
+<tr><th colspan=4> Current Sun ephemerids</th></tr>
+<tr><th>RA</th><td>10:27:10.81</td><th>DEC</th><td>9:41:34.6</td></tr>
+<tr><th>Alt</th><td>-34.49</td><th>Az</th><td>323.39</td></tr>
+<tr><th>Setting</th><td>2026/8/28 18:45:17</td><th>Rising</th><td>2026/8/28 05:35:10</td></tr>
+<tr><th>Civil Twilight</th><td>2026/8/28 19:14:13</td><th>Rising</th><td>2026/8/28 05:06:09</td></tr>
+<tr><th>Nautical Twilight</th><td>2026/8/28 19:46:04</td><th>Rising</th><td>2026/8/28 04:34:12</td></tr>
+<tr><th>Astronomical Twilight</th><td>2026/8/28 20:19:54</td><th>Rising</th><td>2026/8/28 04:00:12</td></tr>
+<tr><th colspan=4> Current Moon ephemerids</th></tr>
+<tr><th>RA</th><td>22:57:24.67</td><th>DEC</th><td>-6:16:49.7</td></tr>
+<tr><th>Alt</th><td>34.22</td><th>Az</th><td>147.00</td></tr>
+<tr><th>Setting</th><td>2026/8/28 05:43:45</td><th>Rising</th><td>2026/8/28 18:54:02</td></tr>
+</body>
+</html>
+</table>
+</td></tr></table><h3 style='color:yellow;'>Mains Power (Shelly 3EM)</h3><table class=tab1><tr><th>Power 3EM<th>Date time<th>Mains<th>Va<th>Vb<th>Vc<th>Ia<th>Ib<th>Ic<th>Pa<th>Pb<th>Pc<th>Total(W)</tr><tr><td>1<td>2026-08-27 22:10:16<td bgcolor=green>OK<td>227.5<td>227.5<td>227.5<td>9.50<td>9.35<td>11.92<td>1,512<td>1,882<td>270<td>3,664</tr></table></body></html>

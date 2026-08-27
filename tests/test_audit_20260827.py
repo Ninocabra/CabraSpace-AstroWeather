@@ -119,3 +119,29 @@ def test_twilight_never_extrapolates_past_its_fit():
         above = entry.sun_altitude > TWILIGHT_FIT_MAX
         assert entry.twilight_extrapolated is above
         assert entry.is_trustworthy is not above
+
+
+def test_every_month_of_the_year_produces_a_night():
+    """From October to March the product silently produced nothing at all.
+
+    night_for scanned forward from 06:00 UTC on the assumption that the Sun was
+    already up when the scan began. True in summer; false at this latitude for
+    half the year, when 06:00 is still night. The first crossing found was then
+    a SUNRISE, so the window came out with its end before its start and hours()
+    returned an empty list -- no frames, no targets, no forecast, no error.
+
+    Found by a test written against the roof model, which asked for a January
+    night and got zero expected open hours out of a climatological 5.5.
+    """
+    import datetime as dt
+
+    from astroweather.ephem import night_for
+
+    for month in range(1, 13):
+        night = night_for(dt.datetime(2026, month, 15, tzinfo=dt.timezone.utc))
+        assert night.sunset is not None and night.sunrise is not None
+        assert night.window_start < night.window_end, f"mes {month} invertido"
+        assert len(night.hours(30)) > 8, f"mes {month} sin frames"
+        # Astronomical darkness at 38 N runs from about 5 h in June to 11 h in
+        # December. Anything outside that means the crossings were mispaired.
+        assert 4.5 < night.dark_hours < 12.0, f"mes {month}: {night.dark_hours} h"
