@@ -390,9 +390,17 @@ def test_the_reported_hours_agree_with_each_other(day, climatology):
     an average night the expectation should also land on the climatological
     figure, since that is what "average" is defined to mean here.
     """
-    times, clear = _night_inputs(day, 0.548)
+    # "Average" is whatever the fitted calibrator says it is, and the test asks
+    # the module instead of carrying its own copy of the number. It used to
+    # hardcode 0.548; the fitted base rate is 0.5347, and the day that drifted
+    # this test failed for a reason that had nothing to do with roofs.
+    from astroweather.roof import _default_clear_rate
+
+    normal = _default_clear_rate()
+    times, clear = _night_inputs(day, normal)
     result = outlook(day, clear, times, climatology)
 
+    assert result.clear_rate == pytest.approx(normal, abs=1e-4)
     assert result.low_hours <= result.climatological_hours <= result.high_hours
     assert result.expected_open_hours == pytest.approx(result.climatological_hours, abs=0.15)
     assert result.night == day.date()

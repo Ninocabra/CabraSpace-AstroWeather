@@ -33,6 +33,13 @@ never produces an impossible month:
 
 So the site is open for about 53 % of the available night across the record.
 
+Validated on years the model never saw: fitting 2013-2023 and predicting the
+24 months of 2024-2025, the monthly climatology is 14.4 points of mean error
+against 18.7 for a single annual number -- a 23 % improvement. An earlier note
+claimed 26 %, which came from comparing against the MEDIAN of the monthly
+medians (0.487) instead of their mean (0.528). Both baselines are defensible
+and the one that flatters us is not the one to quote.
+
 The monthly spread is not noise to be averaged away, and it is not weather
 either. April runs from 22 hours (2020, lockdown) to 243 (2023). Whatever
 closed the dome in April 2020 will not show up in any forecast, which is
@@ -44,6 +51,7 @@ from __future__ import annotations
 
 import calendar
 import datetime as dt
+import functools
 import json
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -63,9 +71,14 @@ CLIMATOLOGY_PATH = Path(__file__).resolve().parent.parent / "data" / "roof_clima
 FIRST_FULL_YEAR, LAST_FULL_YEAR = 2013, 2025
 
 
+@functools.lru_cache(maxsize=256)
 def dark_hours(year: int, month: int, site: Site = NERPIO,
                step_minutes: int = 20) -> float:
-    """Hours in the month with the Sun below the horizon."""
+    """Hours in the month with the Sun below the horizon.
+
+    Cached: it costs a third of a second of ephemerides and depends only on the
+    year and the month, and outlook() was paying it on every single call.
+    """
     days = calendar.monthrange(year, month)[1]
     start = dt.datetime(year, month, 1, tzinfo=dt.timezone.utc)
     steps = days * 24 * 60 // step_minutes
@@ -101,7 +114,16 @@ def build_climatology(open_hours: dict, site: Site = NERPIO) -> dict:
                 continue
             available = dark_hours(y, month, site)
             if available > 0:
-                per_month[month].append(min(1.0, hours / available))
+                fraction = hours / available
+                if fraction > 1.0:
+                    # Clamping quietly is how a wrong denominator survives: the
+                    # whole point of choosing "Sun below the horizon" was that
+                    # nothing exceeds one. If something does, the denominator
+                    # changed and somebody must hear about it.
+                    raise ValueError(
+                        f"{year}-{month:02d}: {hours} h open against {available:.1f} h "
+                        f"of night is impossible; the denominator is wrong")
+                per_month[month].append(fraction)
 
     months = {}
     for month, values in per_month.items():
@@ -127,6 +149,18 @@ def load_climatology(path: Path | None = None) -> dict | None:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _default_clear_rate() -> float:
+    """The base rate of clear hours, from the fitted model if there is one."""
+    try:
+        from .calibration import Calibrator
+        model = Calibrator.load()
+        if model is not None:
+            return float(model.base_rate)
+    except Exception:
+        pass
+    return 0.548
+
+
 @dataclass
 class RoofOutlook:
     """The answer, with its two halves kept apart."""
@@ -134,6 +168,7 @@ class RoofOutlook:
     night: dt.date
     conditions_probability: float     # ours: will the sky allow it
     human_factor: float               # theirs: do they open when it allows
+    clear_rate: float                 # the yardstick "a normal night" means
     open_probability: float
     expected_open_hours: float
     climatological_hours: float
@@ -154,10 +189,14 @@ class RoofOutlook:
     @property
     def sentence(self) -> str:
         month = MONTHS_ES[self.night.month]
+        # Compared against the SAME yardstick the number was computed with. It
+        # used to compare against a hardcoded 0.548, so passing a different
+        # clear rate could make the sentence contradict the percentage it sat
+        # next to.
         return (f"techo {self.verdict} ({self.open_probability*100:.0f} %): "
                 f"en {month} aqui se abre el {self.human_factor*100:.0f} % de la "
-                f"noche por costumbre, y esta previsión está "
-                f"{'por encima' if self.conditions_probability >= 0.548 else 'por debajo'}"
+                f"noche por costumbre, y esta prevision esta "
+                f"{'por encima' if self.conditions_probability >= self.clear_rate else 'por debajo'}"
                 f" de una noche normal")
 
 
@@ -188,7 +227,12 @@ def outlook(day: dt.datetime, clear_probability: list[float],
     # So the climatology leads and the forecast modulates it: what August
     # normally manages, scaled by how much better or worse tonight looks than
     # an average August night.
-    clear_rate = measured_clear_fraction or 0.548      # calibration.py base rate
+    # `or` treats a legitimate 0.0 as missing. And the fallback is read from the
+    # fitted calibrator rather than typed here: the number written in this file
+    # had already drifted from the one in data/cloud_calibration.json.
+    if measured_clear_fraction is None:
+        measured_clear_fraction = _default_clear_rate()
+    clear_rate = float(measured_clear_fraction)
     mean_probability = float(np.mean(clear_probability)) if len(clear_probability) else 0.0
     relative = mean_probability / max(clear_rate, 0.05)
     human = float(record["median_fraction"])
@@ -198,8 +242,6 @@ def outlook(day: dt.datetime, clear_probability: list[float],
         hourly.append({"t": when.isoformat(), "label": when.strftime("%H:%M"),
                        "p_open": round(min(1.0, human * float(probability)
                                            / max(clear_rate, 0.05)), 3)})
-    span = ((times[-1] - times[0]).total_seconds() / 3600
-            if len(times) > 1 else 0.0)
     available = dark_hours(night.night.year, month, site) / calendar.monthrange(
         night.night.year, month)[1]
 
@@ -208,6 +250,7 @@ def outlook(day: dt.datetime, clear_probability: list[float],
         night=night.night.date(),
         conditions_probability=round(mean_probability, 3),
         human_factor=round(human, 3),
+        clear_rate=round(clear_rate, 4),
         open_probability=round(probability, 3),
         expected_open_hours=round(probability * available, 1),
         climatological_hours=round(record["median_fraction"] * available, 1),
