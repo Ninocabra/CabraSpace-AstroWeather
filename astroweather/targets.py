@@ -226,7 +226,10 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
                               "az": round(float(azimuths[index]), 1),
                               "yield": 0.0, "sky_mag": None,
                               "moon_sep": round(float(separations[index]), 1),
-                              "gate_ok": False, "too_low": True})
+                              "gate_ok": False, "too_low": True,
+                              "limiting": "altura",
+                              "why": f"a {altitude:.0f} grados no llega al minimo "
+                                     f"de {MIN_ALTITUDE:.0f}"})
                 continue
             airmass = 1.0 / np.sin(np.radians(altitude))
             hours += 1.0 / len(times) * (
@@ -277,12 +280,45 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
             expected += value * step * usable_probability[index]
             if value > best_value:
                 best_value, best = value, when
+            # Which of the three penalties is actually costing this hour.
+            # The recommendation is worth little if it cannot say why.
+            gate = SKY_GATE.get(target.difficulty, 20.0)
+            extinction_loss = 1 - 10 ** (-0.8 * transparency.k_total * (airmass - 1))
+            background_loss = 1 - min(1.0, 10 ** (0.4 * (sky_mag - NATURAL_FLOOR_MAG)))
+            moon_up = moon[when].altitude > 0
+            if value <= 0.0:
+                limiting = "cielo"
+                why = (f"cielo a {sky_mag:.1f}, por debajo del corte de "
+                       f"{gate:.1f} de su clase"
+                       + (f"; la Luna esta a {separations[index]:.0f} grados"
+                          if moon_up else ""))
+            # A moonless sky sitting at its own natural floor is not a
+            # "limiting factor": reporting 20 % lost on the best night of the
+            # year is true against a bare-floor reference and useless to act
+            # on. It only counts as limiting when something PUT it there.
+            elif (background_loss > extinction_loss
+                  and background_loss > (0.12 if moon_up else 0.38)):
+                limiting = "luna" if moon_up else "fondo"
+                why = (f"el fondo a {sky_mag:.1f} le quita "
+                       f"{background_loss*100:.0f} % del rendimiento"
+                       + (f", con la Luna a {separations[index]:.0f} grados"
+                          if moon_up else " (crepusculo)"))
+            elif extinction_loss > 0.12:
+                limiting = "altura"
+                why = (f"a {altitude:.0f} grados la masa de aire {airmass:.2f} "
+                       f"se lleva {extinction_loss*100:.0f} %")
+            else:
+                limiting = "ninguno"
+                why = (f"hora limpia: cielo natural {sky_mag:.1f} a "
+                       f"{altitude:.0f} grados, nada la estorba")
+
             trace.append({"alt": round(altitude, 1),
                           "az": round(float(azimuths[index]), 1),
                           "yield": round(value, 3),
                           "sky_mag": round(sky_mag, 2),
                           "moon_sep": round(float(separations[index]), 1),
-                          "gate_ok": value > 0.0, "too_low": False})
+                          "gate_ok": value > 0.0, "too_low": False,
+                          "limiting": limiting, "why": why})
 
         results.append(TargetNight(
             target=target,

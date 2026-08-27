@@ -96,6 +96,62 @@ PLANETS: dict[str, float] = {
 }
 
 
+# Where the galaxy's light actually piles up, in galactic longitude. The
+# LEVEL of the band is ours -- 0.39 mag at the plane, measured here over 50,412
+# samples -- but this SHAPE is not: it is the known morphology of the Milky Way
+# (the Sagittarius bulge, the Cygnus star clouds, the Great Rift of dust, the
+# dim anticentre). Said plainly because the two have very different standing.
+def galaxy_structure(longitude_deg, latitude_deg):
+    """Relative brightness along the band, mean normalised to about one."""
+    import numpy as _np
+    l = _np.asarray(longitude_deg, dtype=float) % 360.0
+    b = _np.asarray(latitude_deg, dtype=float)
+    delta = lambda centre: _np.abs((l - centre + 180.0) % 360.0 - 180.0)
+    value = (1.0
+             + 1.15 * _np.exp(-(delta(0) / 30.0) ** 2)      # Sagittarius bulge
+                    * _np.exp(-(b / 14.0) ** 2)
+             + 0.60 * _np.exp(-(delta(80) / 20.0) ** 2)     # Cygnus star clouds
+             + 0.30 * _np.exp(-(delta(35) / 24.0) ** 2)     # Scutum-Aquila
+             - 0.45 * _np.exp(-(delta(180) / 55.0) ** 2)    # dim anticentre
+             # The Great Rift: dust in front of the bulge, not absence of stars.
+             - 0.55 * _np.exp(-((b - 3.5) / 4.5) ** 2)
+                    * _np.exp(-(delta(40) / 48.0) ** 2))
+    return _np.clip(value, 0.15, None) / 1.18
+
+
+def milky_way_field(count: int = 2600, seed: int = 20260827) -> list[list]:
+    """A synthetic star field standing in for the galaxy's integrated light.
+
+    Drawing the Milky Way as a smooth exponential blob is honest about the
+    photometry and useless to look at, because the real thing is resolved into
+    star clouds. So the diffuse term keeps the measured brightness and this
+    supplies the texture: stars scattered with the density of the band, which
+    is what the Milky Way physically IS.
+
+    Deterministic by seed, so the same sky comes back every time.
+    """
+    rng = np.random.default_rng(seed)
+    longitudes, latitudes, weights = [], [], []
+    while len(longitudes) < count:
+        batch = count
+        l = rng.uniform(0, 360, batch)
+        # Star clouds are tighter than the photometric scale height: the band
+        # you can SEE is narrower than the light it contributes.
+        b = rng.laplace(0.0, 8.5, batch)
+        keep = np.abs(b) < 45
+        l, b = l[keep], b[keep]
+        density = galaxy_structure(l, b)
+        accepted = rng.uniform(0, density.max(), len(l)) < density
+        longitudes.extend(l[accepted]); latitudes.extend(b[accepted])
+        weights.extend(density[accepted] / density.max())
+    longitudes = np.array(longitudes[:count]); latitudes = np.array(latitudes[:count])
+    weights = np.array(weights[:count])
+    coordinates = SkyCoord(l=longitudes * u.deg, b=latitudes * u.deg,
+                           frame="galactic").icrs
+    return [[round(float(r), 2), round(float(d), 2), round(float(w), 2)]
+            for r, d, w in zip(coordinates.ra.deg, coordinates.dec.deg, weights)]
+
+
 def milky_way_bands(longitude_step: int = 4) -> list[dict]:
     """The galaxy as a stack of bands, each carrying its measured brightness.
 

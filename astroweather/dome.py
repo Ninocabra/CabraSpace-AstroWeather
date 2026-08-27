@@ -37,8 +37,16 @@ from .targets import CATALOGUE, evaluate_night
 # Typical height above the site of each cloud layer, in metres. Low cloud only
 # matters when it is close; high cloud is visible from a hundred kilometres.
 LAYER_HEIGHT_M = {"low": 1500.0, "mid": 5000.0, "high": 9000.0}
-GRID_RINGS_KM = (20, 45, 80)
+# The ladder has to reach in CLOSE, not just far. A cell 20 km away carries
+# low cloud at 4 degrees of elevation, so a ring set that starts at 20 km can
+# only ever paint low cloud onto the horizon -- and the cloud that decides a
+# night is the one directly overhead. Distances near zero are what fill the
+# top of the dome; distances far out are what fill the rim.
+GRID_RINGS_KM = (2, 5, 10, 20, 45, 90)
 GRID_AZIMUTHS = tuple(range(0, 360, 45))
+# Above this elevation a patch is treated as overhead: azimuth stops meaning
+# anything near the zenith, so it is drawn as a cap rather than a direction.
+ZENITH_CAP_DEG = 78.0
 
 
 def grid_points(site: Site = NERPIO):
@@ -72,12 +80,16 @@ def fetch_cloud_grid(site: Site = NERPIO, days: int = 2) -> tuple[list, list]:
 
 
 def project_clouds(points, payload, index: int) -> list[dict]:
-    """Turn the grid into patches on the dome for one time step."""
+    """Turn the grid into patches on the dome for one time step.
+
+    The site's own cell used to be dropped here on the grounds that a cell
+    directly overhead has no azimuth. True, and irrelevant: it has a POSITION,
+    the zenith, and dropping it left the top of the dome permanently clear no
+    matter what the forecast said.
+    """
     patches = []
     for point, cell in zip(points, payload):
         _, _, distance, azimuth = point
-        if distance == 0:
-            continue                      # overhead cell has no direction
         hourly = cell["hourly"]
         for layer, key in (("high", "cloud_cover_high"),
                            ("mid", "cloud_cover_mid"),
@@ -86,15 +98,20 @@ def project_clouds(points, payload, index: int) -> list[dict]:
             cover = series[index] if index < len(series) else None
             if not cover or cover < 5:
                 continue
-            elevation = math.degrees(math.atan2(LAYER_HEIGHT_M[layer],
-                                                distance * 1000.0))
-            # Angular size falls with distance: near cloud covers more sky.
-            span = math.degrees(math.atan2(15000.0, distance * 1000.0))
+            if distance == 0:
+                elevation, span = 90.0, 60.0      # straight up, and wide
+            else:
+                elevation = math.degrees(math.atan2(LAYER_HEIGHT_M[layer],
+                                                    distance * 1000.0))
+                # Angular size falls with distance: near cloud covers more sky.
+                span = min(60.0, math.degrees(
+                    math.atan2(15000.0, distance * 1000.0)))
             patches.append({
                 "az": azimuth, "alt": round(elevation, 1),
                 "cover": cover, "layer": layer,
-                "span": round(min(60.0, span), 1),
+                "span": round(span, 1),
                 "distance_km": distance,
+                "overhead": elevation >= ZENITH_CAP_DEG,
             })
     return patches
 

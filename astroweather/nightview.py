@@ -33,7 +33,7 @@ from .extinction import evaluate as evaluate_transparency
 from .seeing import integrate
 from .site import NERPIO, Site
 from .skymodel import predict
-from .skyobjects import (milky_way_bands, planet_positions, sidereal_degrees,
+from .skyobjects import (milky_way_field, planet_positions, sidereal_degrees,
                          visible_stars)
 from .targets import CATALOGUE, MIN_ALTITUDE, SKY_GATE, evaluate_night
 
@@ -244,7 +244,7 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
                    # modelled, so there are no seeing events to draw.
                    "note": "estimacion experimental sin calibrar; un solo valor "
                            "por noche, no se modela variacion intranoche"},
-        "milky_way": milky_way_bands(),
+        "galaxy": milky_way_field(),
         "stars": visible_stars(site),
         "planets": planet_positions(mid, site),
         "min_altitude": MIN_ALTITUDE,
