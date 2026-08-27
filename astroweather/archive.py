@@ -1,0 +1,115 @@
+"""Raw + canonical archive (SPEC v8 sections 4.1 and 5).
+
+Rule that governs this module: the raw response is never rewritten and never
+replaced by a corrected value. Everything downstream is derived and can be
+recomputed; the raw cannot.
+"""
+
+from __future__ import annotations
+
+import gzip
+import hashlib
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Iterable
+
+import pyarrow as pa
+import pyarrow.parquet as pq
+
+from .schema import SCHEMAS
+
+PIPELINE_VERSION = "0.1.0"
+
+DATA_ROOT = Path(__file__).resolve().parent.parent / "data"
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc).replace(microsecond=0)
+
+
+# --- raw --------------------------------------------------------------------
+def store_raw(
+    payload: bytes | str | dict[str, Any],
+    *,
+    source: str,
+    site_id: str,
+    retrieved_at: datetime | None = None,
+    suffix: str = "json",
+    root: Path | None = None,
+) -> Path:
+    """Persist a provider response verbatim, gzipped, and return its path.
+
+    Files are content-addressed by hash, so re-fetching the same payload does
+    not duplicate it, and an existing file is never overwritten.
+    """
+    if isinstance(payload, dict):
+        payload = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    if isinstance(payload, str):
+        payload = payload.encode("utf-8")
+
+    retrieved_at = retrieved_at or utcnow()
+    digest = hashlib.sha256(payload).hexdigest()[:16]
+    base = root or DATA_ROOT
+    directory = (
+        base
+        / "raw"
+        / f"site={site_id}"
+        / f"source={source}"
+        / f"year={retrieved_at:%Y}"
+        / f"month={retrieved_at:%m}"
+    )
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{retrieved_at:%Y%m%dT%H%M%SZ}_{digest}.{suffix}.gz"
+    if not path.exists():
+        with gzip.open(path, "wb") as handle:
+            handle.write(payload)
+    return path
+
+
+# --- canonical --------------------------------------------------------------
+def write_canonical(
+    rows: Iterable[dict[str, Any]],
+    *,
+    dataset: str,
+    site_id: str,
+    root: Path | None = None,
+) -> Path | None:
+    """Append typed rows to the partitioned Parquet dataset.
+
+    `dataset` is 'forecasts' or 'measurements'. Rows are validated against the
+    schema on the way in: a typo in a column name fails here, not silently
+    three months later when the model is trained.
+    """
+    rows = list(rows)
+    if not rows:
+        return None
+
+    schema = SCHEMAS[dataset]
+    known = set(schema.names)
+    for row in rows:
+        unknown = set(row) - known
+        if unknown:
+            raise ValueError(f"unknown columns for {dataset}: {sorted(unknown)}")
+        row.setdefault("pipeline_version", PIPELINE_VERSION)
+
+    table = pa.Table.from_pylist(
+        [{name: row.get(name) for name in schema.names} for row in rows],
+        schema=schema,
+    )
+
+    stamp = utcnow()
+    base = root or DATA_ROOT
+    time_col = "valid_utc" if dataset == "forecasts" else "t_utc"
+    first = rows[0].get(time_col) or stamp
+    directory = (
+        base
+        / dataset
+        / f"site={site_id}"
+        / f"year={first:%Y}"
+        / f"month={first:%m}"
+    )
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{stamp:%Y%m%dT%H%M%SZ}.parquet"
+    pq.write_table(table, path, compression="zstd")
+    return path

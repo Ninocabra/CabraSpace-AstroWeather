@@ -1,0 +1,25 @@
+# Datos: NUNCA al repo (van a disco/objeto, no a git)
+data/
+*.parquet
+*.nc
+*.grib
+*.grib2
+*.zip
+
+# Secretos
+.env
+.cdsapirc
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Sistema
+.DS_Store
+Thumbs.db
