@@ -56,18 +56,24 @@ def site_aod(aod_total: float | None, aod_dust: float | None, delta_h: float) ->
     return aod_dust + max(0.0, aod_total - aod_dust) * factor
 
 
-def fetch_air_quality(site: Site, *, days: int = 5) -> dict[str, Any]:
-    response = requests.get(
-        AIR_QUALITY_URL,
-        params={
-            "latitude": site.latitude,
-            "longitude": site.longitude,
-            "hourly": "aerosol_optical_depth,dust,pm10,pm2_5",
-            "timezone": "UTC",
-            "forecast_days": days,
-        },
-        timeout=60,
-    )
+def fetch_air_quality(site: Site, *, days: int = 5,
+                      start: str | None = None, end: str | None = None) -> dict[str, Any]:
+    """Forecast by default; a date range when backfilling history.
+
+    The same endpoint serves the past, which is what lets the aerosol series be
+    reconstructed as far back as the photometer archive goes.
+    """
+    params = {
+        "latitude": site.latitude,
+        "longitude": site.longitude,
+        "hourly": "aerosol_optical_depth,dust,pm10,pm2_5",
+        "timezone": "UTC",
+    }
+    if start and end:
+        params.update({"start_date": start, "end_date": end})
+    else:
+        params["forecast_days"] = days
+    response = requests.get(AIR_QUALITY_URL, params=params, timeout=90)
     response.raise_for_status()
     return response.json()
 

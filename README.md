@@ -56,6 +56,11 @@ empieza antes que ninguna otra cosa.
 - [x] **Rodaja 3: Lluvia + viento + techo** (`gates.py`, `tonight.py`) → **MVP
       OPERACIONAL COMPLETO**: `python -m astroweather.tonight` responde de punta
       a punta "¿podre observar esta noche, con seguridad, y cuando?".
+- [x] **Rodaja 4: Calima + transparencia** (`extinction.py`) — k por altitud y
+      especies, dependencia con la longitud de onda, penalizacion de exposicion,
+      y 22.512 horas de AOD historico. Validado contra el fotometro: **mas
+      aerosol = cielo mas OSCURO** aqui (lo contrario de la intuicion urbana).
+- [ ] Rodajas 5-6: fondo de cielo y seeing → **MVP recomendador**
 - [ ] Lienzo nocturno (mockup SVG antes que backend)
 
 ## Recogida automatica
