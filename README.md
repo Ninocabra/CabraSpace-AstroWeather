@@ -70,6 +70,10 @@ empieza antes que ninguna otra cosa.
       nunca en arcosegundos**: el modelo predijo 1.21" donde se midieron 3.16",
       y esa diferencia es casi toda instrumental — calibrar A ahora ajustaria
       el telescopio, no el cielo.
+- [x] **Motor de horas-SNR por target** (`targets.py`) → **MVP RECOMENDADOR**.
+      Responde "que fotografiar y cuanto cundira", con dos numeros por objeto
+      (si despeja / esperadas) y su motivo. Verificado: en luna llena recomienda
+      banda estrecha y descarta banda ancha; en luna nueva se invierte.
 - [ ] Lienzo nocturno (mockup SVG antes que backend)
 
 ## Recogida automatica
