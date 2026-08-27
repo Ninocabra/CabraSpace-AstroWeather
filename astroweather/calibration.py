@@ -47,11 +47,35 @@ from .queries import DATA_ROOT, connect
 from .skymodel import predict
 
 # Residual scatter within an hour below which the sky tracked the clear-sky
-# model. Chosen against the site's own climatology: it yields 64 % clear hours
-# where the dome-open record gives ~57 %, and dome-open is a lower bound
-# because nobody observes every clear night.
+# model.
+#
+# This constant used to cite a validation against the observatory's dome-open
+# record ("64 % here against ~57 % there"). That justification has been removed
+# because it could not be reproduced: roof_open is populated in 42 of 3,666,893
+# measurement rows, and nights.any_roof_open is empty, so no such comparison is
+# available from this archive. The column exists and the query returns a number
+# -- which is exactly the failure mode this project keeps meeting, and the
+# reason verification.baselines() reports persistence over zero nights.
+#
+# What the value IS defensible on: it is the within-hour scatter of a sky that
+# tracks the model, and the level test below is what carries the rest.
 CLEAR_SCATTER_THRESHOLD = 0.10
 MIN_SAMPLES_PER_HOUR = 4
+
+# Scatter alone is NOT enough, and this was a real hole in the truth chain
+# (external audit, 2026-08-27). A flat, homogeneous stratus deck holds the
+# photometer at a CONSTANT reading for a whole hour, so its scatter is tiny and
+# the hour was being filed as clear. Measured over 4,690 stable hours, 22 % sat
+# more than 0.4 mag off the clear-sky model -- and 97 % of those were DARKER,
+# not brighter. That direction is the signature of this site: with no city
+# below, cloud does not reflect light pollution back at us, it swallows the
+# airglow. So the hour must also sit at the right LEVEL, not just be steady.
+#
+# Both numbers come from the archive, not from taste: the stable-hour residuals
+# have a robust centre of -0.04 mag (the clear-sky model's own bias) and a
+# spread of 0.268 mag, and the cut is placed at three of those sigmas.
+CLEAR_LEVEL_CENTRE = -0.04
+CLEAR_LEVEL_TOLERANCE = 0.80
 MODEL_PATH = DATA_ROOT / "cloud_calibration.json"
 
 
@@ -116,7 +140,9 @@ def observed_clear_hours(since: str = "2024-02-01", root=None) -> dict[dt.dateti
             by_hour[key].append(measured - clear_sky.predicted_mag)
 
     return {
-        hour: float(np.std(values)) < CLEAR_SCATTER_THRESHOLD
+        hour: (float(np.std(values)) < CLEAR_SCATTER_THRESHOLD
+               and abs(float(np.mean(values)) - CLEAR_LEVEL_CENTRE)
+               < CLEAR_LEVEL_TOLERANCE)
         for hour, values in by_hour.items()
         if len(values) >= MIN_SAMPLES_PER_HOUR
     }

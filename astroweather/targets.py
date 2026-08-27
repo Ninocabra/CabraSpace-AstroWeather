@@ -51,6 +51,20 @@ K_REFERENCE = 0.18
 # Below this altitude nothing is worth starting; extinction and differential
 # refraction grow faster than the target rises.
 MIN_ALTITUDE = 25.0
+# Width of the transition around each class gate, and the most a good seeing
+# night is allowed to be worth. Both exist because an uncalibrated model must
+# not be able to produce a spectacular number (see hourly_yield).
+GATE_SHOULDER_MAG = 0.4
+MAX_SHARPNESS_GAIN = 2.0
+
+
+def _shoulder(value: float, centre: float, width: float) -> float:
+    """Smooth 0->1 ramp across `width`, reaching 0.5 exactly at `centre`."""
+    if width <= 0:
+        return 1.0 if value >= centre else 0.0
+    t = (value - (centre - width / 2)) / width
+    t = max(0.0, min(1.0, t))
+    return t * t * (3 - 2 * t)          # smoothstep: flat at both ends
 
 # Sky brightness each class of target NEEDS, in mag/arcsec^2 at its position.
 # The continuous yield alone is not enough: it would happily offer four tenths
@@ -160,7 +174,14 @@ def hourly_yield(*, airmass: float, sky_mag: float, seeing_arcsec: float,
     """
     if airmass is None or airmass <= 0:
         return 0.0
-    if sky_mag < SKY_GATE.get(difficulty, 20.0):
+    gate = SKY_GATE.get(difficulty, 20.0)
+    # The gate used to be a step, and a step is a lie: an hour at 21.28 scored
+    # zero while 21.30 scored 0.685 (external audit, 2026-08-27). Signal-to-
+    # noise degrades smoothly, so the gate becomes a shoulder and keeps its
+    # meaning at the 50 % point. The width is the scale of the yield function
+    # itself: 0.4 mag is a factor 1.45 in background flux.
+    admissible = _shoulder(sky_mag, gate, GATE_SHOULDER_MAG)
+    if admissible <= 0.0:
         return 0.0
     extinction = 10 ** (-0.8 * k_total * (airmass - 1.0))
     background = min(1.0, 10 ** (0.4 * (sky_mag - NATURAL_FLOOR_MAG)))
@@ -168,7 +189,8 @@ def hourly_yield(*, airmass: float, sky_mag: float, seeing_arcsec: float,
         sharpness = (FWHM_REFERENCE / max(seeing_arcsec, 0.3)) ** (2 * alpha)
     else:
         sharpness = 1.0                 # extended targets do not care about blur
-    return float(extinction * background * min(sharpness, 4.0))
+    return float(extinction * background * admissible
+                 * min(sharpness, MAX_SHARPNESS_GAIN))
 
 
 def evaluate_night(targets: list[Target], times: list[dt.datetime],
@@ -218,13 +240,23 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
                 target_altitude_deg=altitude,
                 extinction_k=transparency.k_total,
             )
-            # Narrowband sees only a sliver of the lunar continuum.
-            moon_factor = MOON_FILTER_FACTOR.get(target.difficulty, 1.0)
+            # The filter cuts EVERYTHING outside its passband, not just the
+            # Moon: twilight, airglow and zodiacal light are broadband too.
+            # Attenuating only the lunar term (as this did until the audit of
+            # 2026-08-27) left narrowband facing an unfiltered sky and zeroed
+            # it through both twilights -- backwards, since twilight narrowband
+            # is precisely what the technique is good at.
+            filter_factor = MOON_FILTER_FACTOR.get(target.difficulty, 1.0)
             flux = max(mag_to_nl(floors[when]) - zenith_moon.physical_nl, 1e-6)
-            flux += target_moon.physical_nl * moon_factor
-            sky_mag = nl_to_mag(flux)
+            flux += target_moon.physical_nl
+            sky_mag = nl_to_mag(flux * filter_factor)
 
-            seeing = (turbulence.at_airmass(airmass) if turbulence
+            # The seeing model is uncalibrated and known to run OPTIMISTIC
+            # (1.21 predicted where 3.16 was measured), so the yield is taken
+            # from the pessimistic edge of the published band, never from the
+            # point value. Using the loose number contradicted our own rule of
+            # publishing terciles, and swung compact targets by a factor 3.7.
+            seeing = ((turbulence.range_arcsec[1] * airmass ** 0.6) if turbulence
                       else FWHM_REFERENCE * airmass ** 0.6)
             value = hourly_yield(airmass=airmass, sky_mag=sky_mag,
                                  seeing_arcsec=seeing,

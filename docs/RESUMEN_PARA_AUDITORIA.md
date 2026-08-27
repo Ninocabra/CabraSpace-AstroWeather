@@ -3,7 +3,7 @@
 Sistema de predicción y recomendación para observación de cielo profundo en
 AstroCamp (Nerpio, Albacete; 38.16583 N, −2.32672 W, 1650 m, código MPC I79).
 Especificación vigente en `SPEC.md` (v8, auditada por ChatGPT ×2 y Gemini ×1
-antes de escribir código). **17 commits, 128 tests en verde.**
+antes de escribir código). **19 commits, 139 tests en verde.**
 
 Este documento resume el ESTADO REAL, incluidos los límites. Para auditar el
 diseño está `SPEC.md`; esto es lo que de verdad corre.
@@ -103,9 +103,15 @@ propios.
   mayor parte del hueco es instrumental (el FWHM lleva foco, óptica, guiado,
   montura). **A NO se ajusta**: hacerlo calibraría el telescopio, no el cielo.
   Se publica en terciles con banda, nunca un número suelto.
-- **Calibración probabilística débil.** BSS +3-6 %. La probabilidad está bien
-  calibrada (dice 71 %, ocurre 70.7 %) pero discrimina poco. La mejora vendrá
-  del EPS y del nowcast local, no de más ajuste.
+- **Calibración probabilística débil.** BSS **+3.9 %** tras limpiar la verdad
+  (era +4.6 % con la verdad envenenada: publicábamos más pericia de la que
+  había). La probabilidad sigue bien calibrada (promete 0.64, ocurre 0.641)
+  pero discrimina poco. La mejora vendrá del EPS y del nowcast local.
+- **La tasa base cayó de 64.1 % a 54.8 %** al limpiar la verdad, y no tenemos
+  con qué contrastarla: `roof_open` tiene dato en 42 de 3.666.893 filas.
+- **No hay término galáctico.** La Vía Láctea por el cenit mueve el fondo tanto
+  como la luz zodiacal, que sí modelamos. Es medible con el mismo método del
+  residuo y está pendiente.
 - **Miembros EPS**: solo desde ayer (caducan en ~4 días upstream). La
   calibración probabilística del ensemble tendrá que crecer con el archivo.
 - **Bandas fotométricas**: el 21.71 es banda TESS, no V. Sin calibración de
@@ -144,6 +150,19 @@ Se listan porque dicen más del método que los aciertos:
    cruce forecast↔verdad daba 0 pares en silencio.
 10. `np.allclose` con atol por defecto de 1e-8 declara **idénticos todos los
     Cn²** (valen ~1e-17).
+11. La verdad terreno marcaba despejada cualquier hora **estable**, sin mirar el
+    nivel: un estrato homogéneo tiene dispersión casi nula. **22 % del conjunto
+    de entrenamiento era basura**, y el 97 % de esa basura era más OSCURA, no
+    más brillante — aquí no hay ciudad debajo que la nube refleje.
+12. El filtro de banda estrecha se aplicaba **solo a la Luna**, no al fondo:
+    anulaba el narrowband en todo el crepúsculo, que es justo donde funciona.
+13. Los cortes por clase eran un **escalón**: 0.000 a 0.685 en 0.02 mag.
+14. El rendimiento de compactos leía el **valor puntual** del seeing, un modelo
+    sin calibrar y sesgado optimista, contra nuestra propia regla de publicar
+    terciles. La Cruz de Einstein valía 16.2 h; vale 8.6 h.
+15. El umbral de dispersión citaba una validación contra el registro de techo
+    **que el archivo no contiene**. La columna existe, la consulta corre, el
+    número sale, y no significa nada.
 
 ---
 
