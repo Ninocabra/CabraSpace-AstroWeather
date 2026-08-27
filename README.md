@@ -46,10 +46,13 @@ empieza antes que ninguna otra cosa.
       efemerides precisas y el modelo lunar de Krisciunas & Schaefer con sus tres
       trampas resueltas (Luna bajo el horizonte, separaciones < 10 grados, y el
       acoplamiento con la extincion: con calima la Luna molesta MAS).
-- [~] **Rodaja 2: Nubes** — hecho el modelo de cielo despejado (`skymodel.py`) y con
-      el la deteccion de nubes historica sobre los 7 anos del TESS (el residuo
-      medido-modelado, que la Luna enmascaraba). Pendiente: P_raw -> P_calibrada
-      y las capas de nube relativas al sitio.
+- [x] **Rodaja 2: Nubes** — modelo de cielo despejado (`skymodel.py`), deteccion de
+      nubes historica sobre los 7 anos del TESS, y calibrador de probabilidad
+      (`calibration.py`) entrenado con 33.924 pares de 2,6 anos.
+      **Resultado honesto: bate a la climatologia solo un 3-6 % (BSS), aunque la
+      probabilidad esta bien calibrada** (cuando dice 71 %, ocurre el 70,7 %).
+      El forecast determinista discrimina poco en este sitio; la mejora vendra
+      del EPS y del nowcast local, no de mas ajuste.
 - [ ] Rodaja 3: Lluvia + viento + techo  → cierra el **MVP operacional**
 - [ ] Lienzo nocturno (mockup SVG antes que backend)
 

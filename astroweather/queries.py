@@ -26,6 +26,9 @@ def connect(root: Path | None = None) -> duckdb.DuckDBPyConnection:
     """Open a connection with deduplicated views over the Parquet archive."""
     base = (root or DATA_ROOT).as_posix()
     connection = duckdb.connect()
+    # Everything in the archive is UTC; without this DuckDB hands rows back in
+    # the machine's local zone and joins between tables silently miss by hours.
+    connection.execute("SET TimeZone = 'UTC'")
 
     connection.execute(f"""
         CREATE VIEW measurements AS
