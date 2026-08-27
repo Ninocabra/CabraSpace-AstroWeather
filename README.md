@@ -40,6 +40,26 @@ empieza antes que ninguna otra cosa.
 - [x] Pipeline FWHM (`fwhm_pipeline.py`) — sobre los FITS reales de `E:\ASTRO Sin Procesar\Observatorio Nerpio`
 - [ ] Pendientes de terceros: credenciales BDRC (opcional)
 
+## Recogida automatica
+
+Hay datos que **caducan**: los 51 miembros del EPS viven ~4 dias en el proveedor
+y `cloud.html` solo publica el instante actual. El scheduler los recoge solo:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\install_scheduler.ps1 -Startup
+```
+
+Arranca al iniciar sesion (sin permisos de administrador) y escribe en
+`data/scheduler.log`. Cadencias: sensores cada 5 min - EPS 2x/dia - forecast
+cada 6 h - aerosol, AEMET y TESS 1x/dia - verificacion cada manana.
+Mientras corra en este PC solo recoge dato con el equipo encendido; el VPS de
+la fase 1 lo convierte en 24/7.
+
+```bash
+python -m astroweather.scheduler --once     # todo una vez (prueba o puesta al dia)
+python -m astroweather.scheduler            # en primer plano, para ver que hace
+```
+
 ## Uso
 
 ```bash
