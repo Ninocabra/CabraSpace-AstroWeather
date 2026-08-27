@@ -37,7 +37,7 @@ empieza antes que ninguna otra cosa.
 - [x] Panel de verificación (`verification.py`) — Brier de nubes, sesgo/MAE de T, baselines
 - [x] AEMET verificada (clave en `.env`): sin histórico horario; estación 7067Y a 11,5 km y 1485 m
 - [x] Credenciales ADS (CAMS) en `.env`
-- [ ] **Pipeline FWHM: bloqueado — hacen falta FITS de sesiones reales de AstroCamp**
+- [x] Pipeline FWHM (`fwhm_pipeline.py`) — sobre los FITS reales de `E:\ASTRO Sin Procesar\Observatorio Nerpio`
 - [ ] Pendientes de terceros: credenciales BDRC (opcional)
 
 ## Uso
@@ -52,6 +52,7 @@ python -m astroweather.workers.scrape_astrocamp           # sensores del sitio (
 python -m astroweather.workers.fetch_aerosol --dust       # AOD total + calima de CAMS
 python -m astroweather.workers.backfill_history --start 2024-01-01
 python -m astroweather.verification                       # el panel
+python -m astroweather.workers.fwhm_pipeline "E:\ASTRO Sin Procesar\Observatorio Nerpio\Imagenes\M826-01-11\LIGHT"
 python -m pytest tests/ -q
 ```
 
