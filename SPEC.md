@@ -209,9 +209,19 @@ POST https://tess.dashboards.stars4all.eu/api/tsdb/query   {datasourceId:2, Infl
 # 12) RainViewer: SOLO radar observado (nowcast discontinuado 1-1-2026, verificado: 0 frames).
 #    Licencia superviviente personal/educativa — revisar antes de uso comercial. Nowcast propio
 #    por advección/optical-flow es tarea nuestra (Fase 3).
-# 13) CelesTrak TLEs; 14) OpenNGC (SurfBr: SOLO galaxias, banda B); 15) AEMET OpenData (clave
-#    gratuita; observación = tiempo RECIENTE, sin archivo horario largo — verificar con clave si
-#    existe producto histórico; NO prometer MOS de superficie sobre AEMET histórico).
+# 13) CelesTrak TLEs; 14) OpenNGC (SurfBr: SOLO galaxias, banda B).
+# 15) AEMET OpenData — VERIFICADO con clave 27-08-2026 (clave caduca 2026-12-05, avisar el 21-11):
+#    · `/observacion/convencional/todas` → horario pero SOLO últimas ~12 h (9776 registros,
+#      variables ta/hr/tpr/pres/prec/vv/dv). NO hay archivo horario histórico → confirmada la
+#      objeción de auditoría: el MOS horario NO se apoya en AEMET (se apoya en TESS, 2019→).
+#    · `/valores/climatologicos/diarios/datos/fechaini/{ISO}UTC/fechafin/{ISO}UTC/estacion/{id}`
+#      → histórico DIARIO sí (probado marzo-2024): tmed/tmin/tmax/hrMedia/prec + horas de extremos.
+#      Sirve para climatología y validación diaria, no para MOS horario.
+#    · **Estación de oro: 7067Y "Cañadas del Nerpio", a 11,5 km y 1485 m** (cota casi idéntica a
+#      AstroCamp) — la referencia externa natural del sitio. Otras: 7072Y Sege (14,6 km, 960 m),
+#      7066Y Embalse de la Fuensanta (27 km), 7080X Benizar (32 km).
+#    · Flujo en 2 pasos: la primera llamada devuelve {"datos": url} temporal; la segunda trae el
+#      JSON (encoding latin-1). Clave en `.env` (nunca al repo).
 # 16) Atlas Falchi (CC BY-NC) / atlas Lorenz (LICENCIA COMERCIAL NO CONFIRMADA — solo benchmark
 #    hasta tener permiso escrito) / DarkSkySites (endpoint sin contrato — solo benchmark).
 # 17) ESO Ambient Database (Paranal DIMM): banco externo para validar el estimador HV.
@@ -272,7 +282,9 @@ PROVEEDORES → RAW ARCHIVE → NORMALIZACIÓN → QC → MODELOS FÍSICOS → C
 
 ## 6.1 Fase 0 — instrumentación (semana 1, antes de cualquier frontend)
 
-1. Esquema §4.1 versionado + raw archive. 2. Workers base con invariantes §3.2 (**miembros EPS desde la primera ejecución**). 3. Backfill determinista (Previous Runs). 4. `fetch_tess` (histórico ~7 años → Parquet) + scraper cloud.html. 5. **Pipeline FWHM** (FITS → estrellas → FWHM robusta + excentricidad → plate-solve → cenit/λ → QC → Parquet, con `setup_id`) — cada noche sin él es irrecuperable. 6. Panel de verificación mínimo. 7. Verificaciones pendientes con clave/registro: AEMET histórico, credenciales BDRC, campo exacto del CloudWatcher en cloud.html, semántica de capas de nubes por proveedor contra allsky.
+1. ✅ Esquema §4.1 versionado + raw archive. 2. ✅ Workers base con invariantes §3.2: `fetch_ensemble` (**miembros EPS desde la primera ejecución**) y `fetch_forecast` (híbrido 9 km + perfiles 4 modelos). 3. Backfill determinista (Previous Runs). 4. `fetch_tess` (histórico ~7 años → Parquet) + scraper cloud.html. 5. **Pipeline FWHM** (FITS → estrellas → FWHM robusta + excentricidad → plate-solve → cenit/λ → QC → Parquet, con `setup_id`) — cada noche sin él es irrecuperable. 6. Panel de verificación mínimo. 7. Verificaciones pendientes: ✅ AEMET (hecha: sin histórico horario, con estación 7067Y a 11,5 km), credenciales BDRC, campo exacto del CloudWatcher en cloud.html, semántica de capas de nubes por proveedor contra allsky.
+
+**Deuda con fecha: la clave de AEMET caduca el 2026-12-05** — regenerar en opendata.aemet.es y avisar a Nino el **2026-11-21**.
 
 ## 6.2 Rodajas (cada una con ficha de fuente + backup probado apagando la primaria + lane visual + enchufe al aprendizaje + tests; DoD: pintado con datos reales + backup demostrado + verificación en el panel)
 

@@ -26,17 +26,20 @@ empieza antes que ninguna otra cosa.
 - [x] Archivo raw inmutable + Parquet particionado (`astroweather/archive.py`)
 - [x] Invariantes de ingesta + tests (`astroweather/invariants.py`, `tests/`)
 - [x] Worker del EPS, archivando los 51 miembros (`astroweather/workers/fetch_ensemble.py`)
-- [ ] Workers: forecast híbrido (9 km + 0.25°), air quality, TESS, scraper de cloud.html
+- [x] Worker de forecast híbrido: 9 km (superficie+nubes+BLH) + perfiles de 4 modelos (`fetch_forecast.py`)
+- [ ] Workers: air quality, TESS, scraper de cloud.html
 - [ ] Backfill determinista (Previous Runs)
 - [ ] Pipeline FWHM (FITS → estrellas → FWHM + excentricidad → cenit/λ → Parquet)
 - [ ] Panel de verificación mínimo
-- [ ] Pendientes de terceros: clave AEMET, credenciales BDRC, campo exacto del CloudWatcher
+- [x] AEMET verificada (clave en `.env`): sin histórico horario; estación 7067Y a 11,5 km y 1485 m
+- [ ] Pendientes de terceros: credenciales BDRC, campo exacto del CloudWatcher
 
 ## Uso
 
 ```bash
 pip install pyarrow duckdb requests pytest
-python -m astroweather.workers.fetch_ensemble --days 7   # archiva los miembros de hoy
+python -m astroweather.workers.fetch_ensemble --days 7   # archiva los 51 miembros de hoy
+python -m astroweather.workers.fetch_forecast --days 7   # hibrido: 9 km + perfiles 4 modelos
 python -m pytest tests/ -q
 ```
 
@@ -63,3 +66,8 @@ duckdb.sql("""
   que decimales falsos.
 - **Ficha de fuente obligatoria** antes de integrar cualquier fuente nueva: qué significa
   el dato, retención, resolución nativa, licencia, SLA — verificado con llamada real.
+
+## Secretos y caducidades
+
+`.env` (fuera del repo) guarda las claves. **La clave de AEMET caduca el 2026-12-05**;
+regenerar en opendata.aemet.es. Aviso a Nino: **2026-11-21**.

@@ -110,6 +110,16 @@ def write_canonical(
         / f"month={first:%m}"
     )
     directory.mkdir(parents=True, exist_ok=True)
-    path = directory / f"{stamp:%Y%m%dT%H%M%SZ}.parquet"
+    # The name must be unique even for two writes within the same second
+    # (surface and profile workers run back to back): without the content
+    # digest the second write silently overwrote the first.
+    digest = hashlib.sha256(
+        f"{sorted(r.get('model') for r in rows)}{len(rows)}".encode()
+    ).hexdigest()[:8]
+    path = directory / f"{stamp:%Y%m%dT%H%M%SZ}_{digest}.parquet"
+    counter = 0
+    while path.exists():
+        counter += 1
+        path = directory / f"{stamp:%Y%m%dT%H%M%SZ}_{digest}_{counter}.parquet"
     pq.write_table(table, path, compression="zstd")
     return path
