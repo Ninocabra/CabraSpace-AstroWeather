@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="520" viewBox="0 0 1100 520" font-family="system-ui,sans-serif">
+<defs>
+<pattern id="blocked" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="rgba(190,60,60,0.20)"/><line x1="0" y1="0" x2="0" y2="8" stroke="rgba(255,120,120,0.55)" stroke-width="3"/></pattern>
+<pattern id="uncertain" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1.1" fill="rgba(255,255,255,0.30)"/></pattern>
+</defs>
+<rect width="1100" height="520" fill="#0a0c17"/>
+<rect x="28.3" y="70" width="84.3" height="360" fill="rgb(78,88,120)"/>
+<rect x="111.7" y="70" width="84.3" height="360" fill="rgb(78,88,120)"/>
+<rect x="195.0" y="70" width="84.3" height="360" fill="rgb(40,46,71)"/>
+<rect x="278.3" y="70" width="84.3" height="360" fill="rgb(13,15,34)"/>
+<rect x="361.7" y="70" width="84.3" height="360" fill="rgb(13,15,34)"/>
+<rect x="445.0" y="70" width="84.3" height="360" fill="rgb(13,15,34)"/>
+<rect x="528.3" y="70" width="84.3" height="360" fill="rgb(13,15,35)"/>
+<rect x="611.7" y="70" width="84.3" height="360" fill="rgb(13,16,35)"/>
+<rect x="695.0" y="70" width="84.3" height="360" fill="rgb(14,16,35)"/>
+<rect x="778.3" y="70" width="84.3" height="360" fill="rgb(14,17,36)"/>
+<rect x="861.7" y="70" width="84.3" height="360" fill="rgb(14,17,36)"/>
+<rect x="945.0" y="70" width="84.3" height="360" fill="rgb(15,18,37)"/>
+<rect x="1028.3" y="70" width="84.3" height="360" fill="rgb(78,88,120)"/>
+<text x="62" y="105.0" text-anchor="end" font-size="11" fill="#6d7688">alta</text>
+<rect x="28.3" y="78" width="84.3" height="46" fill="#dfe4ee" opacity="0.38"/>
+<rect x="28.3" y="78" width="84.3" height="46" fill="url(#uncertain)" opacity="0.25"/>
+<rect x="111.7" y="78" width="84.3" height="46" fill="#dfe4ee" opacity="0.40"/>
+<rect x="111.7" y="78" width="84.3" height="46" fill="url(#uncertain)" opacity="0.27"/>
+<rect x="195.0" y="78" width="84.3" height="46" fill="#dfe4ee" opacity="0.36"/>
+<rect x="195.0" y="78" width="84.3" height="46" fill="url(#uncertain)" opacity="0.22"/>
+<rect x="278.3" y="78" width="84.3" height="46" fill="#dfe4ee" opacity="0.34"/>
+<rect x="278.3" y="78" width="84.3" height="46" fill="url(#uncertain)" opacity="0.20"/>
+<rect x="361.7" y="78" width="84.3" height="46" fill="#dfe4ee" opacity="0.32"/>
+<rect x="361.7" y="78" width="84.3" height="46" fill="url(#uncertain)" opacity="0.18"/>
+<rect x="445.0" y="78" width="84.3" height="46" fill="#dfe4ee" opacity="0.38"/>
+<rect x="445.0" y="78" width="84.3" height="46" fill="url(#uncertain)" opacity="0.25"/>
+<rect x="528.3" y="78" width="84.3" height="46" fill="#dfe4ee" opacity="0.40"/>
+<rect x="528.3" y="78" width="84.3" height="46" fill="url(#uncertain)" opacity="0.27"/>
+<rect x="611.7" y="78" width="84.3" height="46" fill="#dfe4ee" opacity="0.34"/>
+<rect x="611.7" y="78" width="84.3" height="46" fill="url(#uncertain)" opacity="0.20"/>
+<rect x="695.0" y="78" width="84.3" height="46" fill="#dfe4ee" opacity="0.29"/>
+<rect x="695.0" y="78" width="84.3" height="46" fill="url(#uncertain)" opacity="0.16"/>
+<rect x="778.3" y="78" width="84.3" height="46" fill="#dfe4ee" opacity="0.36"/>
+<rect x="778.3" y="78" width="84.3" height="46" fill="url(#uncertain)" opacity="0.22"/>
+<rect x="861.7" y="78" width="84.3" height="46" fill="#dfe4ee" opacity="0.32"/>
+<rect x="861.7" y="78" width="84.3" height="46" fill="url(#uncertain)" opacity="0.18"/>
+<rect x="945.0" y="78" width="84.3" height="46" fill="#dfe4ee" opacity="0.38"/>
+<rect x="945.0" y="78" width="84.3" height="46" fill="url(#uncertain)" opacity="0.25"/>
+<rect x="1028.3" y="78" width="84.3" height="46" fill="#dfe4ee" opacity="0.40"/>
+<rect x="1028.3" y="78" width="84.3" height="46" fill="url(#uncertain)" opacity="0.27"/>
+<text x="62" y="159.0" text-anchor="end" font-size="11" fill="#6d7688">media</text>
+<rect x="28.3" y="132" width="84.3" height="46" fill="#b9c2d2" opacity="0.25"/>
+<rect x="28.3" y="132" width="84.3" height="46" fill="url(#uncertain)" opacity="0.11"/>
+<rect x="111.7" y="132" width="84.3" height="46" fill="#b9c2d2" opacity="0.27"/>
+<rect x="111.7" y="132" width="84.3" height="46" fill="url(#uncertain)" opacity="0.13"/>
+<rect x="195.0" y="132" width="84.3" height="46" fill="#b9c2d2" opacity="0.29"/>
+<rect x="195.0" y="132" width="84.3" height="46" fill="url(#uncertain)" opacity="0.16"/>
+<rect x="278.3" y="132" width="84.3" height="46" fill="#b9c2d2" opacity="0.32"/>
+<rect x="278.3" y="132" width="84.3" height="46" fill="url(#uncertain)" opacity="0.18"/>
+<rect x="361.7" y="132" width="84.3" height="46" fill="#b9c2d2" opacity="0.34"/>
+<rect x="361.7" y="132" width="84.3" height="46" fill="url(#uncertain)" opacity="0.20"/>
+<rect x="445.0" y="132" width="84.3" height="46" fill="#b9c2d2" opacity="0.29"/>
+<rect x="445.0" y="132" width="84.3" height="46" fill="url(#uncertain)" opacity="0.16"/>
+<rect x="528.3" y="132" width="84.3" height="46" fill="#b9c2d2" opacity="0.27"/>
+<rect x="528.3" y="132" width="84.3" height="46" fill="url(#uncertain)" opacity="0.13"/>
+<rect x="611.7" y="132" width="84.3" height="46" fill="#b9c2d2" opacity="0.25"/>
+<rect x="611.7" y="132" width="84.3" height="46" fill="url(#uncertain)" opacity="0.11"/>
+<rect x="695.0" y="132" width="84.3" height="46" fill="#b9c2d2" opacity="0.27"/>
+<rect x="695.0" y="132" width="84.3" height="46" fill="url(#uncertain)" opacity="0.13"/>
+<rect x="778.3" y="132" width="84.3" height="46" fill="#b9c2d2" opacity="0.32"/>
+<rect x="778.3" y="132" width="84.3" height="46" fill="url(#uncertain)" opacity="0.18"/>
+<rect x="861.7" y="132" width="84.3" height="46" fill="#b9c2d2" opacity="0.29"/>
+<rect x="861.7" y="132" width="84.3" height="46" fill="url(#uncertain)" opacity="0.16"/>
+<rect x="945.0" y="132" width="84.3" height="46" fill="#b9c2d2" opacity="0.25"/>
+<rect x="945.0" y="132" width="84.3" height="46" fill="url(#uncertain)" opacity="0.11"/>
+<rect x="1028.3" y="132" width="84.3" height="46" fill="#b9c2d2" opacity="0.23"/>
+<rect x="1028.3" y="132" width="84.3" height="46" fill="url(#uncertain)" opacity="0.09"/>
+<text x="62" y="213.0" text-anchor="end" font-size="11" fill="#6d7688">baja</text>
+<rect x="28.3" y="186" width="84.3" height="46" fill="#8b95a8" opacity="0.19"/>
+<rect x="28.3" y="186" width="84.3" height="46" fill="url(#uncertain)" opacity="0.04"/>
+<rect x="111.7" y="186" width="84.3" height="46" fill="#8b95a8" opacity="0.21"/>
+<rect x="111.7" y="186" width="84.3" height="46" fill="url(#uncertain)" opacity="0.07"/>
+<rect x="195.0" y="186" width="84.3" height="46" fill="#8b95a8" opacity="0.25"/>
+<rect x="195.0" y="186" width="84.3" height="46" fill="url(#uncertain)" opacity="0.11"/>
+<rect x="278.3" y="186" width="84.3" height="46" fill="#8b95a8" opacity="0.23"/>
+<rect x="278.3" y="186" width="84.3" height="46" fill="url(#uncertain)" opacity="0.09"/>
+<rect x="361.7" y="186" width="84.3" height="46" fill="#8b95a8" opacity="0.29"/>
+<rect x="361.7" y="186" width="84.3" height="46" fill="url(#uncertain)" opacity="0.16"/>
+<rect x="445.0" y="186" width="84.3" height="46" fill="#8b95a8" opacity="0.27"/>
+<rect x="445.0" y="186" width="84.3" height="46" fill="url(#uncertain)" opacity="0.13"/>
+<rect x="528.3" y="186" width="84.3" height="46" fill="#8b95a8" opacity="0.23"/>
+<rect x="528.3" y="186" width="84.3" height="46" fill="url(#uncertain)" opacity="0.09"/>
+<rect x="611.7" y="186" width="84.3" height="46" fill="#8b95a8" opacity="0.21"/>
+<rect x="611.7" y="186" width="84.3" height="46" fill="url(#uncertain)" opacity="0.07"/>
+<rect x="695.0" y="186" width="84.3" height="46" fill="#8b95a8" opacity="0.25"/>
+<rect x="695.0" y="186" width="84.3" height="46" fill="url(#uncertain)" opacity="0.11"/>
+<rect x="778.3" y="186" width="84.3" height="46" fill="#8b95a8" opacity="0.29"/>
+<rect x="778.3" y="186" width="84.3" height="46" fill="url(#uncertain)" opacity="0.16"/>
+<rect x="861.7" y="186" width="84.3" height="46" fill="#8b95a8" opacity="0.34"/>
+<rect x="861.7" y="186" width="84.3" height="46" fill="url(#uncertain)" opacity="0.20"/>
+<rect x="945.0" y="186" width="84.3" height="46" fill="#8b95a8" opacity="0.27"/>
+<rect x="945.0" y="186" width="84.3" height="46" fill="url(#uncertain)" opacity="0.13"/>
+<rect x="1028.3" y="186" width="84.3" height="46" fill="#8b95a8" opacity="0.23"/>
+<rect x="1028.3" y="186" width="84.3" height="46" fill="url(#uncertain)" opacity="0.09"/>
+<polyline points="70,384 153,427" fill="none" stroke="#f2e6b8" stroke-width="2" stroke-dasharray="5 4" opacity="0.75"/>
+<circle cx="153" cy="427" r="9" fill="#f5ecc6" opacity="0.9"/>
+<polygon points="70,430 70,391 87,386 103,381 120,378 137,377 153,377 170,379 187,382 203,386 220,392 237,397 253,402 270,406 287,410 303,411 320,412 337,411 353,410 370,408 387,406 403,404 420,404 437,404 453,406 470,409 487,413 503,418 520,423 537,428 553,432 570,435 587,437 603,437 620,435 637,431 653,427 670,422 687,416 703,411 720,407 737,404 753,402 770,402 787,403 803,404 820,406 837,408 853,410 870,410 887,409 903,407 920,404 937,400 953,395 970,390 987,385 1003,380 1020,378 1037,376 1053,377 1070,379 1070,430" fill="#05060c"/>
+<text x="1070" y="426" text-anchor="end" font-size="9" fill="#3a4152">perfil de sierra PROVISIONAL — pendiente del horizonte real (DEM)</text>
+<rect x="28.3" y="442" width="84.3" height="26" fill="rgb(49,136,103)" opacity="0.85"/>
+<text x="70" y="488" text-anchor="middle" font-size="10" fill="#7a8296">17</text>
+<rect x="111.7" y="442" width="84.3" height="26" fill="rgb(50,130,100)" opacity="0.85"/>
+<rect x="195.0" y="442" width="84.3" height="26" fill="rgb(51,124,97)" opacity="0.85"/>
+<text x="237" y="488" text-anchor="middle" font-size="10" fill="#7a8296">19</text>
+<rect x="278.3" y="442" width="84.3" height="26" fill="rgb(50,130,100)" opacity="0.85"/>
+<rect x="361.7" y="442" width="84.3" height="26" fill="rgb(52,118,94)" opacity="0.85"/>
+<text x="403" y="488" text-anchor="middle" font-size="10" fill="#7a8296">21</text>
+<rect x="445.0" y="442" width="84.3" height="26" fill="rgb(51,124,97)" opacity="0.85"/>
+<rect x="528.3" y="442" width="84.3" height="26" fill="rgb(50,130,100)" opacity="0.85"/>
+<text x="570" y="488" text-anchor="middle" font-size="10" fill="#7a8296">23</text>
+<rect x="611.7" y="442" width="84.3" height="26" fill="rgb(49,136,103)" opacity="0.85"/>
+<rect x="695.0" y="442" width="84.3" height="26" fill="rgb(50,130,100)" opacity="0.85"/>
+<text x="737" y="488" text-anchor="middle" font-size="10" fill="#7a8296">01</text>
+<rect x="778.3" y="442" width="84.3" height="26" fill="rgb(52,118,94)" opacity="0.85"/>
+<rect x="861.7" y="442" width="84.3" height="26" fill="rgb(53,112,91)" opacity="0.85"/>
+<text x="903" y="488" text-anchor="middle" font-size="10" fill="#7a8296">03</text>
+<rect x="945.0" y="442" width="84.3" height="26" fill="rgb(51,124,97)" opacity="0.85"/>
+<rect x="1028.3" y="442" width="84.3" height="26" fill="rgb(50,130,100)" opacity="0.85"/>
+<text x="1070" y="488" text-anchor="middle" font-size="10" fill="#7a8296">05</text>
+<text x="70" y="30" font-size="19" fill="#e8ecf4" font-weight="600">Noche REGULAR — AstroCamp, Nerpio</text>
+<text x="70" y="52" font-size="13" fill="#8d97ab">Luna 1 % · seeing favorable (0.9-1.6") · P(utilizable) media 47%</text>
+<text x="70" y="486" font-size="12" fill="#9aa4b8">esta noche:</text>
+<text x="148" y="486" font-size="12" fill="#dfe5f0">M31 <tspan fill="#8fd1a0">5.1 h eq</tspan></text>
+<text x="148" y="502" font-size="10" fill="#6d7688">11.2 h equivalentes si despeja</text>
+<text x="448" y="486" font-size="12" fill="#dfe5f0">Cruz de Einstein (Q2237+03 <tspan fill="#8fd1a0">4.9 h eq</tspan></text>
+<text x="448" y="502" font-size="10" fill="#6d7688">10.4 h equivalentes si despeja</text>
+<text x="748" y="486" font-size="12" fill="#dfe5f0">M57 (Anillo) <tspan fill="#8fd1a0">4.3 h eq</tspan></text>
+<text x="748" y="502" font-size="10" fill="#6d7688">9.2 h equivalentes si despeja</text>
+</svg>
