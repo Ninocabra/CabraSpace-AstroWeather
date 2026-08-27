@@ -27,7 +27,10 @@ class Site:
     model_grid_elevation: float
     timezone: str = "UTC"
     mpc_code: str | None = None
-    # Reference sky background of the site (mag/arcsec^2), for q_dark.
+    # Reference sky background of the site (mag/arcsec^2), for q_dark. The
+    # photometer measures 21.71 at the zenith away from the ecliptic, but in
+    # the TESS band; this V-band figure stays as the quality reference until a
+    # band calibration exists (skybackground.py, SPEC v8 section 2.3).
     b_ref_mag: float = 21.9
 
     @property

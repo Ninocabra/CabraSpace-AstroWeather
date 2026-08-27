@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from astroweather.skybackground import NATURAL_FLOOR_MAG
 from astroweather.skymodel import (
     TWILIGHT_FLOOR, cloud_score, predict, residuals, twilight_magnitude,
 )
@@ -14,11 +15,16 @@ NEW_MOON_NIGHT = datetime(2026, 7, 15, 23, tzinfo=timezone.utc)
 
 
 def test_the_model_follows_the_lunar_cycle():
-    """A full Moon must predict a far brighter sky than a new Moon."""
+    """A full Moon must predict a far brighter sky than a new Moon.
+
+    The moonless value is checked against the site's MEASURED floor plus its
+    zodiacal term, not against the 21.9 that was assumed before seven years of
+    photometry said otherwise (skybackground.py).
+    """
     full = predict([FULL_MOON_NIGHT])[0]
     new = predict([NEW_MOON_NIGHT])[0]
     assert full.predicted_mag < new.predicted_mag - 2.0
-    assert new.predicted_mag == pytest.approx(DARK, abs=0.2)
+    assert new.predicted_mag == pytest.approx(NATURAL_FLOOR_MAG, abs=0.35)
 
 
 def test_twilight_was_fitted_not_guessed():

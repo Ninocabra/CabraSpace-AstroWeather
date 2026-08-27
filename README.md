@@ -60,7 +60,11 @@ empieza antes que ninguna otra cosa.
       especies, dependencia con la longitud de onda, penalizacion de exposicion,
       y 22.512 horas de AOD historico. Validado contra el fotometro: **mas
       aerosol = cielo mas OSCURO** aqui (lo contrario de la intuicion urbana).
-- [ ] Rodajas 5-6: fondo de cielo y seeing → **MVP recomendador**
+- [x] **Rodaja 5: Fondo de cielo** (`skybackground.py`) — presupuesto por
+      componentes MEDIDO en el sitio: suelo natural 21.71 (no el 21.9 supuesto),
+      zodiacal 0.27 mag en la ecliptica, airglow lento por F10.7, y el coste en
+      exposicion de cada magnitud perdida.
+- [ ] Rodaja 6: seeing → cierra el **MVP recomendador**
 - [ ] Lienzo nocturno (mockup SVG antes que backend)
 
 ## Recogida automatica

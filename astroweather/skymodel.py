@@ -77,6 +77,11 @@ def predict(times: list[datetime], site: Site = NERPIO,
     Vectorised over the whole list: the ephemerides dominate the cost, and the
     archive is measured in hundreds of thousands of samples.
     """
+    # The floor now carries the site's measured zodiacal and airglow terms
+    # instead of a single assumed number (skybackground.py).
+    from .skybackground import budget as _sky_budget
+    floors = ([b.total_mag for b in _sky_budget(times, site)]
+              if dark_sky_mag is None else None)
     dark_sky_mag = dark_sky_mag if dark_sky_mag is not None else site.b_ref_mag
     when = Time([t.astimezone(timezone.utc) for t in times])
     frame = AltAz(obstime=when, location=location(site))
@@ -94,7 +99,7 @@ def predict(times: list[datetime], site: Site = NERPIO,
         moon_alt = float(moon_altaz.alt.deg[index])
         alpha = float(phase_angles[index])
 
-        components = [dark_sky_mag]
+        components = [floors[index] if floors else dark_sky_mag]
         # The photometer looks up, so the separation is the Moon's zenith angle.
         moon_light = moon_brightness(
             phase_angle_deg=alpha,
