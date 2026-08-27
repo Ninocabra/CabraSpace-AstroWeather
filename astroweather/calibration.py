@@ -18,6 +18,18 @@ Two deliberate limits:
 Ground truth comes from the photometer residual, not from a cloud sensor: the
 site's IR channels do not report, and the residual against the clear-sky model
 is what recovers cloudiness back to 2019.
+
+What the archive actually says, measured over 33,924 hours (this is the shape
+the fit reproduces, not an artefact of it):
+
+    forecast 0-10 % cloud   ->  75.3 % of hours were clear
+    forecast 50-60 %        ->  59.5 %
+    forecast exactly 100 %  ->  40.0 %
+
+Monotonic and real, but shallow, and ASYMMETRIC in a way worth surfacing in the
+product: a fully overcast forecast is genuinely informative, while a clear
+forecast still only buys three nights in four. This model is much better at
+saying "do not bother" than at promising a good night.
 """
 
 from __future__ import annotations

@@ -53,7 +53,9 @@ empieza antes que ninguna otra cosa.
       probabilidad esta bien calibrada** (cuando dice 71 %, ocurre el 70,7 %).
       El forecast determinista discrimina poco en este sitio; la mejora vendra
       del EPS y del nowcast local, no de mas ajuste.
-- [ ] Rodaja 3: Lluvia + viento + techo  → cierra el **MVP operacional**
+- [x] **Rodaja 3: Lluvia + viento + techo** (`gates.py`, `tonight.py`) → **MVP
+      OPERACIONAL COMPLETO**: `python -m astroweather.tonight` responde de punta
+      a punta "¿podre observar esta noche, con seguridad, y cuando?".
 - [ ] Lienzo nocturno (mockup SVG antes que backend)
 
 ## Recogida automatica
