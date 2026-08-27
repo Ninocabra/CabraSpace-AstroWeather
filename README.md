@@ -40,6 +40,16 @@ empieza antes que ninguna otra cosa.
 - [x] Pipeline FWHM (`fwhm_pipeline.py`) — sobre los FITS reales de `E:\ASTRO Sin Procesar\Observatorio Nerpio`
 - [ ] Pendientes de terceros: credenciales BDRC (opcional)
 
+## Fase 1 — en curso
+
+- [x] **Rodaja 1: Noche + Luna** (`ephem.py`, `moonsky.py`) — ventana de la noche,
+      efemerides precisas y el modelo lunar de Krisciunas & Schaefer con sus tres
+      trampas resueltas (Luna bajo el horizonte, separaciones < 10 grados, y el
+      acoplamiento con la extincion: con calima la Luna molesta MAS).
+- [ ] Rodaja 2: Nubes (P_raw -> P_calibrada, capas relativas al sitio)
+- [ ] Rodaja 3: Lluvia + viento + techo  → cierra el **MVP operacional**
+- [ ] Lienzo nocturno (mockup SVG antes que backend)
+
 ## Recogida automatica
 
 Hay datos que **caducan**: los 51 miembros del EPS viven ~4 dias en el proveedor
