@@ -100,7 +100,7 @@ def write_canonical(
 
     stamp = utcnow()
     base = root or DATA_ROOT
-    time_col = "valid_utc" if dataset == "forecasts" else "t_utc"
+    time_col = {"forecasts": "valid_utc", "measurements": "t_utc"}.get(dataset, "date")
     first = rows[0].get(time_col) or stamp
     directory = (
         base

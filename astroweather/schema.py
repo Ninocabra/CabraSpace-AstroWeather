@@ -135,3 +135,39 @@ MEASUREMENT_SCHEMA = pa.schema(
 )
 
 SCHEMAS = {"forecasts": FORECAST_SCHEMA, "measurements": MEASUREMENT_SCHEMA}
+
+
+# --- daily observations from external stations ------------------------------
+# A daily mean is not the same kind of thing as a one-minute photometer
+# reading, so it gets its own table instead of being flattened into
+# `measurements`. The station is described in every row: this is ground truth
+# from 11.5 km away and 165 m below the observatory, and whoever joins it to
+# site data should be forced to see that.
+DAILY_OBSERVATION_SCHEMA = pa.schema(
+    [
+        pa.field("site_id", pa.string()),         # site this station serves as proxy for
+        pa.field("date", pa.date32()),
+        pa.field("station_id", pa.string()),      # AEMET indicativo, e.g. '7067Y'
+        pa.field("station_name", pa.string()),
+        pa.field("station_elevation", pa.float32()),
+        pa.field("station_distance_km", pa.float32()),
+        pa.field("t_mean", pa.float32()),
+        pa.field("t_min", pa.float32()),
+        pa.field("t_max", pa.float32()),
+        pa.field("hour_t_min", pa.string()),
+        pa.field("hour_t_max", pa.string()),
+        pa.field("rh_mean", pa.float32()),
+        pa.field("rh_min", pa.float32()),
+        pa.field("rh_max", pa.float32()),
+        pa.field("precipitation", pa.float32()),
+        pa.field("precipitation_max_intensity", pa.float32()),
+        pa.field("wind_mean", pa.float32()),      # absent for 7067Y, kept for other stations
+        pa.field("source", pa.string()),
+        pa.field("license_tag", pa.string()),
+        pa.field("quality_flags", pa.string()),
+        pa.field("retrieved_at", pa.timestamp("s", tz="UTC")),
+        pa.field("pipeline_version", pa.string()),
+    ]
+)
+
+SCHEMAS["daily_observations"] = DAILY_OBSERVATION_SCHEMA

@@ -254,6 +254,7 @@ Qué significa EXACTAMENTE el dato según el proveedor · retención/histórico 
 
 - **RAW**: respuesta original comprimida y versionada. Nunca se toca.
 - **CANÓNICO** (Parquet ancho + DuckDB; partición Hive site/año/mes/modelo): una fila por `site × model × run × valid × member` con columnas tipadas + metadatos de §3.2.
+- **daily_observations** (v8.1): observaciones DIARIAS de estaciones externas (AEMET). Tabla propia y no dentro de `measurements`: una media diaria no es la misma clase de cosa que una lectura instantánea, y mezclarlas invita a compararlas sin darse cuenta. Cada fila describe su estación (`station_id, station_name, station_elevation, station_distance_km`) y lleva `quality_flags='external_station;<km>;daily_aggregate'` — quien la cruce con datos del sitio está obligado a ver que viene de 11,5 km y 165 m más abajo.
 - **measurements**: `site_id, t_utc, fwhm_zenith_500nm, setup_id, sky_mag_raw, instrument_type, instrument_id, bandpass_id, sky_mag_calibrated, clear_flag, cloud_frac, t_sky_ir (con semántica del campo), k_extinction, t2m, rh, wind, gust, roof_open, censored, quality_flags` — **`setup_id` OBLIGATORIO en cada FWHM** (tabla de configuración instrumental versionada: telescopio, cámara, binning, escala, filtro, foco). Sin él, un cambio de tren óptico parece un cambio de atmósfera.
 
 ## 4.2 Los cinco bucles (correcciones vigentes)
