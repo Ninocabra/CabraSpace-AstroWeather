@@ -153,6 +153,10 @@ class TargetNight:
     min_moon_separation: float
     best_hour: dt.datetime | None
     reason: str
+    # Hour by hour, what the engine actually saw. Exposed so the charts read
+    # the SAME numbers the score came from: a view that recomputes them is a
+    # view that will one day disagree with the recommendation it illustrates.
+    trace: list[dict] = field(default_factory=list)
 
     @property
     def verdict(self) -> str:
@@ -211,12 +215,18 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
 
     results = []
     for target in targets:
-        altitudes, _, separations = target.positions(times, site)
+        altitudes, azimuths, separations = target.positions(times, site)
         conditional, expected, hours, best, best_value = 0.0, 0.0, 0.0, None, 0.0
 
+        trace: list[dict] = []
         for index, when in enumerate(times):
             altitude = float(altitudes[index])
             if altitude < MIN_ALTITUDE:
+                trace.append({"alt": round(altitude, 1),
+                              "az": round(float(azimuths[index]), 1),
+                              "yield": 0.0, "sky_mag": None,
+                              "moon_sep": round(float(separations[index]), 1),
+                              "gate_ok": False, "too_low": True})
                 continue
             airmass = 1.0 / np.sin(np.radians(altitude))
             hours += 1.0 / len(times) * (
@@ -267,6 +277,12 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
             expected += value * step * usable_probability[index]
             if value > best_value:
                 best_value, best = value, when
+            trace.append({"alt": round(altitude, 1),
+                          "az": round(float(azimuths[index]), 1),
+                          "yield": round(value, 3),
+                          "sky_mag": round(sky_mag, 2),
+                          "moon_sep": round(float(separations[index]), 1),
+                          "gate_ok": value > 0.0, "too_low": False})
 
         results.append(TargetNight(
             target=target,
@@ -278,6 +294,7 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
             best_hour=best,
             reason=_reason(target, conditional, hours, float(separations.min()),
                            transparency, turbulence),
+            trace=trace,
         ))
     return sorted(results, key=lambda r: r.q_expected, reverse=True)
 

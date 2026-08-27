@@ -39,6 +39,19 @@ TWILIGHT_LN_SLOPE = 0.820
 TWILIGHT_LN_OFFSET = -9.02
 # Below this the fitted flux is far under the natural sky and adds nothing.
 TWILIGHT_FLOOR = -20.0
+# ...and ABOVE this the fit has nothing to say either. The samples run from -20
+# to -8, so a Sun higher than -8 degrees is extrapolation of an exponential,
+# and an exponential extrapolated far enough says anything you like: at +11.7
+# degrees this function used to return -0.60 mag/arcsec2, a sky brighter than
+# the full Moon's disc. It had a floor and no ceiling.
+#
+# The product window opens an hour before sunset for context, so those frames
+# still need a value. They get one, clamped to a daylight asymptote taken from
+# the literature rather than from this site, and every result carries a flag
+# saying the number is outside the fit. Nothing downstream may publish an
+# extrapolated value as if it had been measured.
+TWILIGHT_FIT_MAX = -8.0
+DAYLIGHT_ZENITH_MAG = 3.5
 
 
 def twilight_magnitude(sun_altitude_deg: float, dark_sky_mag: float) -> float:
@@ -63,10 +76,18 @@ class ClearSky:
     moon_altitude: float
     moon_phase_angle: float
     predicted_mag: float
+    # True when the Sun sits above the twilight fit's domain, so predicted_mag
+    # is an extrapolation clamped at the daylight asymptote, not a measurement.
+    twilight_extrapolated: bool = False
 
     @property
     def is_night(self) -> bool:
         return self.sun_altitude < -18.0
+
+    @property
+    def is_trustworthy(self) -> bool:
+        """Whether this number may be shown as a sky brightness at all."""
+        return not self.twilight_extrapolated
 
 
 def predict(times: list[datetime], site: Site = NERPIO,
@@ -115,7 +136,12 @@ def predict(times: list[datetime], site: Site = NERPIO,
             components.append(twilight)
 
         total_nl = sum(mag_to_nl(m) for m in components if m != float("inf"))
-        results.append(ClearSky(t, sun_alt, moon_alt, alpha, nl_to_mag(total_nl)))
+        magnitude = nl_to_mag(total_nl)
+        extrapolated = sun_alt > TWILIGHT_FIT_MAX
+        if extrapolated:
+            magnitude = max(magnitude, DAYLIGHT_ZENITH_MAG)
+        results.append(ClearSky(t, sun_alt, moon_alt, alpha, magnitude,
+                                extrapolated))
     return results
 
 

@@ -98,3 +98,24 @@ def test_uncalibrated_seeing_cannot_inflate_compact_targets():
               for t in (good, better)]
     assert abs(yields[0] - yields[1]) < 1e-9, "same tercile, different answer"
     assert max(yields) <= MAX_SHARPNESS_GAIN
+
+
+def test_twilight_never_extrapolates_past_its_fit():
+    """It had a floor at -20 deg and no ceiling, so an exponential ran away.
+
+    At +11.7 deg of Sun altitude the clear-sky model returned -0.60 mag/arcsec2
+    -- a sky brighter than the Moon's own disc -- and printed it beside numbers
+    that had been measured.
+    """
+    import datetime as dt
+
+    from astroweather.skymodel import DAYLIGHT_ZENITH_MAG, TWILIGHT_FIT_MAX, predict
+
+    times = [dt.datetime(2026, 8, 27, 12, tzinfo=dt.timezone.utc),
+             dt.datetime(2026, 8, 27, 17, 42, tzinfo=dt.timezone.utc),
+             dt.datetime(2026, 8, 27, 21, 12, tzinfo=dt.timezone.utc)]
+    for entry in predict(times):
+        assert entry.predicted_mag >= DAYLIGHT_ZENITH_MAG
+        above = entry.sun_altitude > TWILIGHT_FIT_MAX
+        assert entry.twilight_extrapolated is above
+        assert entry.is_trustworthy is not above
