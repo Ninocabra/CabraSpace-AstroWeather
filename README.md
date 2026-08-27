@@ -64,7 +64,12 @@ empieza antes que ninguna otra cosa.
       componentes MEDIDO en el sitio: suelo natural 21.71 (no el 21.9 supuesto),
       zodiacal 0.27 mag en la ecliptica, airglow lento por F10.7, y el coste en
       exposicion de cada magnitud perdida.
-- [ ] Rodaja 6: seeing → cierra el **MVP recomendador**
+- [x] **Rodaja 6: Seeing** (`seeing.py`) — perfil Hufnagel-Valley con los tres
+      contratos (h sobre el sitio, W ponderada por espesor, v_eff pesada por
+      Cn²), Richardson como features y flag de riesgo. **Publicado en terciles,
+      nunca en arcosegundos**: el modelo predijo 1.21" donde se midieron 3.16",
+      y esa diferencia es casi toda instrumental — calibrar A ahora ajustaria
+      el telescopio, no el cielo.
 - [ ] Lienzo nocturno (mockup SVG antes que backend)
 
 ## Recogida automatica
