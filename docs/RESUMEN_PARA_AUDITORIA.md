@@ -3,7 +3,7 @@
 Sistema de predicción y recomendación para observación de cielo profundo en
 AstroCamp (Nerpio, Albacete; 38.16583 N, −2.32672 W, 1650 m, código MPC I79).
 Especificación vigente en `SPEC.md` (v8, auditada por ChatGPT ×2 y Gemini ×1
-antes de escribir código). **19 commits, 139 tests en verde.**
+antes de escribir código). **21 commits, 144 tests en verde.**
 
 Este documento resume el ESTADO REAL, incluidos los límites. Para auditar el
 diseño está `SPEC.md`; esto es lo que de verdad corre.
@@ -109,9 +109,14 @@ propios.
   pero discrimina poco. La mejora vendrá del EPS y del nowcast local.
 - **La tasa base cayó de 64.1 % a 54.8 %** al limpiar la verdad, y no tenemos
   con qué contrastarla: `roof_open` tiene dato en 42 de 3.666.893 filas.
-- **No hay término galáctico.** La Vía Láctea por el cenit mueve el fondo tanto
-  como la luz zodiacal, que sí modelamos. Es medible con el mismo método del
-  residuo y está pendiente.
+- ~~No hay término galáctico~~ **RESUELTO**: la Vía Láctea aporta **0.39 mag en
+  el plano**, más que la luz zodiacal (0.27). Medida sobre 50.412 muestras
+  limpias sin Luna. El ajuste conjunto valida de paso el término zodiacal: sin
+  el galáctico, el ajuste se ve forzado a inflar el zodiacal a 0.76 mag con
+  escala de 9° para tragarse la Vía Láctea.
+- **La amplitud zodiacal en la eclíptica es una extrapolación, no una medida**:
+  el cenit de Nerpio nunca se acerca a menos de 14.7° de la eclíptica. La
+  galáctica sí es medida — el cenit cruza |b| = 0.
 - **Miembros EPS**: solo desde ayer (caducan en ~4 días upstream). La
   calibración probabilística del ensemble tendrá que crecer con el archivo.
 - **Bandas fotométricas**: el 21.71 es banda TESS, no V. Sin calibración de

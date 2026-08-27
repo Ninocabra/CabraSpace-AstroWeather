@@ -72,10 +72,17 @@ MIN_SAMPLES_PER_HOUR = 4
 # airglow. So the hour must also sit at the right LEVEL, not just be steady.
 #
 # Both numbers come from the archive, not from taste: the stable-hour residuals
-# have a robust centre of -0.04 mag (the clear-sky model's own bias) and a
-# spread of 0.268 mag, and the cut is placed at three of those sigmas.
-CLEAR_LEVEL_CENTRE = -0.04
-CLEAR_LEVEL_TOLERANCE = 0.80
+# have a robust centre (the clear-sky model's own bias) and a spread, and the
+# cut is placed at three of those sigmas.
+#
+# They MUST be re-derived whenever the clear-sky model changes, because they
+# describe that model's residual and nothing else. Adding the galactic term
+# moved the centre from -0.04 to +0.10 and tightened the spread from 0.268 to
+# 0.248 -- the model got better, so its residual got narrower. The residual
+# offset is the zodiacal elongation gain, which the joint fit of the sky
+# budget did not model; it lands here rather than being tuned away.
+CLEAR_LEVEL_CENTRE = 0.10
+CLEAR_LEVEL_TOLERANCE = 0.74
 MODEL_PATH = DATA_ROOT / "cloud_calibration.json"
 
 

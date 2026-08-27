@@ -20,6 +20,33 @@ So the zenith sky carries about 0.27 mag of zodiacal light when the ecliptic
 passes overhead, and the floor is 0.19 mag brighter than the 21.9 assumed
 before. Both match what the literature expects, which is the point: the site
 was measured rather than looked up.
+
+The GALACTIC term was added later, after an external audit pointed out that the
+Milky Way was missing while the zodiacal light was modelled. It is measurable
+here for a geometric reason: the zenith of a site at +38.17 deg traces a fixed
+declination circle that crosses the galactic equator, so |b| at the zenith
+sweeps the full 0-79 deg. Over 50,412 clean moonless deep-night samples the
+residual runs monotonically from -0.33 mag on the plane to -0.04 at the pole,
+while the ecliptic latitude stays flat across those bins -- so it is the Milky
+Way, not zodiacal light leaking.
+
+Fitting the floor, the zodiacal term and the galactic term JOINTLY on the raw
+measurements is what settles it. Without the galactic term the fit is forced to
+push the zodiacal amplitude to an absurd 0.76 mag over a 9 deg scale to soak up
+the Milky Way. With it:
+
+    natural floor            21.69 mag   (published value 21.71)
+    zodiacal on the ecliptic  0.28 mag / 22.8 deg   (published 0.27 / 25.0)
+    galactic on the plane     0.39 mag / 26.5 deg   (new)
+
+The zodiacal numbers falling back onto the published ones, recovered by a
+different route and no longer able to hide the Milky Way, is the evidence that
+both terms are real. RMS improves from 0.239 to 0.222 mag.
+
+One honest limit that the same geometry imposes: the zenith here never gets
+closer than 14.7 deg to the ecliptic, so the zodiacal amplitude AT the ecliptic
+is an extrapolation of the fitted shape, not a measurement. The galactic
+amplitude is not -- the zenith does cross |b| = 0.
 """
 
 from __future__ import annotations
@@ -53,6 +80,12 @@ ZODIACAL_LATITUDE_SCALE_DEG = 25.0
 # Extra brightening towards the Sun, over and above the latitude term.
 ZODIACAL_ELONGATION_GAIN = 0.10
 
+# Integrated starlight of the Milky Way, fitted jointly with the two terms
+# above so that neither can absorb it (see the module docstring). Larger than
+# the zodiacal contribution, which is why leaving it out was not cosmetic.
+GALACTIC_AMPLITUDE_MAG = 0.39
+GALACTIC_LATITUDE_SCALE_DEG = 26.5
+
 # Airglow tracks solar activity slowly. F10.7 near 130 is the current cycle-25
 # level; the coefficient is small on purpose (SPEC v8 section 2.2 keeps airglow
 # as a SLOW term, never an hourly predictor).
@@ -78,6 +111,19 @@ def zodiacal_excess(ecliptic_latitude_deg: float,
     return excess
 
 
+def galactic_excess(galactic_latitude_deg: float) -> float:
+    """Milky Way brightening over the natural floor, in magnitudes.
+
+    Same exponential shape as the zodiacal term, and for the same reason: it is
+    what the site's own residual traces. The scale height of 26.5 deg is wider
+    than the visible star clouds because integrated starlight includes the
+    faint unresolved disc, not just the bright lanes the eye picks out.
+    """
+    latitude = min(90.0, abs(galactic_latitude_deg))
+    return GALACTIC_AMPLITUDE_MAG * math.exp(
+        -latitude / GALACTIC_LATITUDE_SCALE_DEG)
+
+
 def airglow_excess(f107: float | None) -> float:
     """Airglow brightening over the floor, from the SLOW solar-activity term.
 
@@ -96,15 +142,18 @@ class SkyBudget:
     t_utc: datetime
     natural_floor: float
     zodiacal: float
+    galactic: float
     airglow: float
     light_pollution: float
     total_mag: float
     ecliptic_latitude: float
+    galactic_latitude: float
 
     @property
     def breakdown(self) -> str:
         return (f"suelo natural {self.natural_floor:.2f}"
                 f" · zodiacal {self.zodiacal:+.2f}"
+                f" · via lactea {self.galactic:+.2f}"
                 f" · airglow {self.airglow:+.2f}"
                 f" · LP {self.light_pollution:+.2f}"
                 f" = {self.total_mag:.2f} mag/arcsec2")
@@ -123,6 +172,18 @@ def zenith_ecliptic(times: list[datetime], site: Site = NERPIO):
     return latitudes, elongations
 
 
+def zenith_galactic(times: list[datetime], site: Site = NERPIO):
+    """Galactic latitude of the zenith.
+
+    At a fixed site this is a pure function of sidereal time, which is exactly
+    why seven years of a stationary photometer can measure the Milky Way.
+    """
+    when = Time([t.astimezone(timezone.utc) for t in times])
+    zenith = SkyCoord(AltAz(az=0 * u.deg, alt=90 * u.deg,
+                            obstime=when, location=location(site)))
+    return np.asarray(zenith.galactic.b.deg, dtype=float)
+
+
 def budget(times: list[datetime], site: Site = NERPIO, *,
            f107: float | None = None,
            light_pollution_mag: float | None = None) -> list[SkyBudget]:
@@ -132,22 +193,35 @@ def budget(times: list[datetime], site: Site = NERPIO, *,
     which adds them on top of this floor.
     """
     latitudes, elongations = zenith_ecliptic(times, site)
+    galactic_latitudes = zenith_galactic(times, site)
+    floor_flux = mag_to_nl(NATURAL_FLOOR_MAG)
     results = []
     for index, when in enumerate(times):
         zodiacal = zodiacal_excess(float(latitudes[index]), float(elongations[index]))
+        galactic = galactic_excess(float(galactic_latitudes[index]))
         airglow = airglow_excess(f107)
-        # Light pollution enters as its own flux, not as a magnitude offset.
-        floor_flux = mag_to_nl(NATURAL_FLOOR_MAG - zodiacal - airglow)
+
+        # Each component is its own FLUX added on top of the floor, which is
+        # what the module has always claimed and did not do: subtracting three
+        # magnitude offsets from the floor compounds them, and with the Milky
+        # Way now in the budget there are three of them. The excess magnitudes
+        # are converted to the flux they represent relative to the floor.
+        natural_flux = floor_flux * (1.0
+                                     + (10 ** (0.4 * zodiacal) - 1.0)
+                                     + (10 ** (0.4 * galactic) - 1.0)
+                                     + (10 ** (0.4 * airglow) - 1.0))
         pollution_flux = mag_to_nl(light_pollution_mag) if light_pollution_mag else 0.0
-        total = nl_to_mag(floor_flux + pollution_flux)
+        total = nl_to_mag(natural_flux + pollution_flux)
         results.append(SkyBudget(
             t_utc=when,
             natural_floor=NATURAL_FLOOR_MAG,
             zodiacal=-zodiacal,
+            galactic=-galactic,
             airglow=-airglow,
-            light_pollution=total - nl_to_mag(floor_flux),
+            light_pollution=total - nl_to_mag(natural_flux),
             total_mag=total,
             ecliptic_latitude=float(latitudes[index]),
+            galactic_latitude=float(galactic_latitudes[index]),
         ))
     return results
 
