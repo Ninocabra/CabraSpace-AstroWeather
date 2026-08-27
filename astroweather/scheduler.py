@@ -22,7 +22,7 @@ from __future__ import annotations
 import argparse
 import logging
 import traceback
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -113,6 +113,31 @@ def _job_tess():
     return fetch_tess.run(NERPIO, start=start, resume=False)
 
 
+# Credentials that expire. A key that dies silently takes a source with it,
+# so the collector warns well before, every day, until it is renewed.
+CREDENTIAL_DEADLINES = {
+    "AEMET_API_KEY": date(2026, 12, 5),
+}
+WARN_DAYS_BEFORE = 14
+
+
+def _job_credentials():
+    """Warn while there is still time to renew, not once it is too late."""
+    today = date.today()
+    for name, expiry in CREDENTIAL_DEADLINES.items():
+        remaining = (expiry - today).days
+        if remaining < 0:
+            logger.error("CADUCADA: %s vencio el %s. Renovar y actualizar .env",
+                         name, expiry)
+        elif remaining <= WARN_DAYS_BEFORE:
+            logger.warning("AVISO A NINO: %s caduca el %s (quedan %d dias). "
+                           "Renovar en opendata.aemet.es y actualizar .env",
+                           name, expiry, remaining)
+        else:
+            logger.info("credenciales   ok   %s vence en %d dias", name, remaining)
+    return len(CREDENTIAL_DEADLINES)
+
+
 def _job_verification():
     from .verification import report
     logger.info("panel de verificacion:\n%s", report())
@@ -144,6 +169,9 @@ JOBS = {
     "tess": (CronTrigger(hour=9, minute=0), _job_tess),
     # Late morning, once the previous night is complete.
     "verificacion": (CronTrigger(hour=10, minute=0), _job_verification),
+    # Cheap, daily, and it is the only thing standing between a quiet key
+    # expiry and a source that stops without anyone noticing.
+    "credenciales": (CronTrigger(hour=10, minute=5), _job_credentials),
 }
 
 

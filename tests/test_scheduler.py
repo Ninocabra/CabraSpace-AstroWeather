@@ -60,3 +60,38 @@ def test_jobs_never_overlap_themselves():
     job = built.get_job("sensores")
     assert job.max_instances == 1
     assert job.coalesce is True
+
+
+def test_expiring_credentials_are_watched():
+    """A key that dies quietly takes a whole source down with it."""
+    assert "credenciales" in scheduler.JOBS
+    assert "AEMET_API_KEY" in scheduler.CREDENTIAL_DEADLINES
+
+
+def test_the_warning_arrives_with_time_to_act(monkeypatch, caplog):
+    """Two weeks of notice, not a message the morning after it expired."""
+    import datetime as dt
+
+    class Soon(dt.date):
+        @classmethod
+        def today(cls):
+            return scheduler.CREDENTIAL_DEADLINES["AEMET_API_KEY"] - dt.timedelta(days=10)
+
+    monkeypatch.setattr(scheduler, "date", Soon)
+    with caplog.at_level("WARNING"):
+        scheduler._job_credentials()
+    assert any("AVISO A NINO" in record.message for record in caplog.records)
+
+
+def test_an_expired_key_is_an_error_not_a_warning(monkeypatch, caplog):
+    import datetime as dt
+
+    class TooLate(dt.date):
+        @classmethod
+        def today(cls):
+            return scheduler.CREDENTIAL_DEADLINES["AEMET_API_KEY"] + dt.timedelta(days=1)
+
+    monkeypatch.setattr(scheduler, "date", TooLate)
+    with caplog.at_level("ERROR"):
+        scheduler._job_credentials()
+    assert any("CADUCADA" in record.message for record in caplog.records)
