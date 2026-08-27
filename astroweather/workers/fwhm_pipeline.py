@@ -36,6 +36,7 @@ from pathlib import Path
 
 import numpy as np
 from astropy.io import fits
+from astropy.modeling import fitting, models
 from astropy.stats import sigma_clipped_stats
 from photutils.detection import DAOStarFinder
 from photutils.morphology import data_properties
@@ -117,6 +118,8 @@ def measure_frame(path: Path) -> dict | None:
     # photutils renamed the centroid columns in 3.x; support both.
     x_column = "x_centroid" if "x_centroid" in sources.colnames else "xcentroid"
     y_column = "y_centroid" if "y_centroid" in sources.colnames else "ycentroid"
+    fitter = fitting.LevMarLSQFitter()
+    grid_y, grid_x = np.mgrid[:2 * STAMP_RADIUS + 1, :2 * STAMP_RADIUS + 1]
     widths, eccentricities = [], []
     for row in sources[:MAX_STARS]:
         x, y = int(row[x_column]), int(row[y_column])
@@ -125,17 +128,28 @@ def measure_frame(path: Path) -> dict | None:
             continue
         stamp = image[y - STAMP_RADIUS:y + STAMP_RADIUS + 1,
                       x - STAMP_RADIUS:x + STAMP_RADIUS + 1] - median
+        if stamp.max() <= 0:
+            continue
         try:
-            properties = data_properties(stamp)
-            major = float(properties.semimajor_axis.value)
-            minor = float(properties.semiminor_axis.value)
+            # A fitted Gaussian is what PixInsight and ASTAP report, so our
+            # numbers stay comparable with what the observer already sees.
+            # Second moments were tried first and run ~30 % high on these
+            # frames: they pick up the wings and any neighbouring star.
+            initial = models.Gaussian2D(amplitude=float(stamp.max()),
+                                        x_mean=STAMP_RADIUS, y_mean=STAMP_RADIUS,
+                                        x_stddev=3.0, y_stddev=3.0)
+            fitted = fitter(initial, grid_x, grid_y, stamp)
+            sigma_x = abs(float(fitted.x_stddev.value))
+            sigma_y = abs(float(fitted.y_stddev.value))
+            properties = data_properties(stamp)      # moments still give shape
+            eccentricity = float(properties.eccentricity.value)
         except Exception:
             continue
-        if not (0 < minor <= major) or major > STAMP_RADIUS:
+        if not (0.3 < min(sigma_x, sigma_y) and max(sigma_x, sigma_y) < STAMP_RADIUS):
             continue
         # Circularised sigma, so an elongated star does not inflate the width.
-        widths.append(2.3548 * math.sqrt(major * minor))
-        eccentricities.append(float(properties.eccentricity.value))
+        widths.append(2.3548 * math.sqrt(sigma_x * sigma_y))
+        eccentricities.append(eccentricity)
 
     if len(widths) < MIN_STARS:
         return None

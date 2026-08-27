@@ -32,7 +32,10 @@ def connect(root: Path | None = None) -> duckdb.DuckDBPyConnection:
         SELECT * EXCLUDE (rank) FROM (
             SELECT *, row_number() OVER (
                 PARTITION BY instrument_id, t_utc
-                ORDER BY retrieved_at DESC
+                -- Newest pipeline first: a method change (moments -> Gaussian
+                -- fit for FWHM) must not leave two measurements of the same
+                -- frame competing in one median.
+                ORDER BY pipeline_version DESC, retrieved_at DESC
             ) AS rank
             FROM read_parquet('{base}/measurements/**/*.parquet', union_by_name=true)
         ) WHERE rank = 1

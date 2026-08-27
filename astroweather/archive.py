@@ -19,7 +19,7 @@ import pyarrow.parquet as pq
 
 from .schema import SCHEMAS
 
-PIPELINE_VERSION = "0.1.0"
+PIPELINE_VERSION = "0.2.0"   # 0.2.0: FWHM por ajuste gaussiano (0.1.0 usaba momentos, ~30% alto)
 
 DATA_ROOT = Path(__file__).resolve().parent.parent / "data"
 
