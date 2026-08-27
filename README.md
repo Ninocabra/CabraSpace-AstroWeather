@@ -27,11 +27,13 @@ empieza antes que ninguna otra cosa.
 - [x] Invariantes de ingesta + tests (`astroweather/invariants.py`, `tests/`)
 - [x] Worker del EPS, archivando los 51 miembros (`astroweather/workers/fetch_ensemble.py`)
 - [x] Worker de forecast híbrido: 9 km (superficie+nubes+BLH) + perfiles de 4 modelos (`fetch_forecast.py`)
-- [ ] Workers: air quality, TESS, scraper de cloud.html
+- [x] Worker TESS con backfill 2019→hoy (`fetch_tess.py`) — brillo de cielo, ~450k muestras/año
+- [ ] Workers: air quality (CAMS/ADS), scraper de cloud.html
 - [ ] Backfill determinista (Previous Runs)
 - [ ] Pipeline FWHM (FITS → estrellas → FWHM + excentricidad → cenit/λ → Parquet)
 - [ ] Panel de verificación mínimo
 - [x] AEMET verificada (clave en `.env`): sin histórico horario; estación 7067Y a 11,5 km y 1485 m
+- [x] Credenciales ADS (CAMS) en `.env`
 - [ ] Pendientes de terceros: credenciales BDRC, campo exacto del CloudWatcher
 
 ## Uso
@@ -40,6 +42,7 @@ empieza antes que ninguna otra cosa.
 pip install pyarrow duckdb requests pytest
 python -m astroweather.workers.fetch_ensemble --days 7   # archiva los 51 miembros de hoy
 python -m astroweather.workers.fetch_forecast --days 7   # hibrido: 9 km + perfiles 4 modelos
+python -m astroweather.workers.fetch_tess                 # backfill TESS (reanudable por meses)
 python -m pytest tests/ -q
 ```
 

@@ -60,7 +60,7 @@ UI: «Para M51: 3,2 h equivalentes si despeja / 1,9 h esperadas». La parte CUAN
 |---|---|---|---|---|---|
 | 1 | Noche útil y crepúsculos | El marco temporal de todo | astropy local | — | — |
 | 2 | Luna (fase, altura, separación) | Cada mag de fondo = ×2.5 de tiempo; con Luna: NB sí (LUT por filtro), IFN no | astropy + K&S | — (+ SkyCalc como test) | TESS (en su banda) |
-| 3 | Nubes (capas site-relative + niebla) | EL gate; cirros "20 %" matan fotometría | EPS ECMWF → P_calibrada; híbrido 9 km | ICON/GFS/AROME + CloudWatcher/allsky (0–1 h) | TESS + CloudWatcher + allsky |
+| 3 | Nubes (capas site-relative + niebla) | EL gate; cirros "20 %" matan fotometría | EPS ECMWF → P_calibrada; híbrido 9 km | ICON/GFS/AROME + CloudWatcher/allsky (0–1 h) | **CloudWatcher + allsky** (el TESS de AstroCamp NO sirve de detector de nubes: sus sensores de T no reportan — §3.1 nota 6); el TESS aporta el fondo, que sube con nube+LP |
 | 4 | Lluvia / tormenta | Gate de seguridad escalonado | EPS precip | Radar observado (RainViewer) + sensor local | Estación local |
 | 5 | Viento / rachas | >35–40 km/h cierre; 15–30 degrada guiado | Open-Meteo (rachas, `ms`) | 2 estaciones AstroCamp | Estación local |
 | 6 | Calima + transparencia (AOD polvo, AOD total, α, k) | +0.1 AOD ≈ +0.1 mag y cielo lechoso; el humo castiga el azul; la Luna molesta MÁS con calima | AOD total: Open-Meteo AQ · AOD_dust: CAMS prefetch | GEOS-FP (perfil vertical) → heurística; BDRC solo si conceden credenciales | AERONET Granada + k de la allsky |
@@ -195,8 +195,18 @@ https://previous-runs-api.open-meteo.com/v1/forecast?...&hourly=temperature_2m_p
 
 # 6) TESS stars289 (y cualquier estación de la red, ~250–300 vivas de 658):
 POST https://tess.dashboards.stars4all.eu/api/tsdb/query   {datasourceId:2, InfluxQL sobre
-  mqtt_consumer, name='stars289'}  → mag, tamb, tsky desde ~2019. Filtros: frescura <15 min
+  mqtt_consumer, name='stars289'}  → campos mag, tamb, tsky. Filtros: frescura <15 min
   Y rango 14≤mag≤23. Coordenadas: tags del dashboard (geocodificar) o catálogo tessdb.
+#    VERIFICADO 27-08-2026 al implementar el worker:
+#    · Histórico desde 2019 (~400–500k muestras/año, cadencia ~1/min). Volumen manejable.
+#    · **stars289 publica tamb=0 y tsky=0 SIEMPRE: sus sensores de temperatura no reportan**
+#      (comprobado contra stars1/stars4/stars1000, que sí dan valores reales). Corolario que
+#      CORRIGE la suposición de versiones anteriores: **el TESS de AstroCamp da brillo de
+#      cielo, NO detección de nubes por IR** — el índice `100−3·(tamb−tsky)` daría un "nublado"
+#      constante. La señal de nubes sale de los CloudWatchers de cloud.html. El worker trata
+#      el doble cero como dato ausente (nunca fabrica un índice a partir de ceros).
+#    · Física validada: mediana nocturna de julio-2026 = **21.8–22.0 mag/arcsec²**, que
+#      confirma el `B_ref = 21.9` del sitio (§0) medido, no supuesto.
 
 # 7) cloud.html (scraper, sin SLA): 2 CloudWatchers, 2 estaciones (P real), techos S1R1…S2R4,
 #    tabla de horas abiertas 2012–2026. Filtrar por frescura de timestamp, no por posición.

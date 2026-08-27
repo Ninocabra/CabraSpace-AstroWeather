@@ -30,7 +30,7 @@ def utcnow() -> datetime:
 
 # --- raw --------------------------------------------------------------------
 def store_raw(
-    payload: bytes | str | dict[str, Any],
+    payload: bytes | str | dict[str, Any] | list[Any],
     *,
     source: str,
     site_id: str,
@@ -43,7 +43,7 @@ def store_raw(
     Files are content-addressed by hash, so re-fetching the same payload does
     not duplicate it, and an existing file is never overwritten.
     """
-    if isinstance(payload, dict):
+    if isinstance(payload, (dict, list)):
         payload = json.dumps(payload, ensure_ascii=False, sort_keys=True)
     if isinstance(payload, str):
         payload = payload.encode("utf-8")
@@ -113,9 +113,9 @@ def write_canonical(
     # The name must be unique even for two writes within the same second
     # (surface and profile workers run back to back): without the content
     # digest the second write silently overwrote the first.
-    digest = hashlib.sha256(
-        f"{sorted(r.get('model') for r in rows)}{len(rows)}".encode()
-    ).hexdigest()[:8]
+    models = sorted({str(row.get("model")) for row in rows})
+    fingerprint = f"{dataset}|{models}|{len(rows)}|{first}"
+    digest = hashlib.sha256(fingerprint.encode()).hexdigest()[:8]
     path = directory / f"{stamp:%Y%m%dT%H%M%SZ}_{digest}.parquet"
     counter = 0
     while path.exists():
