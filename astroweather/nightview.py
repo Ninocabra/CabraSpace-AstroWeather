@@ -27,6 +27,8 @@ import json
 import math
 from dataclasses import dataclass
 
+from zoneinfo import ZoneInfo
+
 from .dome import fetch_cloud_grid, project_clouds
 from .ephem import moon_illumination, moon_phase_angle, moon_positions, night_for, sun_positions
 from .extinction import evaluate as evaluate_transparency
@@ -35,6 +37,7 @@ from .site import NERPIO, Site
 from .skymodel import predict
 from .skyobjects import (milky_way_field, planet_positions, sidereal_degrees,
                          visible_stars)
+from .skybackground import NATURAL_FLOOR_MAG as NATURAL_FLOOR
 from .targets import CATALOGUE, MIN_ALTITUDE, SKY_GATE, evaluate_night
 
 # Cloud within this many degrees of a target's azimuth is cloud that matters
@@ -42,6 +45,82 @@ from .targets import CATALOGUE, MIN_ALTITUDE, SKY_GATE, evaluate_night
 # to know which side of a target a patch sits on would be false precision.
 AZIMUTH_SECTOR_DEG = 35.0
 CLOUD_EVENT_THRESHOLD = 40.0
+
+# The archive keeps UTC and always will. The VIEW is read by someone standing
+# in Nerpio, for whom "the window opens at 17:19" is nonsense and "19:19" is
+# obvious. ZoneInfo carries the summer-time change, so this stays right across
+# the last Sunday of October without anyone remembering it.
+LOCAL = ZoneInfo("Europe/Madrid")
+
+# Terciles measured on this site's own archive, so "good" means good HERE.
+# Aerosol optical depth over 22,625 hours of CAMS, and sky background over
+# 65,844 clean photometer hours. Quoting a number without saying whether it is
+# good is most of the way to quoting it uselessly, which is what the seeing
+# tercile already fixed for turbulence.
+AOD_TERCILES = (0.060, 0.110)
+SKY_TERCILES = (21.25, 21.52)
+# Below this margin between air temperature and dew point the corrector plate
+# fogs. Standard astrophotography practice, NOT measured here.
+DEW_MARGIN_WARN, DEW_MARGIN_CRITICAL = 3.0, 1.0
+
+
+def _tercile(value: float, low: float, high: float, higher_is_better: bool) -> str:
+    if higher_is_better:
+        return "favorable" if value >= high else "normal" if value >= low else "desfavorable"
+    return "favorable" if value <= low else "normal" if value <= high else "desfavorable"
+
+
+def _advice(*, moon_illumination: float, moon_up: bool, dust: bool,
+            seeing_tercile: str, sky_tercile: str, dew_margin: float | None,
+            humidity: float | None) -> list[dict]:
+    """What tonight is FOR, in the terms an imager actually plans in.
+
+    A panel of numbers tells you the state of the sky. This tells you what to
+    do about it, which is the whole reason the numbers were gathered.
+    """
+    notes = []
+    if moon_up and moon_illumination > 0.55:
+        notes.append({"kind": "moon", "level": "warn", "text":
+            f"Luna al {moon_illumination*100:.0f} %: noche de BANDA ESTRECHA. "
+            f"Un filtro de 3-5 nm deja pasar una rendija del continuo lunar, "
+            f"asi que Ha y OIII cunden mientras el banda ancha no cuaja."})
+    elif moon_illumination < 0.25 or not moon_up:
+        notes.append({"kind": "moon", "level": "good", "text":
+            "Sin Luna: es la noche para BANDA ANCHA y para lo de bajo "
+            "contraste (IFN, halos, colas de marea) que el resto del mes es "
+            "imposible. Gastarla en banda estrecha es tirar oscuridad."})
+    if dust:
+        notes.append({"kind": "dust", "level": "warn", "text":
+            "Calima: el polvo dispersa hacia delante y aplasta el contraste de "
+            "lo extenso y debil. Los objetos pequenos y brillantes lo notan "
+            "mucho menos, y el rojo atraviesa mejor que el azul."})
+    if seeing_tercile == "favorable":
+        notes.append({"kind": "seeing", "level": "good", "text":
+            "Seeing en el tercil bueno: aprovechalo en lo COMPACTO — "
+            "planetarias, cumulos globulares, nucleos de galaxia. En "
+            "nebulosidad extensa el seeing casi no se nota."})
+    elif seeing_tercile == "desfavorable":
+        notes.append({"kind": "seeing", "level": "warn", "text":
+            "Seeing en el tercil malo: renuncia al detalle fino y ve a lo "
+            "extenso. Una noche mediocre de seeing sigue siendo una buena "
+            "noche para nebulosas grandes."})
+    if sky_tercile == "favorable":
+        notes.append({"kind": "sky", "level": "good", "text":
+            "Fondo de cielo en el mejor tercio del archivo de este sitio."})
+    if dew_margin is not None and dew_margin <= DEW_MARGIN_CRITICAL:
+        notes.append({"kind": "dew", "level": "crit", "text":
+            f"Margen de rocio {dew_margin:.1f} °C: el corrector se empanara "
+            f"casi seguro. Resistencia anti-rocio puesta antes de empezar, no "
+            f"cuando ya se note."})
+    elif dew_margin is not None and dew_margin <= DEW_MARGIN_WARN:
+        notes.append({"kind": "dew", "level": "warn", "text":
+            f"Margen de rocio {dew_margin:.1f} °C: riesgo de empanamiento en "
+            f"las horas frias de madrugada."})
+    if humidity is not None and humidity >= 90:
+        notes.append({"kind": "humidity", "level": "warn", "text":
+            f"Humedad {humidity:.0f} %: cerca del punto en que muchos "
+            f"observatorios cierran por norma, al margen de que haya nubes."})
+    return notes
 
 
 @dataclass(frozen=True)
@@ -147,6 +226,26 @@ def _target_events(result, frames: list[dict], labels: list[str],
     return events
 
 
+def _site_weather(payload, index) -> dict:
+    """Humidity and its consequences, from the site's own grid cell.
+
+    Humidity was being collected and never shown, which is a strange thing to
+    do with the number that decides whether the corrector fogs and whether the
+    observatory closes on principle.
+    """
+    if not payload or index is None:
+        return {}
+    hourly = payload[0].get("hourly", {})
+    def at(key):
+        series = hourly.get(key) or []
+        return series[index] if index < len(series) else None
+    humidity, dew, temperature = at("relative_humidity_2m"), at("dew_point_2m"), at("temperature_2m")
+    margin = (round(temperature - dew, 1)
+              if temperature is not None and dew is not None else None)
+    return {"humidity": humidity, "dew_point": dew, "temperature": temperature,
+            "dew_margin": margin, "wind_ms": at("wind_speed_10m")}
+
+
 def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
           aod_total: float = 0.07, aod_dust: float = 0.01,
           jet_speed: float = 25.0, with_clouds: bool = True,
@@ -154,8 +253,10 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
     """Everything both views need, in one JSON-ready dictionary."""
     day = day or dt.datetime.now(dt.timezone.utc)
     night = night_for(day, site)
-    times = night.hours(30)
-    labels = [t.strftime("%H:%M") for t in times]
+    # Ten minutes through astronomical darkness, thirty either side: the part
+    # being planned against deserves the resolution, twilight does not.
+    times = night.adaptive_hours(10, 30, site)
+    labels = [t.astimezone(LOCAL).strftime("%H:%M") for t in times]
 
     skies = predict(times, site)
     moons = moon_positions(times, site)
@@ -193,6 +294,7 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
             "dark": suns[index].altitude < -18.0,
             "clouds": (project_clouds(points, payload, cloud_index)
                        if cloud_index is not None else []),
+            **_site_weather(payload, cloud_index),
         })
 
     results = evaluate_night(CATALOGUE, times,
@@ -219,8 +321,50 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
                                       transparency)],
         })
 
+    # --- the question the observer actually asks -------------------------
+    outlook = None
+    try:
+        from .calibration import Calibrator
+        from .roof import load_climatology, outlook as roof_outlook
+        climatology, calibrator = load_climatology(), Calibrator.load()
+        if climatology and calibrator:
+            clear = [calibrator.probability(
+                        max((c["cover"] for c in f["clouds"]), default=0.0), 24.0)
+                     for f in frames]
+            result = roof_outlook(day, clear, times, climatology, site)
+            outlook = {"probability": result.open_probability,
+                       "verdict": result.verdict,
+                       "sentence": result.sentence,
+                       "expected_hours": result.expected_open_hours,
+                       "typical_hours": result.climatological_hours,
+                       "range_hours": [result.low_hours, result.high_hours],
+                       "month_fraction": result.human_factor,
+                       "hourly": result.hourly}
+    except Exception:
+        outlook = None
+
+    darkest = max((f["sky_mag"] for f in frames if f["sky_mag_trustworthy"]),
+                  default=NATURAL_FLOOR)
+    middle = frames[len(frames) // 2]
+    sky_tercile = _tercile(darkest, *SKY_TERCILES, higher_is_better=True)
+    aod_tercile = _tercile(transparency.aod_site, *AOD_TERCILES, higher_is_better=False)
+    margins = [f.get("dew_margin") for f in frames if f.get("dew_margin") is not None]
+    humidities = [f.get("humidity") for f in frames if f.get("humidity") is not None]
+
     mid = times[len(times) // 2]
     return {
+        "roof": outlook,
+        "advice": _advice(
+            moon_illumination=moon_illumination(night.dusk_astronomical or night.night),
+            moon_up=any(f["moon_alt"] > 0 and f["dark"] for f in frames),
+            dust=transparency.dust_alert,
+            seeing_tercile=turbulence.tercile,
+            sky_tercile=sky_tercile,
+            dew_margin=min(margins) if margins else None,
+            humidity=max(humidities) if humidities else None),
+        "sky_tercile": sky_tercile,
+        "aod_tercile": aod_tercile,
+        "timezone": "Europe/Madrid",
         "site": {"name": site.name, "lat": site.latitude, "lon": site.longitude,
                  "elevation": site.site_elevation},
         "night": night.night.date().isoformat(),

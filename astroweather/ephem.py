@@ -131,6 +131,29 @@ class Night:
         return max(0.0, (self.dawn_astronomical
                          - self.dusk_astronomical).total_seconds() / 3600)
 
+    def adaptive_hours(self, dark_step: int = 10, twilight_step: int = 30,
+                       site: Site = NERPIO) -> list[datetime]:
+        """Fine sampling where it matters, coarse where it does not.
+
+        Ten minutes through astronomical darkness, because that is the part
+        being planned against and a cloud front crosses the dome in less than
+        half an hour. Thirty either side, because nobody images in twilight and
+        a uniform ten-minute grid would triple the payload to say nothing.
+        """
+        if not (self.window_start and self.window_end):
+            return []
+        probe = self.hours(dark_step)
+        altitudes = [p.altitude for p in sun_positions(probe, site)]
+        grid, last = [], None
+        for when, altitude in zip(probe, altitudes):
+            step = dark_step if altitude < -18.0 else twilight_step
+            if last is None or (when - last).total_seconds() >= step * 60 - 1:
+                grid.append(when)
+                last = when
+        if grid and grid[-1] != probe[-1]:
+            grid.append(probe[-1])
+        return grid
+
     def hours(self, step_minutes: int = 10) -> list[datetime]:
         """The sampling grid the rest of the pipeline works on."""
         if not (self.window_start and self.window_end):

@@ -70,7 +70,8 @@ def fetch_cloud_grid(site: Site = NERPIO, days: int = 2) -> tuple[list, list]:
         params={
             "latitude": ",".join(f"{p[0]:.4f}" for p in points),
             "longitude": ",".join(f"{p[1]:.4f}" for p in points),
-            "hourly": "cloud_cover_low,cloud_cover_mid,cloud_cover_high",
+            "hourly": ("cloud_cover_low,cloud_cover_mid,cloud_cover_high,"
+                       "relative_humidity_2m,dew_point_2m,temperature_2m,wind_speed_10m"),
             "models": "ecmwf_ifs", "forecast_days": days, "timezone": "UTC",
         },
         timeout=90,
