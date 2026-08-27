@@ -29,7 +29,9 @@ empieza antes que ninguna otra cosa.
 - [x] Worker de forecast híbrido: 9 km (superficie+nubes+BLH) + perfiles de 4 modelos (`fetch_forecast.py`)
 - [x] Worker TESS con backfill 2019→hoy (`fetch_tess.py`) — brillo de cielo, ~450k muestras/año
 - [x] Worker AEMET: histórico diario 2019→hoy de la estación 7067Y (`fetch_aemet.py`)
-- [ ] Workers: air quality (CAMS/ADS), scraper de cloud.html
+- [x] Scraper de AstroCamp (`scrape_astrocamp.py`) — CloudWatchers, estaciones, techos, log de seguridad y 15 años de horas de cúpula
+- [x] Capa de consulta deduplicada (`queries.py`) — vistas `measurements`, `forecasts`, `nights`
+- [ ] Worker de air quality (CAMS/ADS)
 - [ ] Backfill determinista (Previous Runs)
 - [ ] Pipeline FWHM (FITS → estrellas → FWHM + excentricidad → cenit/λ → Parquet)
 - [ ] Panel de verificación mínimo
@@ -45,14 +47,16 @@ python -m astroweather.workers.fetch_ensemble --days 7   # archiva los 51 miembr
 python -m astroweather.workers.fetch_forecast --days 7   # hibrido: 9 km + perfiles 4 modelos
 python -m astroweather.workers.fetch_tess                 # backfill TESS (reanudable por meses)
 python -m astroweather.workers.fetch_aemet                # historico diario de la estacion 7067Y
+python -m astroweather.workers.scrape_astrocamp           # sensores del sitio (correr cada 5 min)
 python -m pytest tests/ -q
 ```
 
 Consultar lo archivado:
 
 ```python
-import duckdb
-duckdb.sql("""
+from astroweather.queries import connect
+c = connect()          # vistas ya deduplicadas
+c.execute("""
   SELECT valid_utc,
          sum(CASE WHEN cloud_total < 20 THEN 1 ELSE 0 END)*1.0/count(*) AS p_raw
   FROM read_parquet('data/forecasts/**/*.parquet', hive_partitioning=true)
