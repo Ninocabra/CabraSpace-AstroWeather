@@ -8,10 +8,14 @@ panel says so out loud.
 
 What can be verified today, with the archive as it stands:
 
-* Clouds, against the observatory's own Clear/Cloudy verdict and against the
-  photometer. Note the photometer only sees clouds once the Moon is modelled
-  out (verified: lunar illumination dominates the raw variability), so the
-  cloud score currently leans on the safety log and on AEMET rainfall.
+* Clouds: NOT HERE ANY MORE, see `scoreboard.py`. This module scored them
+  against `measurements.clear_flag`, and that column dies in 2021 -- the TESS
+  cloud index needs tamb and tsky, and AstroCamp's station has published a
+  literal zero for both ever since. Against forecasts that start in 2024 the
+  join left 51 rows out of 22000, all from two days of a different sensor, and
+  the panel printed Brier=0.000 as if it were perfect skill. The section now
+  refuses to score on that little and points at the scoreboard, which uses the
+  photometer itself as truth (6822 hours of overlap instead of 51).
 * Surface temperature, against the AEMET station 11.5 km away, which is
   external ground truth and labelled as such.
 
@@ -26,12 +30,18 @@ from datetime import date
 from .queries import connect
 
 CLEAR_THRESHOLD = 20.0        # cloud cover below this counts as clear
+# A Brier over a handful of hours from one clear spell is not a score. This is
+# the guard that stops the panel from announcing skill it does not have.
+MIN_CLOUD_PAIRS = 200
 
 
-def cloud_scores(start: date | None = None, root=None) -> list[dict]:
+def cloud_scores(start: date | None = None, root=None,
+                 min_pairs: int = MIN_CLOUD_PAIRS) -> list[dict]:
     """Brier score per model and lead time against the observatory's verdict.
 
-    Lower is better; 0.25 is what a constant 50 % guess scores.
+    Lower is better; 0.25 is what a constant 50 % guess scores. `min_pairs`
+    exists so a unit test can score a ten-hour fixture without lowering the bar
+    for the panel, which needs MIN_CLOUD_PAIRS before it says anything.
     """
     connection = connect(root)
     where = f"AND f.valid_utc >= DATE '{start}'" if start else ""
@@ -62,7 +72,7 @@ def cloud_scores(start: date | None = None, root=None) -> list[dict]:
                    AS brier
         FROM predictions p JOIN truth t USING (hour)
         GROUP BY p.model, p.lead_h
-        HAVING count(*) >= 5
+        HAVING count(*) >= {min_pairs}
         ORDER BY brier
     """).fetchall()
 
@@ -149,7 +159,10 @@ def report(root=None) -> str:
             lines.append(f"    {score['model']:26s} lead {score['lead_h']:>3}h  "
                          f"n={score['n']:>4}  Brier={score['brier']:.3f}")
     else:
-        lines.append("    sin pares suficientes todavia (hace falta mas verdad terreno)")
+        lines.append(f"    NO se puntua: clear_flag muere en 2021 (el sensor de AstroCamp")
+        lines.append(f"    publica tamb=tsky=0) y las predicciones empiezan en 2024, asi que")
+        lines.append(f"    no hay ni {MIN_CLOUD_PAIRS} pares. El marcador bueno usa el propio")
+        lines.append(f"    fotometro como verdad: python -m astroweather.scoreboard")
 
     lines += ["", "TEMPERATURA - contra AEMET 7067Y (11.5 km, 165 m mas abajo)"]
     temps = temperature_scores(root=root)

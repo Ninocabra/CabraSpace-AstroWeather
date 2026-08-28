@@ -141,6 +141,11 @@ def _job_credentials():
 def _job_verification():
     from .verification import report
     logger.info("panel de verificacion:\n%s", report())
+    # The scoreboard is the half that says which provider is winning, and it
+    # can only ever score what was archived while it was running. Logged from
+    # the day it exists so the multi-model comparison starts accumulating.
+    from .scoreboard import report as scoreboard_report
+    logger.info("marcador de modelos:\n%s", scoreboard_report())
 
 
 def _heartbeat():

@@ -40,7 +40,9 @@ def archive(tmp_path):
 
 
 def test_a_correct_forecast_scores_better_than_a_wrong_one(archive):
-    scores = {s["model"]: s["brier"] for s in cloud_scores(root=archive)}
+    # min_pairs is lowered on purpose: this checks the arithmetic on a fixture
+    # of ten hours. The panel's own bar stays at MIN_CLOUD_PAIRS.
+    scores = {s["model"]: s["brier"] for s in cloud_scores(root=archive, min_pairs=5)}
     assert scores["good"] == pytest.approx(0.0)
     assert scores["bad"] == pytest.approx(1.0)
     assert scores["good"] < scores["bad"]
