@@ -66,13 +66,27 @@ def test_full_moon_brightens_the_sky_to_the_textbook_value():
     assert 18.0 < sky < 19.5          # the classic full-moon sky
 
 
-def test_a_moon_below_the_horizon_contributes_nothing_physical():
-    """The formulae keep returning light down there; the physics does not."""
-    result = moon_brightness(phase_angle_deg=0, separation_deg=90,
-                             moon_altitude_deg=-3, target_altitude_deg=60)
-    assert result.physical_nl == 0.0
-    assert result.display_nl > 0.0    # smoothing exists, but is kept apart
-    assert sky_magnitude([21.9, result.physical_mag]) == pytest.approx(21.9)
+def test_a_moon_just_below_the_horizon_still_lights_the_sky():
+    """This test used to assert the opposite, and the archive said otherwise.
+
+    The old belief was that below the horizon the physical contribution is zero
+    and any roll-off is decoration. Measured here on 2026-08-28: with the Moon
+    geometrically invisible the sky is still brighter, decaying with the shadow
+    height of the atmosphere. That is what `beam_transmission` carries, and it
+    is also the evidence that the excess is sky and not stray light in the
+    instrument -- stray light needs the direct beam.
+    """
+    just_below = moon_brightness(phase_angle_deg=0, separation_deg=90,
+                                 moon_altitude_deg=-1, target_altitude_deg=60)
+    deep_below = moon_brightness(phase_angle_deg=0, separation_deg=90,
+                                 moon_altitude_deg=-10, target_altitude_deg=60)
+    above = moon_brightness(phase_angle_deg=0, separation_deg=90,
+                            moon_altitude_deg=5, target_altitude_deg=60)
+    assert just_below.physical_nl > 0.0
+    assert just_below.physical_nl < above.physical_nl
+    # ...and once the whole air column is in shadow, then it really is zero.
+    assert deep_below.physical_nl == 0.0
+    assert sky_magnitude([21.9, deep_below.physical_mag]) == pytest.approx(21.9)
 
 
 def test_haze_makes_the_moon_worse_not_better():

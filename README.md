@@ -42,17 +42,23 @@ empieza antes que ninguna otra cosa.
 
 ## Fase 1 — en curso
 
-- [x] **Rodaja 1: Noche + Luna** (`ephem.py`, `moonsky.py`) — ventana de la noche,
-      efemerides precisas y el modelo lunar de Krisciunas & Schaefer con sus tres
-      trampas resueltas (Luna bajo el horizonte, separaciones < 10 grados, y el
-      acoplamiento con la extincion: con calima la Luna molesta MAS).
+- [x] **Rodaja 1: Noche + Luna** (`ephem.py`, `moonsky.py`, `moonscatter.py`) —
+      ventana de la noche, efemerides precisas y el modelo lunar con la
+      estructura de Krisciunas & Schaefer pero con la **ley de dispersion MEDIDA
+      aqui**: la de Mauna Kea se queda corta por un factor de 1,2 con la Luna
+      baja a 5,5 con la Luna alta. Y con una de sus "tres trampas" derogada por
+      el archivo: **la Luna bajo el horizonte NO aporta cero**, sigue dando
+      +0,19 mag con el disco ya invisible, decayendo con la sombra geometrica de
+      la atmosfera. Validado contra noches reservadas (`moonvalidation.py`).
 - [x] **Rodaja 2: Nubes** — modelo de cielo despejado (`skymodel.py`), deteccion de
       nubes historica sobre los 7 anos del TESS, y calibrador de probabilidad
-      (`calibration.py`) entrenado con 33.924 pares de 2,6 anos.
-      **Resultado honesto: bate a la climatologia solo un 3-6 % (BSS), aunque la
-      probabilidad esta bien calibrada** (cuando dice 71 %, ocurre el 70,7 %).
-      El forecast determinista discrimina poco en este sitio; la mejora vendra
-      del EPS y del nowcast local, no de mas ajuste.
+      (`calibration.py`) entrenado con 33.799 pares de 2,6 anos.
+      **BSS +11,7 % sobre climatologia.** Era +3,5 % hasta el 28-08-2026, y la
+      diferencia no fue mas ajuste sino arreglar la VERDAD: con el modelo lunar
+      de Mauna Kea, una noche despejada con Luna salia hasta 1,8 mag fuera del
+      modelo y se archivaba como nublada. Eso caia casi entero sobre horas que
+      el forecast habia dado por despejadas, que es donde la curva estaba plana:
+      previsto 0-10 % de nubes pasa de 75,3 % a 90,1 % de horas despejadas.
 - [x] **Rodaja 3: Lluvia + viento + techo** (`gates.py`, `tonight.py`) → **MVP
       OPERACIONAL COMPLETO**: `python -m astroweather.tonight` responde de punta
       a punta "¿podre observar esta noche, con seguridad, y cuando?".
@@ -61,7 +67,9 @@ empieza antes que ninguna otra cosa.
       y 22.512 horas de AOD historico. Validado contra el fotometro: **mas
       aerosol = cielo mas OSCURO** aqui (lo contrario de la intuicion urbana).
 - [x] **Rodaja 5: Fondo de cielo** (`skybackground.py`) — presupuesto por
-      componentes MEDIDO en el sitio: suelo natural 21.71 (no el 21.9 supuesto),
+      componentes MEDIDO en el sitio: suelo natural 21.71 (no el 21.9 supuesto;
+      **pero ver SPEC 2.2 bis: ese suelo deriva +0,56 mag entre 2019 y 2026 y no
+      describe ningun ano**),
       zodiacal 0.27 mag en la ecliptica, airglow lento por F10.7, y el coste en
       exposicion de cada magnitud perdida.
 - [x] **Rodaja 6: Seeing** (`seeing.py`) — perfil Hufnagel-Valley con los tres
@@ -72,8 +80,11 @@ empieza antes que ninguna otra cosa.
       el telescopio, no el cielo.
 - [x] **Motor de horas-SNR por target** (`targets.py`) → **MVP RECOMENDADOR**.
       Responde "que fotografiar y cuanto cundira", con dos numeros por objeto
-      (si despeja / esperadas) y su motivo. Verificado: en luna llena recomienda
-      banda estrecha y descarta banda ancha; en luna nueva se invierte.
+      (si despeja / esperadas) y su motivo. **Con una regresion conocida y sin
+      tapar** (test en xfail): con el cielo lunar corregido, las constantes de
+      banda estrecha -- calibradas contra un cielo 1,8 mag demasiado oscuro --
+      hacen que con Luna llena ya no recomiende banda estrecha, que como consejo
+      es falso. Se re-derivan con la LUT de SkyCalc.
 - [ ] Lienzo nocturno (mockup SVG antes que backend)
 
 ## Recogida automatica

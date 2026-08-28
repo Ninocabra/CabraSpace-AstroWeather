@@ -17,19 +17,32 @@ Two deliberate limits:
 
 Ground truth comes from the photometer residual, not from a cloud sensor: the
 site's IR channels do not report, and the residual against the clear-sky model
-is what recovers cloudiness back to 2019.
+is what recovers cloudiness back to 2019. That also means the truth INHERITS
+every error of the clear-sky model, which is how it spent months measuring the
+Moon; the correlation with lunar illumination is the control that has to be run
+against the truth itself, not only against the forecast.
 
-What the archive actually says, measured over 33,924 hours (this is the shape
+What the archive actually says, measured over 33,799 hours (this is the shape
 the fit reproduces, not an artefact of it):
 
-    forecast 0-10 % cloud   ->  75.3 % of hours were clear
-    forecast 50-60 %        ->  59.5 %
-    forecast exactly 100 %  ->  40.0 %
+    forecast 0-10 % cloud   ->  90.1 % of hours were clear
+    forecast 30-50 %        ->  71.9 %
+    forecast 50-60 %        ->  65.6 %
+    forecast exactly 100 %  ->  41.6 %
 
-Monotonic and real, but shallow, and ASYMMETRIC in a way worth surfacing in the
-product: a fully overcast forecast is genuinely informative, while a clear
-forecast still only buys three nights in four. This model is much better at
-saying "do not bother" than at promising a good night.
+Monotonic, real and now STEEP. It was not steep before, and the reason is worth
+recording because it was the biggest defect this project has found. Against the
+old sky model the same table read 75.3 % / 59.5 / 40.0, and the flatness was an
+artefact of the truth, not of the forecast: the moonlight law was Mauna Kea's,
+so a clear night with the Moon up came out 0.7-1.8 mag off the model and was
+filed as cloudy. That mislabelling landed almost entirely on hours the forecast
+had called CLEAR, which is exactly where the curve was flattest. Fixing the sky
+model (moonscatter.py) moved the top of the curve from 75.3 % to 90.1 % and left
+the overcast end alone, and the skill score went from +3.5 % to +11.7 % over
+climatology on the same forecasts.
+
+The base rate moved with it, from 53.5 % of deep-night hours clear to 74.1 %.
+Half the difference is nights that were always clear and were being thrown away.
 """
 
 from __future__ import annotations
@@ -43,6 +56,7 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import minimize
 
+from .moonscatter import IN_FIELD_DEG as MOONSCATTER_IN_FIELD_DEG
 from .queries import DATA_ROOT, connect
 from .skymodel import predict
 
@@ -59,6 +73,29 @@ from .skymodel import predict
 #
 # What the value IS defensible on: it is the within-hour scatter of a sky that
 # tracks the model, and the level test below is what carries the rest.
+#
+# DEJADO FIJO A PROPOSITO, y esto es un limite conocido, no un descuido. Este
+# umbral NO tiene la misma sensibilidad con Luna que sin ella: una nube fina
+# redistribuye luz lunar y mueve el fotometro, mientras que sin Luna apenas
+# toca el airglow. Medido sobre horas que la prevision determinista -- que no
+# sale del fotometro -- da por despejadas o por nubladas:
+#
+#     dispersion intrahoraria, con Luna llena contra sin Luna
+#         prevision 0-10 % de nubes    x1,59
+#         prevision 70-100 %           x2,96
+#
+# Si el exceso fuera error del modelo escalaria igual en las dos filas. No lo
+# hace: con Luna se VE nube que sin Luna se pierde. Por eso queda una
+# correlacion de -0,43 entre iluminacion lunar y fraccion de noche despejada
+# que NO se debe eliminar ensanchando este umbral: un g que la lleva a -0,05
+# hace que las horas con prevision de 90-100 % de nubes salgan despejadas el
+# 71,5 % de las veces, contra el 42,1 % de ahora. Eso no es una verdad mejor,
+# es un detector apagado.
+#
+# Lo que queda por hacer bien: guardar la sensibilidad JUNTO a la etiqueta
+# (la fraccion de luz que pone la Luna) para que el calibrador pueda
+# condicionar en ella, en vez de igualar por la fuerza dos etiquetas que
+# significan cosas distintas.
 CLEAR_SCATTER_THRESHOLD = 0.10
 MIN_SAMPLES_PER_HOUR = 4
 
@@ -81,8 +118,43 @@ MIN_SAMPLES_PER_HOUR = 4
 # 0.248 -- the model got better, so its residual got narrower. The residual
 # offset is the zodiacal elongation gain, which the joint fit of the sky
 # budget did not model; it lands here rather than being tuned away.
-CLEAR_LEVEL_CENTRE = 0.10
-CLEAR_LEVEL_TOLERANCE = 0.74
+# Re-derivados el 2026-08-28 contra el modelo de cielo con la ley de dispersion
+# lunar medida aqui (moonscatter.py). Sobre 11.766 horas estables de noches de
+# AJUSTE: centro robusto -0,0164, sigma robusta 0,2290, corte a tres sigmas.
+#
+# Lo que arreglan, que era el fallo mas grande del proyecto: contra el modelo
+# anterior el residuo con la Luna arriba valia -0,713 y el corte estaba a 0,74
+# del centro 0,10, asi que una noche despejada con Luna se archivaba como
+# nublada -- la mitad de la muestra. Ahora el centro no depende de la Luna:
+#
+#     fraccion de luz que pone la Luna   centro    sigma
+#         0,00-0,05  (7.171 horas)       -0,029    0,213
+#         0,05-0,50  (1.079)             -0,023    0,204
+#         0,50-0,90  (1.400)             +0,029    0,244
+#         0,90-1,00  (2.116)             +0,003    0,297
+#
+# DEUDA CON FECHA. Estos dos numeros son de los siete anios juntos, y el suelo
+# del cielo NO es estacionario: la mediana sin Luna sube 0,56 mag entre 2019 y
+# 2026 (SPEC v8 seccion 2.2 bis). Dentro de la verdad ya se nota, aunque todavia
+# no en la tasa global sino en POR QUE LADO se rechaza:
+#
+#     anio   nivel mediano   rechazo por brillante / por oscuro
+#     2019      -0,121              5,9 %  /  2,6 %
+#     2024      +0,042              1,5 %  /  1,4 %
+#     2026      +0,287              0,2 %  /  5,0 %
+#
+# La tolerancia de 0,687 absorbe la deriva por ahora (la tasa de despejado se
+# queda entre 67 y 77 %), pero al ritmo actual de +0,08 mag/anio el nivel mediano
+# alcanza la tolerancia hacia **2031**, y mucho antes empieza a sesgar. Cuando se
+# resuelva 2.2 bis, esto se re-deriva con un termino temporal en vez de una media.
+CLEAR_LEVEL_CENTRE = -0.016
+CLEAR_LEVEL_TOLERANCE = 0.687
+
+# La Luna dentro del campo del fotometro no es brillo de cielo: el instrumento
+# la esta mirando. Son 144 muestras de 131.096 -- solo ocurre cerca de una
+# parada mayor lunar, porque a esta latitud la Luna no pasa de 80,5 grados --
+# pero contaminan el residuo por un factor 2,8 y no se pueden interpretar.
+MOON_IN_FIELD_ALTITUDE = 90.0 - MOONSCATTER_IN_FIELD_DEG
 MODEL_PATH = DATA_ROOT / "cloud_calibration.json"
 
 
@@ -141,10 +213,13 @@ def observed_clear_hours(since: str = "2024-02-01", root=None) -> dict[dt.dateti
     predictions = predict([t for t, _ in rows])
     by_hour: dict[dt.datetime, list[float]] = defaultdict(list)
     for (time, measured), clear_sky in zip(rows, predictions):
-        if clear_sky.sun_altitude < -18.0:       # deep night only
-            key = time.astimezone(dt.timezone.utc).replace(
-                minute=0, second=0, microsecond=0, tzinfo=None)
-            by_hour[key].append(measured - clear_sky.predicted_mag)
+        if clear_sky.sun_altitude >= -18.0:       # deep night only
+            continue
+        if clear_sky.moon_altitude > MOON_IN_FIELD_ALTITUDE:
+            continue                              # el fotometro mira a la Luna
+        key = time.astimezone(dt.timezone.utc).replace(
+            minute=0, second=0, microsecond=0, tzinfo=None)
+        by_hour[key].append(measured - clear_sky.predicted_mag)
 
     return {
         hour: (float(np.std(values)) < CLEAR_SCATTER_THRESHOLD

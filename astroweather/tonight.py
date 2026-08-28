@@ -174,10 +174,14 @@ def render(night_report: NightReport) -> str:
         for hour in blocked[:4]:
             lines.append(f"    {hour.t_utc:%H:%M}  {hour.safety.summary}")
 
+    # Medido el 2026-08-28 sobre 33.799 pares, contra el modelo de cielo con la
+    # ley de dispersion lunar del sitio. Antes de arreglarla estas dos cifras
+    # eran 40 % y 75 %, y la de arriba estaba mal por la verdad, no por el
+    # forecast: una noche despejada con Luna se archivaba como nublada.
     lines += ["", f"  {night_report.calibration_note}",
-              "  el forecast acierta mas avisando de noches malas que prometiendo",
-              "  buenas: cubierto total -> 40 % de horas despejadas, pero cielo",
-              "  limpio previsto -> solo 75 %.",
+              "  cubierto total previsto -> 42 % de horas despejadas; cielo limpio",
+              "  previsto -> 90 %, sobre una tasa base del 74 %. Sigue avisando",
+              "  mejor de las noches malas, pero ya promete las buenas.",
               "  seeing y calidad por dimension: pendientes de las rodajas 4-6."]
     return "\n".join(lines)
 

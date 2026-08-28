@@ -12,6 +12,84 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 28-08-2026 — La ley de dispersión lunar del sitio, y el contrato de v8 que resultó falso
+
+**Qué se buscaba:** la "respuesta angular del fotómetro", porque el 28-08 por la
+mañana se había concluido que el exceso de brillo con Luna era luz parásita del
+instrumento (el test del AOD, sobre un rango de 52×, no encontró dependencia con
+el aerosol → "no es atmósfera").
+
+**Qué salió:** la conclusión era errónea y el propio archivo la refuta. El test
+del AOD descarta el **aerosol**, no la atmósfera: la dispersión Rayleigh la fija
+la densidad del aire, que es constante, así que un fallo en ese término tampoco
+correlaría con el AOD. Cuatro medidas, en orden:
+
+1. **No son nubes iluminadas por la Luna** (el rival que el AOD no toca, y del
+   mismo signo). Con horas planas —dispersión intrahoraria < 0,02 mag, donde sin
+   Luna el modelo clava el cero: residuo +0,004— el exceso sigue entero: −0,67
+   mag a 20-30° de altura lunar y −1,02 a 30-40°.
+2. **La forma es una función de fase.** La función de dispersión medida se
+   describe con una exponencial única a **3,8 % de rms**.
+3. **El aerosol sigue descartado** sobre la cantidad correcta: 1.730 horas
+   estables, AOD de 0,010 a 0,540 (**54×**), respuesta plana (×0,97 a ×1,15).
+4. **Y el que decide: la Luna BAJO el horizonte.** La luz parásita necesita el
+   haz directo. Con el centro de la Luna por debajo de −0,83° —ya invisible— el
+   exceso es **+0,19 mag a 5-7σ** y decae con la altura de la sombra geométrica
+   de la atmósfera. Control con Luna nueva: **+0,009 mag**.
+
+**Cambios en el código:**
+- Nuevo `astroweather/moonscatter.py`: `f(θ) = 1,3612e7·10^(−θ/48,55°)` con suelo
+  en la función publicada de Mauna Kea (este sitio no puede dispersar menos), y
+  `beam_transmission(altura)`, la transmisión del haz medida al cruzar el
+  horizonte, que llega a cero a −6°.
+- **Derogado el contrato de SPEC v8 §2.2 «B_moon_physical = 0 bajo el
+  horizonte»**. El `smoothing_UI` con escala inventada de 1,5° estaba tapando
+  física real; ahora es física y entra en mag_sky y en horas-SNR.
+- `calibration.py`: centro y tolerancia del test de nivel re-derivados contra el
+  modelo nuevo (+0,10/0,74 → **−0,016/0,687**), y exclusión de las horas con la
+  Luna dentro del campo del TESS-W (θ < 12°, 144 muestras de 131.096: ahí el
+  instrumento mira a la Luna y la medida se va ×2,8).
+- Nuevo `astroweather/moonvalidation.py`: el criterio conjunto contra noches
+  reservadas por hash de la fecha (no por corte temporal, que mezclaría la
+  validación con el ciclo de 18,6 años de la declinación lunar).
+- `scoreboard.py`: el titular de la persistencia sale ahora del signo del número
+  y no de lo que se creía. Afirmaba que la línea base ganaba cuando ya perdía.
+
+**Lo que arregla, medido:** contra la verdad limpia, la curva de fiabilidad pasa
+de 75,3 % a **90,1 %** de horas despejadas cuando la previsión da 0-10 % de
+nubes (el extremo de cubierto no se mueve: 40,0 → 41,6 %), la tasa base pasa de
+53,5 % a 74,1 %, y el BSS del calibrador de **+3,5 % a +11,7 %**. Y la
+persistencia, que "batía al modelo por 14 puntos" con intervalo de confianza
+limpio, **pierde por 54,1 puntos**: no era pericia meteorológica, era que entre
+una noche y las 1-5 siguientes la fase lunar apenas cambia.
+
+**Lo que NO se cumple, y no se fuerza:** el criterio pedía |r| < 0,15 entre
+iluminación lunar y fracción de noche despejada. Queda en **−0,42**. Lo que resta
+es **sensibilidad y no sesgo**: con Luna se ve nube fina que sin Luna se pierde
+(dispersión con Luna llena ×1,59 en horas que la previsión da despejadas contra
+×2,96 en las que da nubladas; un artefacto del modelo escalaría igual en las
+dos). Un umbral que lleva r a −0,05 hace que las horas con previsión de 90-100 %
+de nubes salgan despejadas el **71,5 %** de las veces, contra el 42,1 % de ahora.
+Eso no es una verdad mejor, es un detector apagado.
+
+**Rojo a propósito:** `test_a_full_moon_night_is_a_narrowband_night` queda en
+xfail. Con el cielo corregido el par de constantes de banda estrecha
+(`MOON_FILTER_FACTOR` 0,12 y `SKY_GATE` 19,5) estaba calibrado contra un cielo
+1,8 mag demasiado oscuro, y el producto pasa a decir que con Luna llena no se
+hace banda estrecha, que como consejo es falso. SPEC §2.3 ya da valores por
+filtro (Ha 3nm ≈ 0,05, OIII ≈ 0,20, SII ≈ 0,08) que el código no usa; se
+re-derivan los dos juntos con la LUT de SkyCalc.
+
+**Y un problema nuevo y mayor, abierto en SPEC §2.2 bis:** midiendo la
+reproducibilidad de la ley lunar aparece que **la mediana del cielo sin Luna sube
++0,56 mag entre 2019 y 2026**, monótona y robusta a estación y a suelo modelado
+fijo, con el ciclo solar prediciendo el signo contrario. `NATURAL_FLOOR_MAG =
+21.71` es una media de siete años que no describe ningún año, y eso es lo que
+domina la incertidumbre honesta de la ley lunar: **±17 % (0,17 mag) entre años a
+geometría fija**, no el 3,8 % del ajuste.
+
+---
+
 ## v8 — Especificación normativa limpia (27-08-2026)
 
 **Motivo:** la auditoría ChatGPT-2 demostró (grep confirmado) que el maestro v7 contenía instrucciones normativas obsoletas conviviendo con sus correcciones ("BLH solo GFS" en §1.6/§4 vs corregido en §1.4.3d; `score.py` y endpoints "score+confianza" vs el score eliminado en v6) — un riesgo técnico real si un agente de código implementa la instrucción muerta. La v8 reescribe TODO en formato corto: contratos, invariantes, física vigente, plan y decisiones. La historia sale del documento normativo (a este fichero).

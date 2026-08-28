@@ -284,7 +284,11 @@ def report(root=None) -> str:
 
     gap = persistence_gap(root=root)
     if gap is not None:
-        lines.append("  LO QUE HAY QUE MIRAR: 'COMO ANOCHE' LE GANA AL MODELO")
+        # El titular sale del signo del numero, no de lo que se creia el dia
+        # que se escribio: este bloque afirmaba que la persistencia ganaba, y
+        # lo siguio afirmando cuando ya perdia por 54 puntos.
+        persistence_wins = gap["persistence_bss"] > gap["model_bss"]
+        lines.append("  LA LINEA DE BASE GRATUITA: 'COMO ANOCHE' CONTRA EL MODELO")
         lines.append("    Misma muestra, %d horas en %d noches."
                      % (gap["hours"], gap["nights"]))
         lines.append("    persistencia BSS %+.1f %%   contra   modelo calibrado BSS %+.1f %%"
@@ -293,10 +297,17 @@ def report(root=None) -> str:
                      % (gap["gap_points"], gap["ci95"][0], gap["ci95"][1]))
         lines.append("    (las horas de una noche no son independientes). El modelo gana en")
         lines.append("    el %.1f %% de las remuestras." % (gap["model_wins_fraction"] * 100.0))
-        lines.append("    La linea de base gratuita bate al modelo: eso no lo tira a la basura")
-        lines.append("    -sumados van mejor que cualquiera de los dos- pero si dice que la")
-        lines.append("    persistencia tiene que ENTRAR en el calibrador, y que a 1 dia el")
-        lines.append("    producto todavia no justifica su complejidad.")
+        if persistence_wins:
+            lines.append("    La linea de base gratuita bate al modelo: eso no lo tira a la")
+            lines.append("    basura -sumados van mejor que cualquiera de los dos- pero si")
+            lines.append("    dice que la persistencia tiene que ENTRAR en el calibrador.")
+        else:
+            lines.append("    El modelo bate a la linea de base gratuita, que es lo minimo")
+            lines.append("    que se le pide para justificar su complejidad. Cuando esto se")
+            lines.append("    media contra la verdad anterior salia al reves por 14 puntos,")
+            lines.append("    y no era pericia meteorologica: entre una noche y las 1-5")
+            lines.append("    siguientes la fase lunar apenas cambia, y la verdad media la")
+            lines.append("    Luna. La persistencia no predecia el tiempo, predecia el sesgo.")
         lines.append("")
 
     others = [entry for entry in result["models"]

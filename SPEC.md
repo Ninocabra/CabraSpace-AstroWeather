@@ -112,12 +112,46 @@ B_sky(t,alt,az) = B_natural + B_zodiacal(Δλ_helioecl, β) + B_LP + B_moon_phys
 mag_sky = −2.5·log10( Σ 10^(−0.4·mag_i) )        # SIEMPRE suma en flujo
 ```
 
-- **Luna — Krisciunas & Schaefer (1991)** con sus fórmulas canónicas (ver v7 §1.3.2 para el detalle completo, que sigue vigente) y estos contratos: `X(Z)=(1−0.96·sin²Z)^(−0.5)` acotada en 5.0 (no sustituir por Kasten-Young); rama **ρ<10°: f(ρ)≈6.2·10⁷/ρ²**; **B_moon_physical = 0 bajo el horizonte** — el rolloff −6°…0° es `smoothing_UI`, solo presentación, jamás entra en mag_sky ni en horas-SNR; k del §2.1 acoplado (con calima la Luna molesta más); precisión declarada 8–23 % y calibración en Mauna Kea (con calima extrapola → SQM local manda).
+- **Luna — estructura de Krisciunas & Schaefer (1991) con la ley de dispersión MEDIDA aquí** (`moonscatter.py`). Se mantienen de K&S: `X(Z)=(1−0.96·sin²Z)^(−0.5)` acotada en 5.0 (no sustituir por Kasten-Young), la rama de aureola **ρ<10°: f(ρ)∝ρ⁻²** (reescalada para empalmar sin salto), el término del blanco y el acoplamiento con la k del §2.1 (con calima la Luna molesta más). **Cambia la función de dispersión**: la de Mauna Kea se queda corta aquí por un factor que va de 1,2 con la Luna baja a 5,5 con la Luna alta, y sobre 18.834 muestras de 1.246 noches de ajuste lo que se mide es una exponencial única, `f(θ) = 1,3612e7·10^(−θ/48,55°)`, con **suelo en la función publicada** (este sitio tiene más aire y más polvo que Mauna Kea: no puede dispersar menos). Fuera de 12°–80° el valor está extrapolado y se declara.
+  - **DEROGADO el contrato «B_moon_physical = 0 bajo el horizonte»** (v8, 28-08-2026). Es falso y lo dice el archivo: con el centro de la Luna por debajo de −0,83° (ya invisible, contando refracción y semidiámetro) el cenit sigue **+0,19 mag más brillante a 5-7σ**, y decae siguiendo la altura de la sombra geométrica de la atmósfera (medido 102,9 / 87,2 / 66,1 / 24,6 / 11,0 % contra 99,2 / 93,4 / 69,0 / 46,8 / 22,6 % de la geometría pura, a 0,25 / 0,75 / 1,75 / 2,50 / 3,50° de depresión; control con Luna nueva: +0,009 mag). El antiguo `smoothing_UI` con escala inventada de 1,5° estaba tapando física real. Ahora es `moonscatter.beam_transmission`, es **física** y entra en mag_sky y en horas-SNR, y llega a cero a −6°, donde toda la columna de aire sobre el sitio está en sombra.
+  - **Esto NO es luz parásita del instrumento**, y ese fue el diagnóstico equivocado durante un día: la luz parásita necesita el haz directo y se corta cuando la Tierra lo tapa. Sí es instrumental el caso **θ < 12°**, con la Luna dentro del campo del TESS-W (~17° FWHM): son 144 muestras de 131.096 y se excluyen de la verdad de nubes.
+  - **Incertidumbre declarada:** el rms del ajuste por franjas es 3,8 %, pero la reproducibilidad **entre años a geometría fija es ±17 % (0,17 mag)**, y ésa es la cota honesta. Está dominada por la deriva del fotómetro (ver §2.2 bis), no por la física de la dispersión.
 - **Twilight** (−18°…−12°): `B_twilight = B_18·10^(0.4·s·(−18−alt_sol))`, s≈0.4–0.5 calibrable con TESS. Si no está implementado: gate binario noche = Sol<−18°. (Objetivo: Patat 2006 / SkyCalc.)
 - **Zodiacal:** tablas de Leinert 1998 interpoladas (elongación Y β).
 - **Airglow:** componente LENTA — F10.7 en medias de 27/81 días + estacionalidad, con incertidumbre; **no es predictor horario** y no entra en el forecast fino del MVP; el TESS captura el residuo nocturno.
 - **LP:** para Nerpio, constante del sitio (~21.9, TESS manda). Direccional B_LP(alt,az): OBJETIVO pendiente (Garstang / diseño tipo APEX con horizonte 720 bins); hasta entonces, cenit + término de nubes: `B_LP_efectiva = B_LP·[1 + γ·c_frac·(R_100km/R_ref)]` con γ de signo dependiente de cota (espejo si nube encima / escudo si mar de nubes debajo), calibrado con TESS — **este γ se pospone hasta tener dataset etiquetado; no entra en el MVP**.
 - **Conversiones** (verificadas contra lightpollutionmap): `B[nL]=34.08·exp(20.7233−0.92104·V)`; SQM=−2.5·log10(L_mcd/108e6); NELM Bartels.
+
+### 2.2 bis — PROBLEMA ABIERTO: el suelo del cielo deriva (28-08-2026)
+
+Encontrado al medir la reproducibilidad de la ley lunar, y es más grande que
+ella. **La mediana del cielo sin Luna sube +0,56 mag en siete años**, de forma
+monótona:
+
+| año | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
+|---|---|---|---|---|---|---|---|---|
+| mediana sin Luna | 21,32 | 21,29 | 21,30 | 21,43 | 21,44 | 21,52 | 21,69 | 21,88 |
+
+Robusto a todos los controles que le he pasado: solo verano +0,51, solo invierno
++0,59, sujetando el suelo modelado (mismo zodiacal y misma Vía Láctea) +0,37, y
+el p95 de las noches más oscuras +0,53. **El ciclo solar predice el signo
+contrario**: 2019 fue mínimo y 2025 máximo, y más actividad significa más
+airglow, o sea cielo más brillante.
+
+Consecuencias que ya tocan a lo publicado:
+
+1. `NATURAL_FLOOR_MAG = 21.71` es la media de siete años y **no describe ningún
+   año**: sobra 0,4 mag en 2019 y falta 0,17 en 2026.
+2. Todo lo derivado del residuo hereda un sesgo que depende del año, incluidos
+   el centro y la tolerancia del test de nivel.
+3. Es lo que domina la incertidumbre de ±17 % de la ley lunar.
+
+**NO resuelto**: si es el punto cero del fotómetro (un TESS-W envejece y lee más
+oscuro) o el cielo. El control que lo separaría —el contraste de la Vía Láctea,
+invariante ante un cambio de ganancia— sale también cayendo (0,50 → 0,25 mag),
+lo que no encaja con un punto cero puro; pero ese control usa un proxy burdo de
+latitud galáctica y no me apoyo en él. **Necesita sesión propia y probablemente
+una referencia independiente del TESS.**
 
 ## 2.3 Bandas fotométricas (invariante)
 
