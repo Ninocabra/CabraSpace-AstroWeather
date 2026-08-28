@@ -42,7 +42,7 @@ from .extinction import evaluate as evaluate_transparency
 from .moonsky import mag_to_nl, moon_brightness, nl_to_mag
 from .seeing import Turbulence
 from .site import NERPIO, Site
-from .skybackground import NATURAL_FLOOR_MAG
+from .skybackground import NATURAL_FLOOR_MAG, natural_background
 from .skymodel import predict
 
 # Reference night: the yield of one hour under these conditions is 1.0.
@@ -210,12 +210,26 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
     # product window opens an hour before sunset, and without the twilight term
     # those daylight hours look like pristine dark sky and score as usable.
     floors = {c.t_utc: c.predicted_mag for c in predict(times, site)}
+    # ...and the NATURAL part of that zenith floor on its own, so it can be
+    # swapped for the one where each target actually is. Without this the whole
+    # dome was scored with the zenith's Milky Way, which is wrong by up to
+    # 0.405 mag (skybackground.natural_background).
+    zenith_natural = natural_background(times, np.full(len(times), 90.0),
+                                        np.zeros(len(times)), site)
+    zenith_natural_flux = {t: mag_to_nl(v) for t, v in zip(times, zenith_natural)}
     moon = {p.t_utc: p for p in moon_positions(times, site)}
     phase = moon_phase_angle(times[len(times) // 2])
 
     results = []
     for target in targets:
         altitudes, azimuths, separations = target.positions(times, site)
+        # The natural background along THIS target's own track: one coordinate
+        # transform per target, vectorised over the night. The field is smooth
+        # (26.5 deg of scale) so no grid is needed -- it is cheaper and exact to
+        # evaluate the analytic term where the telescope is actually pointing.
+        target_natural_flux = np.array(
+            [mag_to_nl(v) for v in natural_background(times, altitudes,
+                                                      azimuths, site)])
         conditional, expected, hours, best, best_value = 0.0, 0.0, 0.0, None, 0.0
 
         trace: list[dict] = []
@@ -260,8 +274,15 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
             # it through both twilights -- backwards, since twilight narrowband
             # is precisely what the technique is good at.
             filter_factor = MOON_FILTER_FACTOR.get(target.difficulty, 1.0)
-            flux = max(mag_to_nl(floors[when]) - zenith_moon.physical_nl, 1e-6)
-            flux += target_moon.physical_nl
+            # Take the zenith total apart and put the target's own terms back:
+            # out goes the zenith Moon and the zenith natural background, in
+            # come the target's. What survives the subtraction is twilight,
+            # which this model has no azimuth dependence for anyway
+            # (skymodel.twilight_magnitude), so it is right to carry it across.
+            flux = max(mag_to_nl(floors[when])
+                       - zenith_moon.physical_nl
+                       - zenith_natural_flux[when], 1e-6)
+            flux += target_natural_flux[index] + target_moon.physical_nl
             sky_mag = nl_to_mag(flux * filter_factor)
 
             # The seeing model is uncalibrated and known to run OPTIMISTIC

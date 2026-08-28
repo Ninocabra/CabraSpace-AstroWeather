@@ -159,17 +159,35 @@ class SkyBudget:
                 f" = {self.total_mag:.2f} mag/arcsec2")
 
 
-def zenith_ecliptic(times: list[datetime], site: Site = NERPIO):
-    """Ecliptic latitude of the zenith, and its elongation from the Sun."""
+def direction_ecliptic(times: list[datetime], altitudes_deg, azimuths_deg,
+                       site: Site = NERPIO):
+    """Ecliptic latitude of a DIRECTION, and its elongation from the Sun."""
     when = Time([t.astimezone(timezone.utc) for t in times])
-    zenith = SkyCoord(AltAz(az=0 * u.deg, alt=90 * u.deg,
-                            obstime=when, location=location(site)))
-    ecliptic = zenith.transform_to("geocentricmeanecliptic")
+    pointing = SkyCoord(AltAz(az=np.asarray(azimuths_deg, dtype=float) * u.deg,
+                              alt=np.asarray(altitudes_deg, dtype=float) * u.deg,
+                              obstime=when, location=location(site)))
+    ecliptic = pointing.transform_to("geocentricmeanecliptic")
     sun = get_sun(when).transform_to("geocentricmeanecliptic")
     latitudes = np.asarray(ecliptic.lat.deg, dtype=float)
     elongations = np.abs(((np.asarray(ecliptic.lon.deg, dtype=float)
                            - np.asarray(sun.lon.deg, dtype=float) + 180) % 360) - 180)
     return latitudes, elongations
+
+
+def direction_galactic(times: list[datetime], altitudes_deg, azimuths_deg,
+                       site: Site = NERPIO):
+    """Galactic latitude of a DIRECTION."""
+    when = Time([t.astimezone(timezone.utc) for t in times])
+    pointing = SkyCoord(AltAz(az=np.asarray(azimuths_deg, dtype=float) * u.deg,
+                              alt=np.asarray(altitudes_deg, dtype=float) * u.deg,
+                              obstime=when, location=location(site)))
+    return np.asarray(pointing.galactic.b.deg, dtype=float)
+
+
+def zenith_ecliptic(times: list[datetime], site: Site = NERPIO):
+    """Ecliptic latitude of the zenith, and its elongation from the Sun."""
+    return direction_ecliptic(times, np.full(len(times), 90.0),
+                              np.zeros(len(times)), site)
 
 
 def zenith_galactic(times: list[datetime], site: Site = NERPIO):
@@ -178,10 +196,54 @@ def zenith_galactic(times: list[datetime], site: Site = NERPIO):
     At a fixed site this is a pure function of sidereal time, which is exactly
     why seven years of a stationary photometer can measure the Milky Way.
     """
+    return direction_galactic(times, np.full(len(times), 90.0),
+                              np.zeros(len(times)), site)
+
+
+def natural_background(times: list[datetime], altitudes_deg, azimuths_deg,
+                       site: Site = NERPIO, *, f107: float | None = None):
+    """Natural sky background WHERE THE TELESCOPE IS POINTING, in magnitudes.
+
+    The zenith is not the sky. The Milky Way term is 0.39 mag on the plane and
+    decays over 26.5 deg, so collapsing the whole dome to its zenith value costs
+    up to 0.405 mag over the usable sky -- measured over four nights of 2026,
+    against the 0.17 mag of uncertainty this model declares. That is enough to
+    push a target across the 21.3 gate of `extremo_contraste` in the wrong
+    direction, which is the class where a false positive costs a whole night.
+
+    WHAT THIS STILL DOES NOT MODEL, and it is a real gap rather than a rounding
+    error: the AIRMASS dependence of the background itself. Airglow follows a
+    van Rhijn law and the column grows towards the horizon, so the real sky
+    brightens as you go down. The product only recommends above 25 deg, where
+    that term is a couple of tenths, but it is NOT in here and must not be
+    quoted as if it were (SPEC v8 section 2.2).
+    """
+    # One frame and one SkyCoord for both transforms: building the AltAz frame
+    # is what costs, and doing it twice per target doubled the runtime of the
+    # whole recommender for nothing.
     when = Time([t.astimezone(timezone.utc) for t in times])
-    zenith = SkyCoord(AltAz(az=0 * u.deg, alt=90 * u.deg,
-                            obstime=when, location=location(site)))
-    return np.asarray(zenith.galactic.b.deg, dtype=float)
+    pointing = SkyCoord(AltAz(az=np.asarray(azimuths_deg, dtype=float) * u.deg,
+                              alt=np.asarray(altitudes_deg, dtype=float) * u.deg,
+                              obstime=when, location=location(site)))
+    ecliptic = pointing.transform_to("geocentricmeanecliptic")
+    sun = get_sun(when).transform_to("geocentricmeanecliptic")
+    latitudes = np.asarray(ecliptic.lat.deg, dtype=float)
+    elongations = np.abs(((np.asarray(ecliptic.lon.deg, dtype=float)
+                           - np.asarray(sun.lon.deg, dtype=float) + 180) % 360) - 180)
+    galactic_latitudes = np.asarray(pointing.galactic.b.deg, dtype=float)
+    floor_flux = mag_to_nl(NATURAL_FLOOR_MAG)
+    airglow = airglow_excess(f107)
+    values = []
+    for index in range(len(latitudes)):
+        zodiacal = zodiacal_excess(float(latitudes[index]),
+                                   float(elongations[index]))
+        galactic = galactic_excess(float(galactic_latitudes[index]))
+        values.append(nl_to_mag(floor_flux * (
+            1.0
+            + (10 ** (0.4 * zodiacal) - 1.0)
+            + (10 ** (0.4 * galactic) - 1.0)
+            + (10 ** (0.4 * airglow) - 1.0))))
+    return np.asarray(values, dtype=float)
 
 
 def budget(times: list[datetime], site: Site = NERPIO, *,
