@@ -49,11 +49,21 @@ def test_narrowband_survives_astronomical_twilight():
     assert hourly_yield(airmass=1.0, sky_mag=twilight, seeing_arcsec=2.0,
                         k_total=0.18, alpha=0.0, difficulty="narrowband") > 0.5
 
-    # Still honest at the bright end: nautical twilight remains unusable.
-    # It lands a thousandth of a magnitude inside the shoulder, so the test
-    # asks for negligible, not for a hard zero that floating point cannot give.
+    # Y honesto por el extremo brillante, aunque el corte se movio el
+    # 2026-08-28. Esta asercion decia "el crepusculo NAUTICO sigue siendo
+    # inservible", y eso no salia de la fisica sino del factor de 0,12 por clase
+    # que el codigo usaba y que no esta en SPEC. Con el valor de SPEC 2.3 para
+    # un Ha de 3 nm (0,05, o sea 3,25 mag de supresion) el nautico rinde un
+    # cuarto de hora por hora -- degradado, no muerto -- que es lo que hace
+    # cualquiera que empiece en Ha antes de que cierre la noche. Donde muere de
+    # verdad es en el CIVIL, y eso es lo que el test fija ahora.
     nautical = nl_to_mag(mag_to_nl(17.0) * factor)
-    assert hourly_yield(airmass=1.0, sky_mag=nautical, seeing_arcsec=2.0,
+    nautical_yield = hourly_yield(airmass=1.0, sky_mag=nautical, seeing_arcsec=2.0,
+                                  k_total=0.18, alpha=0.0, difficulty="narrowband")
+    assert 0.1 < nautical_yield < 0.5          # degradado, no gratis
+
+    civil = nl_to_mag(mag_to_nl(15.0) * factor)
+    assert hourly_yield(airmass=1.0, sky_mag=civil, seeing_arcsec=2.0,
                         k_total=0.18, alpha=0.0, difficulty="narrowband") < 0.02
 
 
