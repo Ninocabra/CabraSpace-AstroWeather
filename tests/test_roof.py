@@ -38,7 +38,7 @@ from astroweather.roof import (
     outlook,
 )
 from astroweather.site import NERPIO
-from astroweather.workers.scrape_astrocamp import parse
+from astroweather.workers.scrape_astrocamp import _sensor_verdict, parse
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SNAPSHOT = REPO_ROOT / "cloud_snapshot.html"
@@ -490,3 +490,38 @@ def test_a_missing_climatology_file_is_not_an_exception(tmp_path, climatology):
     copy = tmp_path / "roof_climatology.json"
     copy.write_text(json.dumps(climatology), encoding="utf-8")
     assert load_climatology(copy)["months"]["7"]["median_fraction"] == pytest.approx(0.835, abs=0.005)
+
+
+def test_the_status_strip_is_read_at_all():
+    """Se parseaban 4 de las 12 tablas de la pagina, y esta era una de las que
+    faltaban. Trae DOS veredictos de cielo independientes y el estado de red e
+    internet, que es lo que el gate `hardware_ok` esperaba sin que nadie se lo
+    diera."""
+    parsed = parse(SNAPSHOT.read_text(encoding="utf-8", errors="replace"))
+    status = parsed["status"]
+    assert status["Sky (3)"] in ("Clear", "Cloudy")
+    assert status["Sky (4)"] in ("Clear", "Cloudy")
+    assert status["Mains (1)"].startswith("Mains")
+    assert status["Internet (1)"] in ("Online", "Offline")
+
+
+def test_the_two_fields_the_parser_used_to_throw_away():
+    """El indice de nubes del AAG (columna S.I.) y el punto de rocio de la
+    estacion se leian desde el principio y no se escribian. El primero es el
+    numero que el fabricante ya da corregido; el segundo lo recalculabamos por
+    Magnus-Sonntag perdiendo la comprobacion cruzada gratis."""
+    parsed = parse(SNAPSHOT.read_text(encoding="utf-8", errors="replace"))
+    assert all(c["sky_index"] is not None for c in parsed["cloudwatchers"])
+    assert all(m["dew_point"] is not None for m in parsed["meteo"])
+
+
+def test_the_verdict_comes_from_its_own_sensor():
+    """Se estampaba un unico veredicto del log en todas las filas, y no cuadraba
+    con el sensor: decia despejado en 71 de 181 lecturas mientras el IR marcaba
+    -28 C."""
+    parsed = parse(SNAPSHOT.read_text(encoding="utf-8", errors="replace"))
+    for sensor in parsed["cloudwatchers"]:
+        propio = _sensor_verdict(parsed["status"], sensor["id"])
+        if propio is not None:
+            numero = "".join(c for c in sensor["id"] if c.isdigit())
+            assert propio == (parsed["status"][f"Sky ({numero})"] == "Clear")
