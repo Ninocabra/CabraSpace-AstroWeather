@@ -31,6 +31,7 @@ from .extinction import evaluate as evaluate_transparency
 from .moonsky import moon_brightness, nl_to_mag, mag_to_nl
 from .seeing import integrate
 from .site import NERPIO, Site
+from .queries import night_inputs
 from .skymodel import predict
 from .targets import CATALOGUE, evaluate_night
 
@@ -137,12 +138,21 @@ def moon_glow_profile(phase_angle: float, moon_alt: float, k: float,
 
 
 def build(day: dt.datetime | None = None, site: Site = NERPIO,
-          *, aod_total: float = 0.07, aod_dust: float = 0.01,
-          jet_speed: float = 25.0, with_clouds: bool = True) -> dict:
-    """The whole night, ready for the renderer."""
+          *, aod_total: float | None = None, aod_dust: float | None = None,
+          jet_speed: float | None = None, with_clouds: bool = True) -> dict:
+    """The whole night, ready for the renderer.
+
+    Aerosol and jet speed default to the FORECAST for this night, not to a
+    constant. They were constants until 2026-08-28, and the forecast for both
+    had been archived and unread for months.
+    """
     day = day or dt.datetime.now(dt.timezone.utc)
     night = night_for(day, site)
     times = night.hours(30)
+    forecast = night_inputs(times[0], times[-1], site.site_id)
+    aod_total = forecast["aod_total"] if aod_total is None else aod_total
+    aod_dust = forecast["aod_dust"] if aod_dust is None else aod_dust
+    jet_speed = forecast["jet_speed"] if jet_speed is None else jet_speed
 
     skies = predict(times, site)
     moons = moon_positions(times, site)
@@ -218,6 +228,7 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO,
                              round(turbulence.range_arcsec[1], 1)],
                    "jet": round(turbulence.jet_speed, 0),
                    "tau0_ms": round(turbulence.coherence_time_ms, 1),
+                   "source": forecast["jet_source"],
                    "note": "estimacion experimental, sin calibrar con FWHM local"},
         "frames": frames,
         "targets": tracks,

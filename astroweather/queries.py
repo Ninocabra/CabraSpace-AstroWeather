@@ -88,6 +88,74 @@ def connect(root: Path | None = None) -> duckdb.DuckDBPyConnection:
     return connection
 
 
+# Valores de respaldo, y son SUPUESTOS, no medidas. Son los que el producto
+# usaba como constantes hasta el 2026-08-28, cuando se descubrio que la
+# prevision de las dos cosas llevaba meses archivada y sin conectar.
+FALLBACK_AOD_TOTAL = 0.07
+FALLBACK_AOD_DUST = 0.01
+FALLBACK_JET_MS = 25.0
+
+
+def night_inputs(start, end, site_id: str = "nerpio",
+                 root: Path | None = None) -> dict:
+    """Aerosol y viento en altura PREVISTOS para una ventana de noche.
+
+    Las dos cosas se pronostican y se archivan desde hace meses -- CAMS da AOD
+    de futuro y el ECMWF da los niveles de presion -- y hasta hoy el producto
+    usaba en su lugar dos constantes por defecto que nadie alimentaba. Peor:
+    estaban elegidas para ser plausibles, asi que el fallo no se veia. La noche
+    del 28-08-2026 el jet previsto era 17,8 m/s contra la constante de 25,0, y
+    variaba de 24,0 a las 21:00 a 13,4 a las 06:00.
+
+    Cada valor viene con su procedencia, porque un supuesto y una prevision no
+    se publican igual.
+    """
+    result = {"aod_total": FALLBACK_AOD_TOTAL, "aod_dust": FALLBACK_AOD_DUST,
+              "jet_speed": FALLBACK_JET_MS, "aod_source": "supuesto",
+              "jet_source": "supuesto"}
+    try:
+        connection = connect(root)
+    except Exception:
+        return result                     # sin archivo, los supuestos y a decirlo
+
+    try:
+        row = connection.execute("""
+            SELECT median(aod_total), median(aod_dust), count(*) FROM (
+                SELECT aod_total, aod_dust FROM forecasts
+                WHERE site_id = ? AND valid_utc BETWEEN ? AND ?
+                  AND aod_total IS NOT NULL
+                QUALIFY row_number() OVER (
+                    PARTITION BY valid_utc ORDER BY run_utc DESC) = 1)
+        """, [site_id, start, end]).fetchone()
+        if row and row[2]:
+            result["aod_total"] = float(row[0])
+            result["aod_dust"] = float(row[1]) if row[1] is not None else FALLBACK_AOD_DUST
+            result["aod_source"] = "cams"
+    except Exception:
+        pass
+
+    try:
+        # El "jet" del perfil Hufnagel-Valley es el viento de la capa del chorro,
+        # o sea el MAYOR de los niveles altos, no el de uno elegido a dedo. Se
+        # toma por hora y se resume con la mediana de la noche.
+        row = connection.execute("""
+            SELECT median(jet), count(*) FROM (
+                SELECT greatest(coalesce(v200, 0), coalesce(v250, 0),
+                                coalesce(v300, 0)) AS jet
+                FROM forecasts
+                WHERE site_id = ? AND valid_utc BETWEEN ? AND ?
+                  AND (v200 IS NOT NULL OR v250 IS NOT NULL OR v300 IS NOT NULL)
+                QUALIFY row_number() OVER (
+                    PARTITION BY valid_utc ORDER BY run_utc DESC) = 1)
+        """, [site_id, start, end]).fetchone()
+        if row and row[1] and row[0]:
+            result["jet_speed"] = float(row[0])
+            result["jet_source"] = "ecmwf"
+    except Exception:
+        pass
+    return result
+
+
 def summary(root: Path | None = None) -> dict[str, int]:
     """Row counts after deduplication -- what the archive actually holds."""
     connection = connect(root)

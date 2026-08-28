@@ -34,6 +34,7 @@ from .ephem import moon_illumination, moon_phase_angle, moon_positions, night_fo
 from .extinction import evaluate as evaluate_transparency
 from .seeing import integrate
 from .site import NERPIO, Site
+from .queries import night_inputs
 from .skymodel import predict
 from .skyobjects import (milky_way_field, planet_positions, sidereal_degrees,
                          visible_stars)
@@ -247,16 +248,27 @@ def _site_weather(payload, index) -> dict:
 
 
 def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
-          aod_total: float = 0.07, aod_dust: float = 0.01,
-          jet_speed: float = 25.0, with_clouds: bool = True,
+          aod_total: float | None = None, aod_dust: float | None = None,
+          jet_speed: float | None = None, with_clouds: bool = True,
           usable: float = 0.8) -> dict:
-    """Everything both views need, in one JSON-ready dictionary."""
+    """Everything both views need, in one JSON-ready dictionary.
+
+    El aerosol y el jet salen de la PREVISION de esta noche, no de una
+    constante. Lo fueron hasta el 2026-08-28: CAMS pronostica el AOD y el ECMWF
+    los niveles de presion, las dos cosas llevaban meses archivadas, y el
+    producto usaba en su lugar 0,07 y 25 m/s. Los supuestos estaban elegidos
+    para ser plausibles, que es justo por lo que no se veia el fallo.
+    """
     day = day or dt.datetime.now(dt.timezone.utc)
     night = night_for(day, site)
     # Ten minutes through astronomical darkness, thirty either side: the part
     # being planned against deserves the resolution, twilight does not.
     times = night.adaptive_hours(10, 30, site)
     labels = [t.astimezone(LOCAL).strftime("%H:%M") for t in times]
+    forecast = night_inputs(times[0], times[-1], site.site_id)
+    aod_total = forecast["aod_total"] if aod_total is None else aod_total
+    aod_dust = forecast["aod_dust"] if aod_dust is None else aod_dust
+    jet_speed = forecast["jet_speed"] if jet_speed is None else jet_speed
 
     skies = predict(times, site)
     moons = moon_positions(times, site)
@@ -375,11 +387,13 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
                      night.dusk_astronomical or night.night), 3),
                  "phase_angle": round(phase, 1)},
         "transparency": {"k": round(transparency.k_total, 3),
+                         "aod_source": forecast["aod_source"],
                          "aod_site": round(transparency.aod_site, 3),
                          "dust_alert": transparency.dust_alert,
                          "verdict": transparency.verdict,
                          "color_note": transparency.color_note},
-        "seeing": {"tercile": turbulence.tercile,
+        "seeing": {"source": forecast["jet_source"],
+                   "tercile": turbulence.tercile,
                    "range": [round(turbulence.range_arcsec[0], 1),
                              round(turbulence.range_arcsec[1], 1)],
                    "jet": round(turbulence.jet_speed, 0),
