@@ -85,6 +85,11 @@ def _job_ensemble():
     return fetch_ensemble.run(NERPIO, forecast_days=7)
 
 
+def _job_prediction():
+    from .workers import archive_prediction
+    return archive_prediction.run(NERPIO)
+
+
 def _job_forecast():
     from .workers import fetch_forecast
     counts = fetch_forecast.run(NERPIO, days=7)
@@ -167,6 +172,10 @@ JOBS = {
     # EPS members expire upstream in ~4 days; twice a day is cheap insurance.
     "ensemble": (CronTrigger(hour="6,18", minute=10), _job_ensemble),
     "forecast": (CronTrigger(hour="*/6", minute=20), _job_forecast),
+    # Justo despues del forecast: lo que NOSOTROS decimos, guardado antes de
+    # que pase. Sin esto, cambiar el calibrador cambia retroactivamente lo que
+    # dijimos que dijimos, y no hay auditoria posible.
+    "prediccion": (CronTrigger(hour="*/6", minute=25), _job_prediction),
     # CAMS queues, so it runs once a day well away from anything interactive.
     "aerosol": (CronTrigger(hour=7, minute=30), _job_aerosol),
     "aemet": (CronTrigger(hour=8, minute=0), _job_aemet),
