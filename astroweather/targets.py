@@ -71,13 +71,29 @@ def _shoulder(value: float, centre: float, width: float) -> float:
 # of an hour of IFN under a full Moon, and there is no such thing. These are
 # the sanity cuts of SPEC v8 section 1.2 -- an hour brighter than the class
 # threshold counts as zero for that target, not as a little bit of progress.
-# Fraction of the moonlight that survives each filter. A 3 nm narrowband
-# passes a sliver of the lunar continuum, which is exactly why a full Moon
-# night is a narrowband night. These are the fallback values of SPEC v8
-# section 1.1, flagged as approximation_quality=low until the SkyCalc LUT
-# replaces them: the real factor depends on phase, filter shape and QE.
+# Fraccion de la luz que sobrevive a cada filtro. Son los valores de respaldo
+# que SPEC v8 seccion 2.3 fija, etiquetados approximation_quality=low hasta que
+# la LUT de SkyCalc los sustituya: el factor real depende de fase, forma del
+# filtro y QE.
+#
+# Hasta el 2026-08-28 el codigo NO usaba estos: tenia un unico 0,12 por clase
+# que no esta en SPEC. Mientras el cielo con Luna salia 1,8 mag mas oscuro de lo
+# que es, el 0,12 colaba; con la ley de dispersion lunar medida
+# (moonscatter.py), el producto pasaba a decir que con Luna llena no se hace
+# banda estrecha. Como consejo es falso, y ademas contradice al documento
+# normativo, que manda.
+NARROWBAND_FILTERS = {
+    "Ha 3nm": 0.05,
+    "SII": 0.08,
+    "OIII": 0.20,
+}
+# La clase "narrowband" se puntua con el filtro MAS tolerante a la Luna, porque
+# la pregunta que responde el gate es "se puede observar", y con Luna llena lo
+# que se puede es Ha. El veredicto dice de que filtro habla: un booleano solo
+# seria mas corto, no mas cierto -- OIII con Luna llena no cuaja.
+NARROWBAND_REFERENCE = "Ha 3nm"
 MOON_FILTER_FACTOR = {
-    "narrowband": 0.12,        # a 3-5 nm Ha/OIII/SII filter
+    "narrowband": NARROWBAND_FILTERS[NARROWBAND_REFERENCE],
     "compacto_resolucion": 1.0,
     "extremo_contraste": 1.0,
     "bajo_contraste": 1.0,
@@ -311,6 +327,8 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
                 limiting = "cielo"
                 why = (f"cielo a {sky_mag:.1f}, por debajo del corte de "
                        f"{gate:.1f} de su clase"
+                       + (f" (medido en {NARROWBAND_REFERENCE}; con OIII sale "
+                          f"peor)" if target.difficulty == "narrowband" else "")
                        + (f"; la Luna esta a {separations[index]:.0f} grados"
                           if moon_up else ""))
             # A moonless sky sitting at its own natural floor is not a
