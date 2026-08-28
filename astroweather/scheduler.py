@@ -85,6 +85,11 @@ def _job_ensemble():
     return fetch_ensemble.run(NERPIO, forecast_days=7)
 
 
+def _job_web():
+    from .webexport import write
+    return str(write())
+
+
 def _job_prediction():
     from .workers import archive_prediction
     return archive_prediction.run(NERPIO)
@@ -176,6 +181,9 @@ JOBS = {
     # que pase. Sin esto, cambiar el calibrador cambia retroactivamente lo que
     # dijimos que dijimos, y no hay auditoria posible.
     "prediccion": (CronTrigger(hour="*/6", minute=25), _job_prediction),
+    # Y detras, el JSON que lee la web: se regenera con cada pasada nueva, que
+    # es lo unico que puede cambiarlo.
+    "web": (CronTrigger(hour="*/6", minute=30), _job_web),
     # CAMS queues, so it runs once a day well away from anything interactive.
     "aerosol": (CronTrigger(hour=7, minute=30), _job_aerosol),
     "aemet": (CronTrigger(hour=8, minute=0), _job_aemet),
