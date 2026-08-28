@@ -112,6 +112,15 @@ MEASUREMENT_SCHEMA = pa.schema(
         # clouds / transparency
         pa.field("clear_flag", pa.bool_()),
         pa.field("cloud_frac", pa.float32()),
+        # Indice de nubes del propio AAG CloudWatcher (columna "S.I." de la
+        # pagina). El parser lo leia desde el principio y lo tiraba: es el
+        # numero que el fabricante ya da corregido, y es el que mejor detecta
+        # nube fina. NO es una fraccion, por eso no reutiliza `cloud_frac`.
+        pa.field("sky_index", pa.float32()),
+        # Punto de rocio que la estacion PUBLICA. Lo tirabamos y lo
+        # recalculabamos por Magnus-Sonntag desde t2m y rh, perdiendo ademas la
+        # comprobacion cruzada gratis (SPEC v8 seccion 2.6).
+        pa.field("dew_point", pa.float32()),
         pa.field("k_extinction", pa.float32()),
         # IR sky sensor: store WHICH field it is, semantics are not obvious
         # (raw IR, Ts-Ta, or the vendor's corrected sky temperature).

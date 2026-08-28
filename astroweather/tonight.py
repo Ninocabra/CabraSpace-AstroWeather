@@ -81,18 +81,31 @@ class NightReport:
         return opening_probability([h.usable_probability for h in self.hours])
 
 
-def _forecast_rows(site: Site, start: dt.datetime, end: dt.datetime, root=None):
+def _forecast_rows(site: Site, start: dt.datetime, end: dt.datetime, root=None,
+                   model: str | None = None):
+    """Las horas de la noche, de UN modelo.
+
+    El filtro por modelo no es cosmetico. Sin el, la consulta se queda con la
+    pasada mas reciente de CUALQUIER proveedor, hora por hora: ICON corre cada
+    3 h y GFS cada 6, asi que pueden desplazar al ECMWF en unas horas y no en
+    otras y dejar una noche cosida con tres modelos distintos. Y encima la
+    curva de calibracion es de uno solo, asi que aplicarla al resto es corregir
+    numeros que no son suyos. El propio marcador avisa de que los proveedores
+    no entienden lo mismo por "cobertura nubosa".
+    """
     connection = connect(root)
-    return connection.execute("""
+    condicion = "AND model = ?" if model else "AND model NOT LIKE '%prev%'"
+    parametros = [site.site_id, start, end] + ([model] if model else [])
+    return connection.execute(f"""
         SELECT valid_utc, cloud_total, wind10m, gust10m, precipitation,
                prob_precip, cape, lead_h
         FROM forecasts
         WHERE site_id = ? AND valid_utc BETWEEN ? AND ?
           AND member IS NULL AND cloud_total IS NOT NULL
-          AND model NOT LIKE '%prev%'
+          {condicion}
         QUALIFY row_number() OVER (PARTITION BY valid_utc ORDER BY run_utc DESC) = 1
         ORDER BY valid_utc
-    """, [site.site_id, start, end]).fetchall()
+    """, parametros).fetchall()
 
 
 def report(day: dt.datetime | None = None, site: Site = NERPIO, root=None) -> NightReport:
@@ -102,7 +115,17 @@ def report(day: dt.datetime | None = None, site: Site = NERPIO, root=None) -> Ni
     calibrator = Calibrator.load()
     now = dt.datetime.now(dt.timezone.utc)
 
-    rows = _forecast_rows(site, night.window_start, night.window_end, root)
+    # Primero el modelo con el que se calibro. Hasta el 2026-08-28 esto no se
+    # comprobaba y el producto llevaba consumiendo `ecmwf_ifs` mientras la curva
+    # venia del retroanalisis de `ecmwf_ifs025`: dos mallas distintas del mismo
+    # proveedor, y una correccion medida sobre la otra.
+    wanted = calibrator.trained_on_model if calibrator else None
+    rows = _forecast_rows(site, night.window_start, night.window_end, root, wanted)
+    mismatch = None
+    if wanted and not rows:
+        rows = _forecast_rows(site, night.window_start, night.window_end, root)
+        if rows:
+            mismatch = wanted
     times = [r[0] for r in rows]
     moon = {p.t_utc: p for p in moon_positions(times, site)} if times else {}
 
@@ -130,6 +153,12 @@ def report(day: dt.datetime | None = None, site: Site = NERPIO, root=None) -> Ni
             f"(BSS sobre climatologia: "
             f"{(1 - calibrator.brier / calibrator.brier_climatology) * 100:+.1f} %)"
             if calibrator else "SIN CALIBRAR: probabilidad no disponible")
+    if mismatch:
+        # Se dice, no se esconde: una probabilidad calibrada sobre otro modelo
+        # sigue siendo mejor que ninguna, pero deja de ser lo que promete.
+        note += ("\n  AVISO: se calibro con " + mismatch + " y esta noche no hay "
+                 "nubes de ese modelo, asi que la curva se esta aplicando a "
+                 "otro. La probabilidad vale menos de lo que dice el BSS.")
 
     return NightReport(
         night=night.night.date(),

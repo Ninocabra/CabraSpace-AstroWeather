@@ -1,0 +1,64 @@
+# Archiva los 51 miembros del EPS, que es lo unico que no se puede recuperar.
+#
+# Aguas arriba, Open-Meteo conserva los miembros del ensemble 4-5 dias. Todo lo
+# demas del archivo -- el fotometro, las previsiones deterministas, AEMET -- se
+# puede volver a descargar; esto no. Y hasta hoy dependia de que un PC concreto
+# estuviera encendido a las 06:10 y a las 18:10: el 28-08-2026 se perdio la
+# pasada de la manana porque el equipo arranco a las 08:14.
+#
+# Coste: dos ejecuciones al dia de ~1 minuto, unos 60 minutos al mes de los
+# 2.000 gratuitos de un repo privado. Y ~4 kB por pasada, 3 MB al anio.
+#
+# Lo que NO hace, a proposito: no archiva el fotometro ni los sensores del
+# sitio. Eso son ~600 ficheros al dia y merece su propia decision de
+# arquitectura, no colarse por aqui.
+
+name: Archivo del EPS
+
+on:
+  schedule:
+    # Las mismas horas que el scheduler local, para que se solapen en vez de
+    # turnarse: si los dos corren, el deduplicador de `queries.py` se encarga.
+    - cron: "10 6 * * *"
+    - cron: "10 18 * * *"
+  workflow_dispatch:
+
+# Dos ejecuciones a la vez chocarian al hacer push. La segunda espera.
+concurrency:
+  group: archivo-eps
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  archivar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar lo minimo
+        run: pip install --quiet requests pyarrow numpy
+
+      - name: Descargar el ensemble
+        run: python -m astroweather.workers.fetch_ensemble --days 7
+
+      - name: Guardar solo el raw del EPS
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # El .gitignore ya deja pasar unicamente esta ruta; el canonico se
+          # re-deriva del raw y no viaja.
+          git add "data/raw/site=nerpio/source=openmeteo_ensemble"
+          if git diff --cached --quiet; then
+            echo "Sin miembros nuevos: nada que guardar."
+            exit 0
+          fi
+          git commit -m "EPS archivado automaticamente ($(date -u +%Y-%m-%dT%H:%MZ))"
+          # Alguien pudo empujar mientras corriamos.
+          git pull --rebase --autostash
+          git push

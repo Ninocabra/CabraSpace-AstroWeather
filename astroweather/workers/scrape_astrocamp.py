@@ -76,6 +76,11 @@ def parse(page: str) -> dict:
         "roofs": {},
         "safety_log": [],
         "open_hours": {},
+        # La franja de estado de arriba de la pagina, que no se miraba. Trae
+        # DOS veredictos de cielo independientes -- Sky (3) y Sky (4) -- y el
+        # estado de red electrica e internet, que es justo lo que el gate
+        # `hardware_ok` esperaba y nadie le daba.
+        "status": {},
     }
 
     for table in _tables(page):
@@ -86,7 +91,8 @@ def parse(page: str) -> dict:
         # is located by its signature instead of by position.
         def _is_header(row: list[str]) -> bool:
             return (
-                row[:3] == ["Cloud", "Date time", "SkyTemp"]
+                (row and row[0].startswith("Humidity ("))
+                or row[:3] == ["Cloud", "Date time", "SkyTemp"]
                 or row[:3] == ["Meteo", "Date time", "Temp Out"]
                 or row[:2] == ["Date time", "AstroCamp Safety log"]
                 or (row and row[0].startswith("S1R"))
@@ -98,7 +104,12 @@ def parse(page: str) -> dict:
             continue
         header, rows = rows[head_index], rows[head_index:]
 
-        if header[:3] == ["Cloud", "Date time", "SkyTemp"]:
+        if header and header[0].startswith("Humidity ("):
+            # Pares nombre/valor: "Sky (4)", "Cloudy", "Mains (1)", "Mains OK"...
+            for name, state in zip(header[::2], header[1::2]):
+                result["status"][name.strip()] = state.strip()
+
+        elif header[:3] == ["Cloud", "Date time", "SkyTemp"]:
             for row in rows[1:]:
                 if len(row) < 5:
                     continue
@@ -154,6 +165,24 @@ def parse(page: str) -> dict:
     return result
 
 
+def _sensor_verdict(status: dict, sensor_id: str) -> bool | None:
+    """El veredicto DE ESE sensor, de la franja de estado.
+
+    Hasta el 2026-08-28 se estampaba en todas las filas un unico veredicto
+    sacado del log de seguridad, y no cuadraba con el propio sensor: decia
+    despejado en 71 de 181 lecturas mientras el IR marcaba -28 C, que es cielo
+    claro sin discusion. La franja publica un Clear/Cloudy POR sensor -- Sky (3)
+    y Sky (4) son dos aparatos distintos -- y eso es lo que hay que guardar.
+    """
+    numero = "".join(c for c in sensor_id if c.isdigit())
+    estado = status.get(f"Sky ({numero})")
+    if estado == "Clear":
+        return True
+    if estado == "Cloudy":
+        return False
+    return None
+
+
 def _sky_verdict(safety_log: list[dict]) -> bool | None:
     """The observatory's own latest Clear/Cloudy call, if it published one."""
     for entry in safety_log:
@@ -176,11 +205,17 @@ def to_rows(parsed: dict, site: Site, retrieved_at: datetime) -> list[dict]:
             "site_id": site.site_id,
             "t_utc": sensor["t_utc"],
             "t_sky_ir": sensor["sky_temp"],
+            "sky_index": sensor["sky_index"],
             # Vendor semantics: an AAG-style IR sky temperature, not a
             # broadband radiative temperature (SPEC v8 section 2.6).
             "t_sky_ir_semantics": "aag_cloudwatcher_skytemp",
+            # OJO: es el sensor `ambient` del AAG, que va en la caja y de dia se
+            # calienta al sol -- medido, hasta +18 C sobre la estacion. De NOCHE
+            # coinciden en 0,02 C, asi que el indice de nubes no esta sesgado,
+            # pero quien promedie `t2m` sin filtrar por instrument_type mezcla
+            # dos aparatos distintos.
             "t2m": sensor["ambient"],
-            "clear_flag": verdict,
+            "clear_flag": _sensor_verdict(parsed["status"], sensor["id"]) or verdict,
             "instrument_type": "CloudWatcher",
             "instrument_id": sensor["id"],
             "source": "astrocamp_cloudwatcher",
@@ -195,6 +230,7 @@ def to_rows(parsed: dict, site: Site, retrieved_at: datetime) -> list[dict]:
             "t_utc": station["t_utc"],
             "t2m": station["t_out"],
             "rh": station["rh_out"],
+            "dew_point": station["dew_point"],
             "wind": station["wind_ms"],
             "station_pressure": station["pressure"],
             "instrument_type": "WeatherStation",
@@ -216,7 +252,13 @@ def to_rows(parsed: dict, site: Site, retrieved_at: datetime) -> list[dict]:
             "instrument_type": "RoofStatus",
             "instrument_id": "astrocamp_roofs",
             "source": "astrocamp_roofs",
-            "quality_flags": "open=%d/%d" % (open_count, len(parsed["roofs"])),
+            # Al recuento de techos se le suma el estado de hardware de la
+            # franja de arriba: el gate `hardware_ok` existia sin nadie que lo
+            # alimentara, y la pagina publica red, internet y humedad.
+            "quality_flags": ";".join(
+                ["open=%d/%d" % (open_count, len(parsed["roofs"]))]
+                + [f"{k}={v}" for k, v in sorted(parsed["status"].items())
+                   if k.startswith(("Mains", "Internet", "Humidity"))]),
             "retrieved_at": retrieved_at,
         })
     return rows

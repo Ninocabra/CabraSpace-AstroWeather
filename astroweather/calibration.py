@@ -158,6 +158,12 @@ MOON_IN_FIELD_ALTITUDE = 90.0 - MOONSCATTER_IN_FIELD_DEG
 MODEL_PATH = DATA_ROOT / "cloud_calibration.json"
 
 
+# El modelo del que sale el retroanalisis con el que se entrena. La curva de
+# calibracion es SUYA y de nadie mas: aplicarla a otro proveedor, o a otra malla
+# del mismo proveedor, es usar una correccion medida sobre numeros distintos.
+BACKFILL_MODEL = "ecmwf_ifs025"
+
+
 @dataclass
 class Calibrator:
     """P(clear) = sigmoid(a + b*cloud_fraction + c*lead_days)."""
@@ -170,6 +176,11 @@ class Calibrator:
     brier_climatology: float
     base_rate: float
     fitted_at: str
+    # Con que modelo se entreno. Tiene valor por defecto para que los ficheros
+    # guardados antes del 2026-08-28 sigan cargando; hasta esa fecha el
+    # acoplamiento era implicito y por eso nadie vio que el producto consumia
+    # ecmwf_ifs mientras la curva venia de ecmwf_ifs025.
+    trained_on_model: str = BACKFILL_MODEL
 
     def probability(self, cloud_percent: float, lead_hours: float = 24.0) -> float:
         z = (self.intercept
@@ -251,7 +262,8 @@ def training_pairs(truth: dict[dt.datetime, bool], root=None):
     return pairs
 
 
-def fit(pairs: list[tuple[float, float, bool]]) -> Calibrator:
+def fit(pairs: list[tuple[float, float, bool]],
+        model: str = BACKFILL_MODEL) -> Calibrator:
     """Logistic fit by maximum likelihood, scored against climatology."""
     if len(pairs) < 100:
         raise ValueError(f"insufficient data to calibrate: {len(pairs)} pairs")
@@ -284,6 +296,7 @@ def fit(pairs: list[tuple[float, float, bool]]) -> Calibrator:
         brier_climatology=float(np.mean((base_rate - observed) ** 2)),
         base_rate=base_rate,
         fitted_at=dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+        trained_on_model=model,
     )
 
 

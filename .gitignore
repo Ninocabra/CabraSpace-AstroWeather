@@ -1,6 +1,18 @@
-# Datos: NUNCA al repo (van a disco/objeto, no a git)
-data/
+# Datos: NUNCA al repo (van a disco/objeto, no a git)...
+data/*
 *.parquet
+
+# ...CON UNA EXCEPCION, y solo una. Los 51 miembros del EPS son lo unico del
+# archivo que NO se puede volver a descargar: aguas arriba se conservan 4-5
+# dias. Mientras el scheduler dependa de que un PC concreto este encendido, cada
+# noche apagada es una noche perdida para siempre -- el 28-08-2026 ya se perdio
+# la pasada de las 06:10. Son ~4 kB por pasada, dos al dia: 3 MB al anio.
+# El canonico NO viaja: se re-deriva del raw, que es la evidencia.
+!data/raw/
+data/raw/*
+!data/raw/site=nerpio/
+data/raw/site=nerpio/*
+!data/raw/site=nerpio/source=openmeteo_ensemble/
 *.nc
 *.grib
 *.grib2

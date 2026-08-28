@@ -39,6 +39,12 @@ SURFACE_VARS = (
 
 PROFILE_MODELS = ("ecmwf_ifs025", "icon_seamless", "gfs_seamless", "meteofrance_seamless")
 PROFILE_VARS = (
+    # cloud_cover (total) va aqui a proposito desde el 2026-08-28: el
+    # calibrador se entreno con el retroanalisis de ecmwf_ifs025 y el producto
+    # venia consumiendo el de ecmwf_ifs, que es otro modelo. Sin esta variable,
+    # el modelo con el que se calibro no sirve nubes en vivo y la unica salida
+    # era aplicar la curva a numeros que no son suyos.
+    "cloud_cover",
     "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",
     "temperature_850hPa", "temperature_700hPa", "temperature_500hPa",
     "wind_speed_500hPa", "wind_speed_300hPa", "wind_speed_250hPa", "wind_speed_200hPa",
