@@ -1,0 +1,249 @@
+"""Turn the ESO all-sky panorama into the Milky Way shape map used by the dome.
+
+The dome already knows HOW BRIGHT the Milky Way is here: 0.39 mag at the plane,
+measured on 50412 samples of this site's photometer, falling as exp(-|b|/26.5).
+What it did not know is what the Milky Way LOOKS like, and it was drawing a
+borrowed morphology out of a hand-made point list.
+
+This script takes the shape from the ESO/Serge Brunier panorama (CC BY 4.0) and
+keeps the level ours. Three things have to happen for that to be honest:
+
+1. UNDO THE STRETCH. A published panorama is not a photometric map: its pixel
+   values are a display curve applied to the real surface brightness. Used raw
+   it is badly wrong — the saturated bulge swallows the normalisation and the
+   Cygnus and Scutum clouds, among the brightest sky in the north, come out at
+   0.2 of their parallel's mean. The curve is recovered by fitting
+
+       rowmean(b) = a * E(b)^gamma + pedestal ,   E(b) = 10^(0.4*0.39*e^(-|b|/26.5)) - 1
+
+   which calibrates the photo against THE ONE PROFILE THIS SITE MEASURED.
+   Fitted: gamma = 3.505, a = 1.424, pedestal = 0.00187, residual rms 6 % of
+   range. Inverting it brings the contrast along the plane down from 0.06-4.0
+   to a physical 0.6-1.6.
+
+   WHAT GAMMA IS NOT. It is not "the panorama's display curve", and saying so
+   would be an overclaim. An adversarial review (Codex, 28-08-2026) knocked that
+   reading down and it is right: row means alone cannot separate the response
+   from the photo's own latitude profile, because (E^p)^q = E^(pq). Every pair
+   (real profile E^p, response exponent 3.505/p) fits identically. Gamma is the
+   COMPOSITE exponent, and inverting it makes the photo's row means match our
+   measured profile BY CONSTRUCTION. That is enough for the job — the map only
+   has to redistribute light along parallels — but the price is real and
+   measured: refitting with latitude profiles that fit just as well (scale 20 or
+   35 instead of 26.5, rms 0.00438 and 0.00437 against 0.00437) moves the
+   bulge/anticentre contrast from 1.84 to 2.23 and 1.59. **The morphology is
+   solid; its contrast carries about +-21 %.**
+
+2. NORMALISE EACH ROW to a mean of 1, so the map carries shape and nothing else:
+   it redistributes the light we measured along each parallel. Exact before
+   encoding; the clip, the Lanczos resize and the 8-bit quantisation that follow
+   do not preserve a mean, so the guarantee is a MEASURED one, not an algebraic
+   one: worst row of the shipped map is 0.9925, i.e. 0.0001 mag of sky. Guarded
+   by tests/test_milkyway_map.py so it cannot drift silently.
+
+3. FADE OUT WHERE THE PHOTO IS ONLY PEDESTAL. Above |b| ~ 60 the panorama sits
+   within 10 % of its own black level, and inverting a 3.5 power there amplifies
+   noise into mottling. Each row is blended toward a flat 1 by the measured
+   fraction of its light that stands above the pedestal — no threshold invented,
+   and the blend leaves the row mean untouched. It is still a heuristic: that
+   fraction is a signal-to-background ratio, not a measured uncertainty.
+
+Why the longitude structure is borrowed rather than measured: the zenith of
+Nerpio is pinned at Dec +38.17 and crosses the galactic equator at exactly two
+longitudes (l = 169.0 and 76.9). But "this site carries no longitude
+information" is too strong, and the same review caught it: over a sidereal day
+that zenith sweeps a CONTINUOUS 124.11 deg arc of galactic longitude (verified
+with astropy: 124.113 deg between l = 184.99 and l = 60.88; with |b| < 10 it
+still covers 104 deg in two stretches). So a third of the longitudes ARE
+constrained by our own archive, entangled with latitude, and checking the
+borrowed shape against them inside that arc is the obvious next measurement.
+Outside it there is nothing, which is why the shape is borrowed at all.
+
+Run:  python tools/build_milkyway_map.py
+"""
+
+from __future__ import annotations
+
+import base64
+import io
+import re
+import sys
+from pathlib import Path
+
+import numpy as np
+from PIL import Image
+
+Image.MAX_IMAGE_PIXELS = None
+
+ROOT = Path(__file__).resolve().parents[1]
+SOURCE_URL = "https://cdn.eso.org/images/large/eso0932a.jpg"
+RAW = ROOT / "data" / "raw" / "eso" / "eso0932a.jpg"
+TARGET = ROOT / "docs" / "mockups" / "night.html"
+
+# Final map. Measured against the full-resolution shape, dropping to 512x256
+# (0.70 deg/px) costs an RMS shape error of 0.107 on a factor whose typical
+# value is 1, and saves 310 kB of base64 inside night.html. The glow is diffuse
+# and the dome is 620 px across, so that resolution is not the limit.
+MAP_W, MAP_H = 512, 256
+BLOCK = 6           # block-median side on the 6000x3000 original: 0.36 deg
+SHAPE_MAX = 4.0     # guard, see the clipping report the script prints
+SHAPE_MIN = 0.05
+# The site's own measurement, and the reference the photo is calibrated against.
+# Same numbers as astroweather/skybackground.py.
+AMPLITUDE_MAG = 0.39
+LATITUDE_SCALE = 26.5
+
+BEGIN = "/* --- BEGIN milky-way map (generated by tools/build_milkyway_map.py) --- */"
+END = "/* --- END milky-way map --- */"
+
+
+def fetch() -> None:
+    if RAW.exists():
+        print(f"origen ya en disco: {RAW} ({RAW.stat().st_size} bytes)")
+        return
+    import requests
+
+    print(f"bajando {SOURCE_URL} ...")
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"}
+    response = requests.get(SOURCE_URL, headers=headers, timeout=300)
+    response.raise_for_status()
+    RAW.parent.mkdir(parents=True, exist_ok=True)
+    RAW.write_bytes(response.content)
+    print(f"bajado: {len(response.content)} bytes")
+
+
+def luminance(path: Path) -> np.ndarray:
+    rgb = np.asarray(Image.open(path).convert("RGB"), np.float32) / 255.0
+    linear = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * linear[..., 0] + 0.7152 * linear[..., 1] + 0.0722 * linear[..., 2]
+
+
+def assert_projection(lum: np.ndarray) -> None:
+    """Positive control: the Magellanic Clouds are bright and extended, so they
+    say which way galactic longitude runs. It aborts rather than guessing."""
+    height, width = lum.shape
+    if abs(width / height - 2.0) > 0.01:
+        sys.exit(f"la imagen no es 2:1 ({width}x{height}): no es equirectangular")
+    ppd = width / 360.0
+
+    def disc_mean(lon: float, lat: float, radius_deg: float, flip: bool) -> float:
+        wrapped = ((lon + 180.0) % 360.0) - 180.0
+        x = int(((wrapped + 180.0) if flip else (180.0 - wrapped)) / 360.0 * width)
+        y = int((90.0 - lat) / 180.0 * height)
+        r = int(radius_deg * ppd)
+        yy, xx = np.ogrid[-r:r + 1, -r:r + 1]
+        patch = lum[y - r:y + r + 1, x - r:x + r + 1]
+        return float(patch[(yy * yy + xx * xx) <= r * r].mean())
+
+    def band_median(lat: float) -> float:
+        y = int((90.0 - lat) / 180.0 * height)
+        h = int(3.0 * ppd)
+        return float(np.median(lum[max(0, y - h):y + h, :]))
+
+    clouds = [("LMC", 280.47, -32.89, 3.0), ("SMC", 302.80, -44.30, 1.8)]
+    scores = {}
+    for flip in (False, True):
+        scores[flip] = min(disc_mean(l, b, r, flip) / band_median(b) for _, l, b, r in clouds)
+        which = "l crece a la derecha" if flip else "l decrece a la derecha"
+        print(f"  control {which}: contraste minimo de las Nubes x{scores[flip]:.1f}")
+    if not (scores[False] > 2.0 and scores[False] > 1.5 * scores[True]):
+        sys.exit("CONTROL POSITIVO FALLIDO: la proyeccion no es la esperada; no se genera nada")
+    print("  control positivo OK: l decrece hacia la derecha, +180 en el borde izquierdo")
+
+
+def build_shape(lum: np.ndarray) -> np.ndarray:
+    height, width = lum.shape
+    rows, cols = height // BLOCK, width // BLOCK
+    # A block MEDIAN, not a mean: it removes the point stars (the dome draws
+    # those from a catalogue) and keeps the diffuse glow.
+    blocks = (lum[:rows * BLOCK, :cols * BLOCK]
+              .reshape(rows, BLOCK, cols, BLOCK)
+              .transpose(0, 2, 1, 3)
+              .reshape(rows, cols, BLOCK * BLOCK))
+    diffuse = np.median(blocks, axis=2)
+
+    latitude = 90.0 - (np.arange(rows) + 0.5) / rows * 180.0
+    measured = 10 ** (0.4 * AMPLITUDE_MAG * np.exp(-np.abs(latitude) / LATITUDE_SCALE)) - 1.0
+    row_mean = diffuse.mean(axis=1)
+
+    # Grid on gamma, linear least squares on (a, pedestal) for each: three
+    # parameters, 500 rows, and no dependency beyond numpy.
+    best = None
+    for gamma in np.arange(1.0, 8.0001, 0.005):
+        design = np.column_stack([np.power(measured, gamma), np.ones_like(measured)])
+        coef, *_ = np.linalg.lstsq(design, row_mean, rcond=None)
+        residual = float(((design @ coef - row_mean) ** 2).sum())
+        if best is None or residual < best[0]:
+            best = (residual, float(gamma), float(coef[0]), float(coef[1]))
+    rss, gamma, scale, pedestal = best
+    rms = float(np.sqrt(rss / rows))
+    span = float(row_mean.max() - row_mean.min())
+    print(f"  curva de respuesta: gamma={gamma:.3f}  a={scale:.5f}  pedestal={pedestal:.5f}")
+    print(f"  residuo rms {rms:.5f} sobre un rango de {span:.5f} ({100 * rms / span:.1f} %)")
+    if not (1.5 < gamma < 6.0 and rms < 0.15 * span):
+        sys.exit("CALIBRACION FALLIDA: la curva de respuesta no se ajusta; no se genera nada")
+
+    linear = np.clip((diffuse - pedestal) / scale, 0.0, None) ** (1.0 / gamma)
+    shape = linear / np.maximum(linear.mean(axis=1, keepdims=True), 1e-12)
+
+    # How much of each row stands above the photo's own black level. It is the
+    # weight, so rows that are pure pedestal fade to a flat 1 on their own.
+    weight = np.clip(1.0 - pedestal / np.maximum(row_mean, 1e-12), 0.0, 1.0)[:, None]
+    shape = 1.0 + weight * (shape - 1.0)
+
+    clipped = float((shape > SHAPE_MAX).mean() * 100.0)
+    print(f"  forma: mediana {np.median(shape):.2f}  p99 {np.percentile(shape, 99):.2f}  "
+          f"max {shape.max():.2f}  (el tope de {SHAPE_MAX} recorta el {clipped:.3f} %)")
+    for target in (0, 10, 30, 60, 85):
+        index = int(np.argmin(np.abs(np.abs(latitude) - target)))
+        row = shape[index]
+        print(f"    |b|={target:2d}  peso {weight[index, 0]:.2f}  "
+              f"p05 {np.percentile(row, 5):.2f}  p95 {np.percentile(row, 95):.2f}  "
+              f"amplitud del modelo {AMPLITUDE_MAG * np.exp(-target / LATITUDE_SCALE):.3f} mag")
+    shape = np.clip(shape, SHAPE_MIN, SHAPE_MAX)
+
+    small = Image.fromarray(np.round(shape / SHAPE_MAX * 255.0).astype(np.uint8), "L")
+    return np.asarray(small.resize((MAP_W, MAP_H), Image.LANCZOS))
+
+
+def encode(map8: np.ndarray) -> str:
+    buffer = io.BytesIO()
+    Image.fromarray(map8, "L").save(buffer, format="PNG", optimize=True)
+    raw = buffer.getvalue()
+    print(f"  PNG {MAP_W}x{MAP_H} en escala de grises: {len(raw)} bytes "
+          f"-> {len(raw) * 4 // 3} en base64")
+    return base64.b64encode(raw).decode("ascii")
+
+
+def patch_html(payload: str) -> None:
+    html = TARGET.read_text(encoding="utf-8")
+    block = (f"{BEGIN}\n"
+             f"/* ESO/S. Brunier, CC BY 4.0 \u2014 {SOURCE_URL}\n"
+             f"   Equirectangular in galactic coordinates: l = +180 at the left edge and\n"
+             f"   decreasing rightwards, b = +90 at the top. Each row is normalised to a\n"
+             f"   mean of 1, so this carries SHAPE only; the level is the measured one. */\n"
+             f"const MW_W = {MAP_W}, MW_H = {MAP_H}, MW_SCALE = {SHAPE_MAX};\n"
+             f'const MW_PNG = "data:image/png;base64,{payload}";\n'
+             f"{END}")
+    if BEGIN in html:
+        html = re.sub(re.escape(BEGIN) + r".*?" + re.escape(END), lambda _: block,
+                      html, flags=re.S)
+    else:
+        anchor = "const NIGHTS = RAW.nights"
+        html = html.replace(anchor, block + "\n" + anchor, 1)
+    TARGET.write_text(html, encoding="utf-8", newline="")
+    print(f"  night.html actualizado ({TARGET.stat().st_size} bytes)")
+
+
+def main() -> None:
+    fetch()
+    print("midiendo la panoramica:")
+    lum = luminance(RAW)
+    assert_projection(lum)
+    map8 = build_shape(lum)
+    patch_html(encode(map8))
+
+
+if __name__ == "__main__":
+    main()
