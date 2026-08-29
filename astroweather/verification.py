@@ -187,6 +187,74 @@ def wind_correction(root=None, model: str | None = None) -> dict:
                     f"{mejor['ratio']*100:.0f} % del viento medio real")}
 
 
+# Ventana sobre la que se mide el sesgo contra el fotometro. Corta a proposito:
+# lo que se corrige NO es un desfase constante sino una DERIVA, y una ventana
+# larga promedia epocas distintas y no describe ninguna.
+VENTANA_FOTOMETRO_DIAS = 180
+MIN_PARES_FOTOMETRO = 100
+
+
+def photometer_bias(root=None, dias: int = VENTANA_FOTOMETRO_DIAS) -> dict:
+    """Cuanto se equivoca nuestro cielo predicho contra el fotometro, AHORA.
+
+    Medido el 29-08-2026 sobre 916 pares repartidos de 2019 a 2026, el sesgo
+    (predicho menos medido) por anio sale asi:
+
+        2019 +0,082   2021 +0,181   2023 +0,009   2025 -0,116
+        2020 +0,094   2022 +0,048   2024 +0,043   2026 -0,191
+
+    En conjunto es +0,030, o sea nada. Pero NO es ruido alrededor de cero: baja
+    de forma monotona casi 0,3 mag en siete anios, y eso es exactamente la
+    deriva del suelo de SPEC 2.2 bis -- `NATURAL_FLOOR_MAG = 21.71` es una media
+    de siete anios que no describe ningun anio.
+
+    Por eso esto se mide sobre una ventana CORTA y se vuelve a medir cada vez:
+    corregir con la media de siete anios seria corregir con un numero que ya no
+    vale, y corregir con una constante fija volveria a estar mal el anio que
+    viene, en el otro sentido.
+    """
+    try:
+        import datetime as dt
+        from .skymodel import predict
+        from .site import NERPIO
+        conexion = connect(root)
+        filas = conexion.execute(f"""
+            SELECT date_trunc('hour', t_utc) AS h, median(sky_mag_raw) AS medido
+            FROM measurements
+            WHERE instrument_type = 'TESS' AND sky_mag_raw IS NOT NULL
+              AND t_utc > now() - INTERVAL {int(dias)} DAY
+            GROUP BY 1 ORDER BY 1
+        """).fetchall()
+    except Exception:
+        return {"aplicable": False, "porque": "sin acceso al archivo"}
+    if not filas:
+        return {"aplicable": False, "porque": "sin lecturas del fotometro"}
+
+    tiempos = [f[0].replace(tzinfo=dt.timezone.utc) for f in filas]
+    medidos = [float(f[1]) for f in filas]
+    diferencias = []
+    for punto, medido in zip(predict(tiempos, NERPIO), medidos):
+        # Solo noche cerrada y lectura fisicamente posible: de dia el fotometro
+        # emite ceros y hay estaciones que se quedan clavadas en 13,25.
+        if punto.is_night and punto.is_trustworthy and 16.0 < medido < 22.5:
+            diferencias.append(punto.predicted_mag - medido)
+    if len(diferencias) < MIN_PARES_FOTOMETRO:
+        return {"aplicable": False, "n": len(diferencias),
+                "porque": f"solo {len(diferencias)} pares, hacen falta "
+                          f"{MIN_PARES_FOTOMETRO}"}
+    diferencias.sort()
+    n = len(diferencias)
+    media = sum(diferencias) / n
+    varianza = sum((x - media) ** 2 for x in diferencias) / n
+    return {"aplicable": True, "n": n, "ventana_dias": dias,
+            "sesgo": round(media, 3), "mediana": round(diferencias[n // 2], 3),
+            "sigma": round(varianza ** 0.5, 3),
+            "porque": ("el fotometro manda: es medida y el modelo es estimacion. "
+                       "Se mide sobre los ultimos meses y no sobre todo el "
+                       "archivo porque lo que hay no es un desfase constante "
+                       "sino una deriva")}
+
+
 def baselines(root=None) -> dict:
     """Persistence and climatology: the two scores any forecast must beat."""
     connection = connect(root)

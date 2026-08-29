@@ -90,6 +90,11 @@ def _job_web():
     return str(write())
 
 
+def _job_tess_live():
+    from .workers import fetch_tess
+    return fetch_tess.run_live()
+
+
 def _job_allsky():
     from .workers import fetch_allsky
     return fetch_allsky.run()
@@ -224,6 +229,10 @@ JOBS = {
     "aemet_horario": (CronTrigger(hour="2,10,18", minute=15), _job_aemet_hourly),
     # The photometer archive is served by month; topping up daily is enough.
     "tess": (CronTrigger(hour=9, minute=0), _job_tess),
+    # Y el fotometro EN VIVO cada diez minutos. El relleno por meses construye
+    # el archivo; esto es para que el panel pueda ensenar el fondo de cielo
+    # medido de ahora en vez de uno de hace un dia.
+    "tess_vivo": (IntervalTrigger(minutes=10), _job_tess_live),
     # La allsky sirve 19,2 h como mucho (medido) a 15 s de cadencia. Cada 4
     # horas pidiendo 5 deja una hora de solape: una caida corta no abre hueco,
     # y lo repetido lo quita la vista deduplicada.

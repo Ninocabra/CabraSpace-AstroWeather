@@ -95,6 +95,7 @@ def _night(day: dt.datetime, site: Site, root=None, *,
         turbulence=turbulence, aod_total=forecast["aod_total"],
         aod_dust=forecast["aod_dust"], site=site)
 
+    calibracion = _calibracion_fotometro()
     ordenados = sorted(targets, key=lambda t: (-t.q_expected, -t.q_conditional,
                                               t.target.name))
     window = night_report.best_window
@@ -146,6 +147,16 @@ def _night(day: dt.datetime, site: Site, root=None, *,
         # Y la pregunta 2.
         "cielo": {
             "mag_cenit_mas_oscuro": round(darkest, 2) if darkest else None,
+            # Lo mismo, corregido contra el fotometro. NO es un retoque
+            # cosmetico: el modelo se mide 0,27 mag pesimista en esta epoca, y
+            # esa correccion sale de comparar prediccion y medida en el MISMO
+            # sitio del que salen los datos. Se publican los dos numeros porque
+            # el crudo es lo que usa el recomendador y el corregido es lo que
+            # mejor describe el cielo.
+            "mag_cenit_corregido": (round(darkest + calibracion["sesgo"] * -1, 2)
+                                    if darkest and calibracion.get("aplicable")
+                                    else None),
+            "calibracion_fotometro": calibracion,
             "seeing": {
                 "tercil": turbulence.tercile,
                 "rango_arcsec": [round(turbulence.range_arcsec[0], 1),
@@ -253,6 +264,15 @@ def _suben_esta_noche(times, site) -> list:
         AltAz(obstime=cuando, location=lugar)).alt.deg)
     pico = alturas.max(axis=1)
     return [objetivo for objetivo, alto in zip(objetivos, pico) if alto >= MIN_ALTITUDE]
+
+
+def _calibracion_fotometro() -> dict:
+    """Envoltorio para poder sustituirlo en los tests sin tocar la BD."""
+    try:
+        from .verification import photometer_bias
+        return photometer_bias()
+    except Exception:
+        return {"aplicable": False, "porque": "no medible"}
 
 
 def _horas_oscuras(night_report, night) -> float | None:
@@ -413,6 +433,30 @@ def verificacion_viento() -> dict:
 # Columnas del archivo con las que se puede tapar un hueco de la descarga en
 # vivo, y a que campo del panel corresponden. Solo lo que el scraper guarda
 # cada 5 minutos: no se rellena nada que no se este midiendo de verdad.
+# Rango fisicamente posible de cada lectura. Un sensor que devuelve cero no
+# esta diciendo "cero": esta diciendo que no ha leido, y publicarlo tal cual es
+# lo que hizo que el panel ensenara "viento 0 km/h" con la pagina a medias.
+# SPEC 5 ya lo pedia -- "descartar por frescura y rango fisico" -- y hasta hoy
+# solo se aplicaba al fotometro.
+RANGOS = {
+    "temperatura": (-25.0, 45.0),
+    "humedad": (1.0, 100.0),
+    "punto_rocio": (-40.0, 30.0),
+    "viento_ms": (0.0, 60.0),
+    "presion": (700.0, 950.0),
+    "cielo_ir": (-60.0, 30.0),
+    "cielo_indice": (-50.0, 100.0),
+}
+
+
+def _plausible(campo: str, valor) -> bool:
+    """Si el valor cae dentro de lo que ese sensor puede medir de verdad."""
+    if valor is None:
+        return False
+    minimo, maximo = RANGOS.get(campo, (float("-inf"), float("inf")))
+    return minimo <= float(valor) <= maximo
+
+
 DESDE_ARCHIVO = {
     "temperatura": "t2m", "humedad": "rh", "viento_ms": "wind",
     "presion": "station_pressure", "punto_rocio": "dew_point",
@@ -491,8 +535,12 @@ def _sensores(site: Site, root=None) -> dict | None:
         "incompleto": getattr(ahora, "missing_note", None) if ahora else "sin respuesta",
     }
 
-    faltan = [campo for campo, columna in DESDE_ARCHIVO.items()
-              if panel.get(campo) is None]
+    # Se sustituye lo que falta Y lo que no puede ser: un cero de viento con la
+    # pagina a medias no es calma, es una lectura que no llego.
+    faltan = [campo for campo in DESDE_ARCHIVO
+              if not _plausible(campo, panel.get(campo))]
+    for campo in faltan:
+        panel[campo] = None
     archivo = _ultimo_del_archivo([DESDE_ARCHIVO[c] for c in faltan], root)
     completados = {}
     for campo in faltan:
@@ -506,7 +554,34 @@ def _sensores(site: Site, root=None) -> dict | None:
     # Que se completo y de cuando: sin esto el panel diria "18 grados" sin decir
     # que ese 18 es de hace veinte minutos.
     panel["del_archivo"] = completados
+    # EL FOTOMETRO MANDA. Es medida y todo lo demas de esta pagina es
+    # estimacion, asi que el fondo de cielo de AHORA sale de el y no del modelo.
+    panel.update(_fotometro_ahora(root))
     return panel
+
+
+def _fotometro_ahora(root=None) -> dict:
+    """La ultima lectura valida del fotometro, con su hora.
+
+    Hasta hoy la mas reciente que teniamos era de mas de un dia antes, porque
+    `fetch_tess` rellena por meses. Ahora hay un trabajo en vivo cada diez
+    minutos y esto lo lee del archivo, que es donde ese trabajo lo deja.
+    """
+    try:
+        from .queries import connect
+        fila = connect(root).execute("""
+            SELECT sky_mag_raw, t_utc FROM measurements
+            WHERE instrument_type = 'TESS' AND sky_mag_raw IS NOT NULL
+              AND t_utc > now() - INTERVAL 3 HOUR
+            ORDER BY t_utc DESC LIMIT 1
+        """).fetchone()
+    except Exception:
+        return {}
+    if not fila:
+        return {"cielo_mag_medido": None, "cielo_mag_medido_utc": None}
+    return {"cielo_mag_medido": round(float(fila[0]), 2),
+            "cielo_mag_medido_utc": fila[1].isoformat(timespec="seconds"),
+            "cielo_mag_instrumento": "TESS stars289"}
 
 
 # Lo que la cupula necesita y lo que NO. `nightview.build()` da 623 kB: de

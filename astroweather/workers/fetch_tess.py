@@ -121,6 +121,37 @@ def _to_rows(series: list[dict], site: Site, station: str, retrieved_at: datetim
     return rows
 
 
+def run_live(site: Site = NERPIO, *, station: str = DEFAULT_STATION,
+             minutos: int = 90) -> dict:
+    """La ultima hora y media del fotometro, para tenerlo AHORA y no ayer.
+
+    El relleno por meses es para construir el archivo; esto es otra cosa. Hasta
+    hoy la lectura mas reciente que teniamos era de mas de un dia antes, asi
+    que el producto publicaba un fondo de cielo PREDICHO al lado de un
+    fotometro que estaba midiendo el de verdad y al que no le preguntabamos.
+
+    Mismo camino que el resto -- raw archivado, filas canonicas, filtro de
+    plausibilidad -- porque una lectura en vivo no merece menos disciplina que
+    una historica: precisamente en vivo es cuando llegan los ceros de dia y los
+    13,25 clavados.
+    """
+    fin = utcnow()
+    inicio = fin - timedelta(minutes=minutos)
+    retrieved_at = fin
+    series = query(_window_sql(station, inicio, fin), since_days=2, timeout=45)
+    if not series:
+        return {"filas": 0, "ultima": None, "mag": None}
+    store_raw(series, source=f"tess_{station}_live", site_id=site.site_id,
+              retrieved_at=retrieved_at)
+    filas = _to_rows(series, site, station, retrieved_at)
+    write_canonical(filas, dataset="measurements", site_id=site.site_id)
+    validas = [f for f in filas if f["sky_mag_raw"] is not None]
+    ultima = max(validas, key=lambda f: f["t_utc"]) if validas else None
+    return {"filas": len(filas), "validas": len(validas),
+            "ultima": ultima["t_utc"].isoformat() if ultima else None,
+            "mag": round(float(ultima["sky_mag_raw"]), 2) if ultima else None}
+
+
 def _months(start: datetime, end: datetime) -> Iterator[tuple[datetime, datetime]]:
     cursor = start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     while cursor < end:
@@ -182,6 +213,8 @@ def run(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--station", default=DEFAULT_STATION)
+    parser.add_argument("--live", action="store_true",
+                        help="solo la ultima hora y media, para el panel")
     parser.add_argument("--start", help="YYYY-MM (por defecto 2019-01)")
     parser.add_argument("--months", type=int, help="solo N meses desde --start")
     parser.add_argument("--no-resume", action="store_true")
