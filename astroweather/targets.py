@@ -123,6 +123,11 @@ class Target:
     # comparable across object classes (SPEC v8 section 1.1).
     difficulty: str
     note: str = ""
+    # Otros nombres por los que alguien lo buscaria: el ingles, la designacion
+    # alternativa, el numero de otro catalogo. La pagina en ingles buscaba
+    # "Veil" y no encontraba el Velo (29-08-2026): un buscador que solo conoce
+    # un idioma es medio buscador.
+    aliases: tuple[str, ...] = ()
 
     def positions(self, times: list[dt.datetime], site: Site = NERPIO):
         when = Time([t.astimezone(dt.timezone.utc) for t in times])
@@ -134,26 +139,125 @@ class Target:
                 np.asarray(separations, dtype=float))
 
 
-# A small curated list. Fifty well-understood objects beat twenty thousand with
-# incomparable photometry, which is why this is hand-written.
+# A curated list. Fifty well-understood objects beat twenty thousand with
+# incomparable photometry, which is why this is hand-written: `difficulty` and
+# `alpha` son juicios sobre el objeto que ningun catalogo trae, y sin ellos el
+# recomendador no puede decir nada util.
+#
+# Ampliada el 29-08-2026 de 10 a 44 para que el buscador de la web tenga a que
+# buscar. Las coordenadas de los nuevos NO se escribieron de memoria: se
+# resolvieron contra SIMBAD (`SkyCoord.from_name`) y se pegaron. Las de los diez
+# originales se dejan como estaban -- en objetos extensos el "centro" es una
+# decision de encuadre, no un dato, y la de un catalogo no tiene por que ser
+# mejor que la que ya se habia elegido a mano.
 CATALOGUE = [
     Target("IFN en M81/M82", 148.9, 69.1, "ifn", 0.0, "extremo_contraste",
-           "el target mas exigente en contraste que existe: sin Luna o nada"),
+           "el target mas exigente en contraste que existe: sin Luna o nada",
+           aliases=("IFN", "Integrated Flux Nebula", "cirros galacticos",)),
     Target("M51 (halo y puente de marea)", 202.47, 47.19, "galaxy", 0.5,
-           "bajo_contraste", "el nucleo sale casi siempre; el puente, no"),
-    Target("M31", 10.68, 41.27, "galaxy", 0.5, "normal", ""),
-    Target("M81", 148.89, 69.07, "galaxy", 0.5, "normal", ""),
+           "bajo_contraste", "el nucleo sale casi siempre; el puente, no",
+           aliases=("Whirlpool", "Remolino", "NGC 5194",)),
+    Target("M31", 10.68, 41.27, "galaxy", 0.5, "normal", "",
+           aliases=("Andromeda", "Andromeda Galaxy", "NGC 224",)),
+    Target("M81", 148.89, 69.07, "galaxy", 0.5, "normal", "",
+           aliases=("Bode", "Bode's Galaxy", "NGC 3031",)),
     Target("NGC 7000 (Norteamérica)", 314.75, 44.52, "nebula", 0.0, "narrowband",
-           "banda estrecha: aprovecha noches de Luna"),
-    Target("Velo (NGC 6960)", 311.66, 30.72, "nebula", 0.0, "narrowband", ""),
+           "banda estrecha: aprovecha noches de Luna",
+           aliases=("North America Nebula", "Norteamerica", "Caldwell 20",)),
+    Target("Velo (NGC 6960)", 311.66, 30.72, "nebula", 0.0, "narrowband", "",
+           aliases=("Veil", "Veil Nebula", "Witch's Broom", "Escoba de Bruja",)),
     Target("M57 (Anillo)", 283.40, 33.03, "planetary", 1.0, "compacto_resolucion",
-           "pequena: el seeing manda"),
+           "pequena: el seeing manda",
+           aliases=("Ring Nebula", "Anillo", "NGC 6720",)),
     Target("Cruz de Einstein (Q2237+0305)", 340.13, 3.36, "lens", 1.0,
            "compacto_resolucion",
-           "componentes a 1.8 arcsec: solo con seeing excepcional"),
+           "componentes a 1.8 arcsec: solo con seeing excepcional",
+           aliases=("Einstein Cross", "Huchra's Lens", "Q2237",)),
     Target("M13", 250.42, 36.46, "cluster", 0.5, "normal",
-           "poco exigente: buen plan de noche mediocre"),
-    Target("M27 (Dumbbell)", 299.90, 22.72, "planetary", 0.5, "normal", ""),
+           "poco exigente: buen plan de noche mediocre",
+           aliases=("Hercules Cluster", "Great Globular", "NGC 6205",)),
+    Target("M27 (Dumbbell)", 299.90, 22.72, "planetary", 0.5, "normal", "",
+           aliases=("Dumbbell Nebula", "Pesa", "NGC 6853",)),
+    Target("M1 (Cangrejo)", 83.6324, 22.0174, "nebula", 0.5, "narrowband",
+           "resto de supernova: Halfa y OIII",
+           aliases=("Crab Nebula", "Crab", "NGC 1952",)),
+    Target("M8 (Laguna)", 270.9042, -24.3867, "nebula", 0.0, "narrowband", "",
+           aliases=("Lagoon Nebula", "Lagoon", "NGC 6523",)),
+    Target("M16 (Aguila)", 274.6880, -13.7920, "nebula", 0.0, "narrowband",
+           "los Pilares piden focal larga",
+           aliases=("Eagle Nebula", "Pillars of Creation", "NGC 6611",)),
+    Target("M17 (Omega)", 275.1958, -16.1717, "nebula", 0.0, "narrowband", "",
+           aliases=("Omega Nebula", "Swan Nebula", "NGC 6618",)),
+    Target("M20 (Trifida)", 270.6750, -22.9717, "nebula", 0.0, "normal",
+           "mezcla emision y reflexion: no es solo banda estrecha",
+           aliases=("Trifid Nebula", "Trifid", "NGC 6514",)),
+    Target("M33 (Triangulo)", 23.4621, 30.6602, "galaxy", 0.5, "bajo_contraste",
+           "brillo superficial bajo: enganosa",
+           aliases=("Triangulum Galaxy", "Pinwheel", "NGC 598",)),
+    Target("M42 (Orion)", 83.8201, -5.3876, "nebula", 0.0, "normal",
+           "nucleo saturado: exposiciones cortas aparte",
+           aliases=("Orion Nebula", "Great Orion Nebula", "NGC 1976",)),
+    Target("M45 (Pleyades)", 56.6008, 24.1139, "cluster", 0.5, "bajo_contraste",
+           "la nebulosa de reflexion es lo dificil",
+           aliases=("Pleiades", "Seven Sisters", "Siete Cabrillas",)),
+    Target("M63 (Girasol)", 198.9553, 42.0294, "galaxy", 0.5, "bajo_contraste", "",
+           aliases=("Sunflower Galaxy", "NGC 5055",)),
+    Target("M64 (Ojo Negro)", 194.1821, 21.6827, "galaxy", 0.5, "normal", "",
+           aliases=("Black Eye Galaxy", "NGC 4826",)),
+    Target("M65", 169.7330, 13.0923, "galaxy", 0.5, "normal", "",
+           aliases=("NGC 3623",)),
+    Target("M66", 170.0626, 12.9915, "galaxy", 0.5, "normal", "",
+           aliases=("NGC 3627",)),
+    Target("M78", 86.6908, 0.0792, "nebula", 0.5, "bajo_contraste",
+           "reflexion: nada de banda estrecha",
+           aliases=("NGC 2068",)),
+    Target("M82 (Cigarro)", 148.9685, 69.6797, "galaxy", 0.5, "normal",
+           "los chorros de Halfa piden filtro",
+           aliases=("Cigar Galaxy", "NGC 3034",)),
+    Target("M92", 259.2808, 43.1359, "cluster", 0.5, "normal", "",
+           aliases=("NGC 6341",)),
+    Target("M97 (Lechuza)", 168.6988, 55.0190, "planetary", 1.0, "compacto_resolucion", "",
+           aliases=("Owl Nebula", "NGC 3587",)),
+    Target("M101 (Molinete)", 210.8024, 54.3488, "galaxy", 0.5, "bajo_contraste",
+           "brillo superficial bajo",
+           aliases=("Pinwheel Galaxy", "NGC 5457",)),
+    Target("M104 (Sombrero)", 189.9976, -11.6231, "galaxy", 0.5, "normal", "",
+           aliases=("Sombrero Galaxy", "NGC 4594",)),
+    Target("M106", 184.7401, 47.3037, "galaxy", 0.5, "normal", "",
+           aliases=("NGC 4258",)),
+    Target("M15", 322.4930, 12.1670, "cluster", 0.5, "normal", "",
+           aliases=("NGC 7078",)),
+    Target("M22", 279.0997, -23.9047, "cluster", 0.5, "normal", "",
+           aliases=("NGC 6656",)),
+    Target("NGC 6888 (Creciente)", 303.0273, 38.3549, "nebula", 0.0, "narrowband", "",
+           aliases=("Crescent Nebula", "Caldwell 27",)),
+    Target("NGC 7023 (Iris)", 315.4038, 68.1633, "nebula", 0.5, "bajo_contraste",
+           "reflexion mas polvo: banda ancha y cielo oscuro",
+           aliases=("Iris Nebula", "Caldwell 4",)),
+    Target("NGC 7635 (Burbuja)", 350.2013, 61.2017, "nebula", 0.0, "narrowband", "",
+           aliases=("Bubble Nebula", "Caldwell 11",)),
+    Target("NGC 7293 (Helix)", 337.4106, -20.8372, "planetary", 0.5, "narrowband",
+           "baja desde Nerpio: mira la altura",
+           aliases=("Helix Nebula", "Ojo de Dios", "Caldwell 63",)),
+    Target("NGC 2237 (Roseta)", 97.6504, 4.9807, "nebula", 0.0, "narrowband", "",
+           aliases=("Rosette Nebula", "Caldwell 49",)),
+    Target("NGC 253", 11.8881, -25.2888, "galaxy", 0.5, "normal", "",
+           aliases=("Sculptor Galaxy", "Caldwell 65",)),
+    Target("NGC 891", 35.6371, 42.3483, "galaxy", 0.5, "bajo_contraste",
+           "canal de polvo: pide resolucion y cielo",
+           aliases=("Caldwell 23",)),
+    Target("NGC 2903", 143.0421, 21.5008, "galaxy", 0.5, "normal", "",
+           aliases=("Caldwell 39",)),
+    Target("NGC 4565 (Aguja)", 189.0867, 25.9874, "galaxy", 0.5, "normal", "",
+           aliases=("Needle Galaxy", "Caldwell 38",)),
+    Target("IC 434 (Cabeza de Caballo)", 85.2500, -2.5000, "nebula", 0.0, "narrowband", "",
+           aliases=("Horsehead Nebula", "Barnard 33",)),
+    Target("IC 1396 (Trompa del Elefante)", 324.7450, 57.5139, "nebula", 0.0, "narrowband", "",
+           aliases=("Elephant's Trunk Nebula", "Trompa",)),
+    Target("IC 1805 (Corazon)", 38.2100, 61.4711, "nebula", 0.0, "narrowband", "",
+           aliases=("Heart Nebula", "Corazon", "Melotte 15",)),
+    Target("IC 1848 (Alma)", 42.8550, 60.4189, "nebula", 0.0, "narrowband", "",
+           aliases=("Soul Nebula", "Alma", "Westerhout 5",)),
 ]
 
 

@@ -25,11 +25,13 @@ import datetime as dt
 import json
 from pathlib import Path
 
+from .advice import Conditions, evaluate as evaluate_advice
 from .calibration import Calibrator
-from .ephem import moon_illumination, night_for
+from .ephem import moon_illumination, moon_positions, night_for
 from .extinction import evaluate as evaluate_transparency
 from .queries import DATA_ROOT, night_inputs
 from .seeing import integrate
+from . import site_now
 from .site import NERPIO, Site
 from .skymodel import predict
 from .targets import CATALOGUE, evaluate_night
@@ -55,7 +57,8 @@ def _hour(hour) -> dict:
     }
 
 
-def _night(day: dt.datetime, site: Site, root=None) -> dict | None:
+def _night(day: dt.datetime, site: Site, root=None, *,
+           with_catalogue: bool = True) -> dict | None:
     night_report = report(day, site, root)
     if not night_report.hours:
         return None
@@ -141,6 +144,138 @@ def _night(day: dt.datetime, site: Site, root=None) -> dict | None:
                             reverse=True)[:TOP_TARGETS]
             if t.q_conditional > 0
         ],
+        # El CATALOGO entero, para que la web pueda buscar en el y dibujar la
+        # cupula de cualquier objeto sin recalcular nada. La traza va a un punto
+        # de cada tres -- suficiente para trazar el arco y una tercera parte del
+        # peso -- y solo mientras el objeto esta por encima del horizonte.
+        # Solo en la primera noche: el buscador y la cupula son de HOY, y las
+        # trazas de la segunda duplicaban el peso del fichero (38 kB de 44) sin
+        # que nadie las mire.
+        "objetos": ([_objeto(t, times) for t in sorted(
+            targets, key=lambda t: (-t.q_expected, t.target.name))]
+            if with_catalogue else []),
+        # Lo que un astrofotografo te diria al oido, con los numeros dentro.
+        "consejos": evaluate_advice(_condiciones(
+            night_report, turbulence, transparency, darkest, times, site)),
+    }
+
+
+def _objeto(resultado, times) -> dict:
+    """Un objeto del catalogo con lo que hace falta para buscarlo y pintarlo."""
+    traza = [
+        {"t": t.isoformat(timespec="minutes"),
+         "alt": round(paso["alt"], 1), "az": round(paso["az"], 1)}
+        for i, (t, paso) in enumerate(zip(times, resultado.trace))
+        if i % 3 == 0 and not paso.get("too_low")
+    ]
+    return {
+        "nombre": resultado.target.name,
+        "tipo": resultado.target.kind,
+        "clase": resultado.target.difficulty,
+        "ra": resultado.target.ra_deg,
+        "dec": resultado.target.dec_deg,
+        "nota": resultado.target.note,
+        # Otros nombres por los que alguien lo buscaria. La pagina en ingles
+        # buscaba "Veil" y no encontraba el Velo.
+        "alias": list(resultado.target.aliases),
+        "horas_si_despeja": round(resultado.q_conditional, 1),
+        "horas_esperadas": round(resultado.q_expected, 1),
+        "horas_sobre_minimo": round(resultado.hours_above_minimum, 1),
+        "altura_maxima": round(resultado.max_altitude, 1),
+        "separacion_luna": round(resultado.min_moon_separation, 1),
+        "mejor_hora": (resultado.best_hour.isoformat(timespec="minutes")
+                       if resultado.best_hour else None),
+        "veredicto": resultado.verdict,
+        "porque": resultado.reason,
+        "traza": traza,
+    }
+
+
+def _condiciones(night_report, turbulence, transparency, darkest, times, site):
+    """Traduce la noche al vocabulario de la base de consejos."""
+    lunas = moon_positions(times, site)
+    ahora = None
+    try:
+        ahora = site_now.fetch(site=site)
+    except Exception:
+        pass                       # la pagina de AstroCamp se cae a ratos
+    viento = verificacion_viento()
+    return Conditions(
+        moon_illumination=night_report.moon_illumination,
+        moon_altitude_max=max((m.altitude for m in lunas), default=None),
+        sky_mag=darkest,
+        seeing_tercile=turbulence.tercile,
+        seeing_range=turbulence.range_arcsec,
+        aod=transparency.aod_site,
+        k_total=transparency.k_total,
+        dust_alert=transparency.dust_alert,
+        transparency_verdict=transparency.verdict,
+        open_probability=night_report.opening_probability,
+        dark_hours=night_report.dark_hours,
+        humidity=getattr(ahora, "rh_out", None),
+        dew_margin=getattr(ahora, "dew_margin", None),
+        wind=getattr(ahora, "wind_ms", None),
+        wind_uncalibrated=not viento.get("applied", False),
+    )
+
+
+def verificacion_viento() -> dict:
+    """Envoltorio para poder sustituirlo en los tests sin tocar la BD."""
+    try:
+        return wind_correction()
+    except Exception:
+        return {"factor": 1.0, "applied": False}
+
+
+def _sensores(site: Site) -> dict | None:
+    """El sitio ahora mismo. None si la pagina de AstroCamp no responde."""
+    try:
+        ahora = site_now.fetch(site=site)
+    except Exception:
+        return None
+    return {
+        "leido_utc": ahora.retrieved_at.isoformat(timespec="seconds"),
+        "medido_utc": ahora.t_utc.isoformat(timespec="seconds") if ahora.t_utc else None,
+        "antiguedad_min": (round(ahora.age_minutes, 1)
+                           if ahora.age_minutes is not None else None),
+        "fresco": ahora.meteo_fresh,
+        "temperatura": ahora.t_out,
+        "humedad": ahora.rh_out,
+        "punto_rocio": ahora.dew_point,
+        "margen_rocio": (round(ahora.dew_margin, 1)
+                         if ahora.dew_margin is not None else None),
+        "riesgo_rocio": ahora.dew_risk,
+        "viento_ms": ahora.wind_ms,
+        "viento_dir": ahora.wind_dir,
+        "presion": ahora.pressure,
+        # El CloudWatcher es verdad de nubes INDEPENDIENTE del modelo, y lleva
+        # vivo desde el 27-08-2026 tras cuatro anios muerto.
+        "cielo_ir": ahora.sky_temp,
+        "cielo_indice": ahora.sky_index,
+        "cielo_fresco": ahora.sky_fresh,
+        "cielo_despejado": ahora.sky_clear,
+        "techos_abiertos": ahora.roofs_open,
+        "techos_total": ahora.roofs_total,
+        "estado_seguridad": ahora.safety_status,
+        "incompleto": ahora.missing_note,
+    }
+
+
+def _cupula(site: Site) -> dict | None:
+    """La cupula de esta noche. Sin nubes si la rejilla no contesta."""
+    try:
+        from .dome import build as build_dome
+        cupula = build_dome(site=site)
+    except Exception:
+        return None
+    return {
+        "noche": cupula["night"],
+        "luna": cupula["moon"],
+        "marcos": [{"t": f["t"], "etiqueta": f["label"],
+                    "sol_alt": f["sun_alt"], "luna_alt": f["moon_alt"],
+                    "luna_az": f["moon_az"], "cielo_mag": f["sky_mag"],
+                    "nubes": f["clouds"]}
+                   for f in cupula["frames"]],
     }
 
 
@@ -150,7 +285,8 @@ def build(site: Site = NERPIO, *, nights: int = 2, root=None) -> dict:
 
     salidas = []
     for offset in range(nights):
-        noche = _night(now + dt.timedelta(days=offset), site, root)
+        noche = _night(now + dt.timedelta(days=offset), site, root,
+                       with_catalogue=(offset == 0))
         if noche:
             salidas.append(noche)
 
@@ -196,6 +332,14 @@ def build(site: Site = NERPIO, *, nights: int = 2, root=None) -> dict:
             "altitud_m": site.site_elevation,
         },
         "noches": salidas,
+        # Lo que los sensores del sitio dicen AHORA. No es prevision y no se
+        # mezcla con ella: va con su antiguedad delante para que la pagina
+        # pueda apagar un numero viejo en vez de ensenarlo como si fuera de
+        # este minuto.
+        "sensores": _sensores(site),
+        # La cupula, con la Luna y las nubes proyectadas: lo que hace falta
+        # para dibujar CUALQUIER objeto del catalogo sin recalcular nada.
+        "cupula": _cupula(site),
         "confianza": {
             "calibrado": calibrator is not None,
             "pares_de_entrenamiento": calibrator.trained_on if calibrator else 0,
