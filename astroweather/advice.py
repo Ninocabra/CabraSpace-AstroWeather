@@ -70,6 +70,15 @@ DEW_VIGILAR = 5.0
 VIENTO_VIGILAR = 5.5
 VIENTO_MALO = 8.3
 
+# Humedad relativa a partir de la cual el aerosol CRECE con el agua y la
+# extincion sube por encima de lo que dice un AOD seco (crecimiento
+# higroscopico: el aerosol capta agua, aumenta de tamano y cambia su indice de
+# refraccion). La literatura mide un factor 2,2 en la razon de lidar a RH 92 %,
+# y la ordenacion espectral de la extincion llega a INVERTIRSE cerca del 92-98 %.
+# Aqui se usa como aviso, no como correccion: no medimos el crecimiento.
+RH_HIGROSCOPICA = 80.0
+RH_CRITICA = 92.0
+
 VERDE, AMBAR, ROJO = "verde", "ambar", "rojo"
 LIGHTS = (VERDE, AMBAR, ROJO)
 
@@ -137,6 +146,15 @@ def _banda_ancha(c: Conditions, clave: str, etiqueta: str, gate: float) -> dict:
                      lo arregla: apilar baja el ruido, no el fondo. Y si aun así
                      sales, mantente a más de {MOON_SEP_MIN:.0f}° del disco — por
                      debajo de eso el halo domina el encuadre entero.""")
+    if (c.luna_manda and c.moon_illumination >= MOON_MID
+            and c.humidity is not None and c.humidity >= RH_HIGROSCOPICA):
+        return _fila(clave, etiqueta, ROJO, "Luna y humedad se suman",
+                     f"""Con la Luna al {c.luna_pct} % y {c.humidity:.0f} % de
+                     humedad, el halo es peor de lo que dice el modelo: el aerosol
+                     hidratado dispersa más (Mie), así que la misma Luna ensucia
+                     más cielo. Sube la separación mínima al objeto por encima de
+                     los {MOON_SEP_MIN:.0f}° habituales y cuenta con un gradiente
+                     de fondo fuerte en el encuadre.""")
     if c.luna_manda and c.moon_illumination >= MOON_MID:
         return _fila(clave, etiqueta, AMBAR, "solo objetos brillantes",
                      f"""Con la Luna al {c.luna_pct} % el color sale en cúmulos y
@@ -150,6 +168,14 @@ def _banda_ancha(c: Conditions, clave: str, etiqueta: str, gate: float) -> dict:
                      pierde más que el rojo. El balance de color que calibres esta
                      noche no valdrá para otra, así que saca los canales seguidos o
                      no los mezcles con otras sesiones.""")
+    if c.humidity is not None and c.humidity >= RH_HIGROSCOPICA:
+        return _fila(clave, etiqueta, AMBAR, "la humedad hincha el aerosol",
+                     f"""Cielo despejado no es lo mismo que cielo transparente. Con
+                     {c.humidity:.0f} % de humedad el aerosol capta agua y CRECE, y
+                     la extinción real sube por encima del k={c.k_txt()} que ves
+                     arriba, que sale de un aerosol seco. El efecto se dispara
+                     cerca del 92 %. Da por hecho que pierdes algo más de lo que
+                     dice la previsión, sobre todo en azul.""")
     return _fila(clave, etiqueta, VERDE, "adelante",
                  f"""Fondo en {c.cielo()} mag/arcsec² contra los {gate:.1f} que pide
                  la técnica, y la Luna no manda ({c.luna_pct} % iluminada{'' if
@@ -191,6 +217,14 @@ def _oiii(c: Conditions) -> dict:
                      λ⁻⁴, así que la Luna le afecta mucho más que al Hα: con
                      {c.luna_pct} % iluminada el fondo en OIII sube de largo. Si solo
                      puedes elegir un filtro esta noche, es el Hα.""")
+    if c.humidity is not None and c.humidity >= RH_CRITICA:
+        return _fila("oiii", "OIII", AMBAR, "la humedad le pega en su banda",
+                     f"""Con {c.humidity:.0f} % de humedad el aerosol hidratado
+                     dispersa mucho más, y lo hace sobre todo en azul, que es
+                     justo donde vive el OIII. Cerca del 92 % la extinción llega a
+                     invertir su orden espectral. No es una noche perdida, pero el
+                     contraste que saques hoy no lo vas a poder mezclar con el de
+                     una noche seca.""")
     if c.luna_manda:
         return _fila("oiii", "OIII", AMBAR, "vigila la separación",
                      f"""Con la Luna al {c.luna_pct} % el OIII aún trabaja, pero es el
@@ -262,6 +296,17 @@ def _infrarrojo(c: Conditions) -> dict:
                      onda, asi que donde el OIII se ahoga el IR pasa. Si tienes
                      camara sin filtro de bloqueo, esta es su noche. Cuenta con
                      reenfocar: el punto focal del IR no es el del visible.""")
+    if c.humidity is not None and c.humidity >= RH_CRITICA:
+        return _fila("ir", "Infrarrojo", AMBAR, "la banda J es la que sufre",
+                     f"""El IR aguanta la humedad mejor que el visible, pero no
+                     todo por igual: con vapor de agua alto la banda J pierde
+                     bastante -- en la literatura, hasta un 21 % de transmisión
+                     entre 1 y 10 mm de agua precipitable -- mientras H y K se
+                     mueven menos del 5 %. Con {c.humidity:.0f} % de humedad
+                     relativa en superficie, prioriza H o K si tu filtro llega, y
+                     no compares fotometría de J entre noches. AVISO: el agua
+                     precipitable NO se prevé aquí todavía; la humedad de
+                     superficie es un indicio, no la medida.""")
     if c.luna_manda and c.moon_illumination >= MOON_MID:
         return _fila("ir", "Infrarrojo", VERDE, "la Luna le molesta poco",
                      f"""Mismo argumento que hace robusto al Halfa, llevado mas
@@ -292,7 +337,11 @@ def _planetaria(c: Conditions) -> dict:
                      pesimista de la banda). La alta resolución vive del seeing y
                      esta noche no lo hay: baja la focal o cambia de plan. El fondo
                      de cielo, en cambio, le da igual — la Luna no es el problema
-                     aquí.""")
+                     aquí. De dónde sale este número: del viento en el chorro, a
+                     200 hPa, que es el predictor de altura que usa la literatura.
+                     Lo que NO ve es la capa de suelo, que es la que más manda y
+                     que aquí nadie mide — por eso esto va en terciles y sin
+                     calibrar.""")
     if c.wind is not None and c.wind >= VIENTO_MALO:
         return _fila("planetaria", "Planetaria y lunar", AMBAR,
                      "el viento vibra el tubo",
@@ -435,7 +484,49 @@ def evaluate(conditions: Conditions) -> dict:
     ]
     return {"adquisicion": adquisicion, "objetos": objetos,
             "avisos": _avisos(c), "limitante": limitante(c),
-            "resumen": _titular(c, adquisicion, objetos)}
+            "resumen": _titular(c, adquisicion, objetos),
+            "referencias": REFERENCIAS}
+
+
+# De donde sale cada correlacion que se usa arriba. Va DENTRO del JSON por la
+# misma razon que la procedencia de cada numero: un consejo que no se puede
+# rastrear no se puede discutir, y aqui se esta diciendo a alguien que cambie
+# lo que iba a hacer esta noche.
+REFERENCIAS = [
+    {"tema": "Separación a la Luna",
+     "dice": "El fondo toca su mínimo alrededor de 80-90° del disco; la práctica "
+             "publicada pide 40° como mínimo en banda ancha cerca de la llena.",
+     "usado_en": ["rgb", "luminancia", "oiii"]},
+    {"tema": "Filtros estrechos y luz lunar",
+     "dice": "3 nm suprime la Luna bastante mejor que 7-12 nm. Hα y SII aguantan; "
+             "el OIII no, porque cae en el azul donde Rayleigh va como λ⁻⁴.",
+     "usado_en": ["ha", "oiii", "sii", "dual"]},
+    {"tema": "Humedad y aerosol (crecimiento higroscópico)",
+     "dice": "Con humedad alta el aerosol capta agua y crece: sube la extinción "
+             "por encima de la que predice un AOD seco, y cerca del 92 % la "
+             "ordenación espectral llega a invertirse. También hace que la misma "
+             "Luna disperse más (Mie).",
+     "usado_en": ["rgb", "luminancia", "oiii", "ir"]},
+    {"tema": "Vapor de agua e infrarrojo",
+     "dice": "Entre 1 y 10 mm de agua precipitable, la banda J pierde hasta un "
+             "21 % de transmisión mientras H y K se mueven menos del 5 %.",
+     "usado_en": ["ir"]},
+    {"tema": "Seeing y viento en altura",
+     "dice": "El viento a 200 hPa (el chorro, ~12 km) es el predictor de altura "
+             "habitual y correla con el empeoramiento del seeing; pero la capa de "
+             "suelo domina y no se mide aquí.",
+     "usado_en": ["planetaria", "planetarias", "ir"]},
+    {"tema": "Altura y masa de aire",
+     "dice": "A 30° se cruzan ~2 masas de aire y queda cerca del 81 % del flujo "
+             "cenital; por debajo de 30-35° la dispersión atmosférica empieza a "
+             "teñir los bordes de las estrellas.",
+     "usado_en": ["galaxias", "emision", "reflexion", "cumulos", "ifn"]},
+    {"tema": "Rocío",
+     "dice": "Condensa cuando la óptica ALCANZA el punto de rocío; la práctica es "
+             "mantener las superficies unos grados por encima. El margen que "
+             "publicamos (aire − rocío) es optimista: el frontal radia al cielo.",
+     "usado_en": ["rocio"]},
+]
 
 
 def _avisos(c: Conditions) -> list[dict]:

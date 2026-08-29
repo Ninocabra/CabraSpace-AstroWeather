@@ -113,7 +113,26 @@ def _night(day: dt.datetime, site: Site, root=None, *,
         "luna_iluminacion": round(night_report.moon_illumination, 3),
         # La respuesta a la pregunta 1, que es la que manda.
         "probabilidad_de_abrir": round(night_report.opening_probability, 3),
+        # OJO a la diferencia, que confunde y con razon: esto es la suma de la
+        # probabilidad utilizable sobre TODA la ventana de producto (del ocaso
+        # menos una hora al orto mas una), asi que incluye el crepusculo. Por
+        # eso puede pasar de la oscuridad astronomica: 11,4 contra 7,8 la misma
+        # noche. Lo que se puede hacer en crepusculo es planetaria y objetos
+        # brillantes, no cielo profundo, y por eso va tambien la cuenta
+        # restringida a la oscuridad de verdad.
         "horas_utilizables_esperadas": round(night_report.usable_hours, 1),
+        "horas_utilizables_oscuras": _horas_oscuras(night_report, night),
+        # Que significa EXACTAMENTE la probabilidad de arriba, dentro del JSON:
+        # sin esto, "probabilidad de que la noche sea utilizable" se lee como
+        # "probabilidad de que abran el techo", y no es eso.
+        "probabilidad_definicion": (
+            "Probabilidad de que haya CONDICIONES para abrir, no de que abran: "
+            "el techo lo abren personas y un techo cerrado no significa mal "
+            "tiempo. Por hora es la probabilidad de cielo despejado multiplicada "
+            "por 0,85 por cada riesgo en vigilancia, y cero si una puerta de "
+            "seguridad la bloquea. Para la noche se toma la MEJOR hora, siempre "
+            "que se esperen al menos 4 h utilizables en total; si no, se penaliza "
+            "en proporcion."),
         "mejor_ventana": ({"desde": window[0].isoformat(),
                            "hasta": window[1].isoformat(),
                            "p_media": round(window[2], 3)} if window else None),
@@ -174,6 +193,22 @@ def _night(day: dt.datetime, site: Site, root=None, *,
 
 LIMITA_CODIGO = {"cielo": "c", "luna": "l", "fondo": "f", "altura": "a",
                  "ninguno": "n"}
+
+
+def _horas_oscuras(night_report, night) -> float | None:
+    """Horas utilizables esperadas DENTRO de la oscuridad astronomica.
+
+    La cuenta grande incluye el crepusculo porque la ventana de producto va del
+    ocaso menos una hora al orto mas una, y en crepusculo se puede hacer
+    planetaria y objetos brillantes. Pero para cielo profundo lo que cuenta es
+    esta, y publicar solo la grande hacia parecer que la noche da mas de lo que
+    da.
+    """
+    if not (night.dusk_astronomical and night.dawn_astronomical):
+        return 0.0
+    total = sum(h.usable_probability for h in night_report.hours
+                if night.dusk_astronomical <= h.t_utc <= night.dawn_astronomical)
+    return round(total, 1)
 
 
 def _objeto(resultado) -> dict:
