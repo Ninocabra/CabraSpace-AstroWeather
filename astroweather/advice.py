@@ -240,6 +240,50 @@ def _dual(c: Conditions) -> dict:
                  promete.""")
 
 
+def _infrarrojo(c: Conditions) -> dict:
+    """El IR cercano: lo que atraviesa lo que los demas no.
+
+    La dispersion Rayleigh va como lambda^-4 y la de Mie del aerosol cae
+    tambien con la longitud de onda, asi que a 700-1000 nm tanto la luz lunar
+    como la calima molestan MUCHO menos que en visible -- es el mismo argumento
+    que hace al Halfa robusto, llevado mas lejos. Ademas el seeing mejora con
+    lambda^(1/5): una noche mediocre en visible es algo mejor en IR.
+
+    Lo que cuesta: casi ninguna camara color sirve (el filtro de bloqueo IR va
+    de serie y hay que quitarlo), el foco se desplaza respecto al visible en
+    casi cualquier optica que no sea apocromatica de verdad, y el objeto tiene
+    que EMITIR ahi -- polvo, gigantes rojas, nebulosas de reflexion -- porque
+    en IR no hay lineas de emision que valgan.
+    """
+    if c.dust_alert:
+        return _fila("ir", "Infrarrojo", VERDE, "es lo que mejor atraviesa",
+                     f"""Con calima (AOD {c.aod_txt()}, k={c.k_txt()}) el IR es la
+                     banda que menos pierde: la dispersion cae con la longitud de
+                     onda, asi que donde el OIII se ahoga el IR pasa. Si tienes
+                     camara sin filtro de bloqueo, esta es su noche. Cuenta con
+                     reenfocar: el punto focal del IR no es el del visible.""")
+    if c.luna_manda and c.moon_illumination >= MOON_MID:
+        return _fila("ir", "Infrarrojo", VERDE, "la Luna le molesta poco",
+                     f"""Mismo argumento que hace robusto al Halfa, llevado mas
+                     lejos: a {c.luna_pct} % de Luna, el fondo en IR sube mucho
+                     menos que en visible porque el Rayleigh va como lambda^-4. Y
+                     el seeing mejora con lambda^(1/5), asi que ademas resuelve algo
+                     mejor. Pide objeto que EMITA ahi -- polvo, gigantes rojas,
+                     reflexion -- y camara sin filtro de bloqueo IR.""")
+    if c.seeing_tercile == "desfavorable":
+        alto = f'{c.seeing_range[1]:.1f}"' if c.seeing_range else "?"
+        return _fila("ir", "Infrarrojo", AMBAR, "salva algo del seeing",
+                     f"""Con seeing {c.seeing_tercile} (hasta {alto}) el IR resuelve
+                     algo mejor, porque el seeing escala como lambda^(1/5). Es una
+                     mejora real pero pequena: no convierte una noche mala en buena,
+                     la deja algo menos mala.""")
+    return _fila("ir", "Infrarrojo", AMBAR, "sin ventaja esta noche",
+                 f"""El IR gana cuando hay algo que atravesar -- Luna, calima, mal
+                 seeing -- y esta noche no lo hay: cielo en {c.cielo()} y seeing
+                 {c.seeing_tercile or 'sin dato'}. Con el cielo asi, la banda ancha
+                 normal recoge mucha mas senal por hora.""")
+
+
 def _planetaria(c: Conditions) -> dict:
     alto = f"{c.seeing_range[1]:.1f}" if c.seeing_range else "?"
     if c.seeing_tercile == "desfavorable":
@@ -375,7 +419,8 @@ def evaluate(conditions: Conditions) -> dict:
     adquisicion = [
         _banda_ancha(c, "rgb", "RGB / color", SKY_GATE["normal"]),
         _banda_ancha(c, "luminancia", "Luminancia", SKY_GATE["bajo_contraste"]),
-        _halfa(c), _oiii(c), _sii(c), _dual(c), _planetaria(c),
+        _halfa(c), _oiii(c), _sii(c), _dual(c), _infrarrojo(c),
+        _planetaria(c),
     ]
     objetos = [
         _familia(c, "galaxias", "Galaxias", "normal"),
@@ -389,7 +434,8 @@ def evaluate(conditions: Conditions) -> dict:
         _ifn(c),
     ]
     return {"adquisicion": adquisicion, "objetos": objetos,
-            "avisos": _avisos(c), "resumen": _titular(c, adquisicion)}
+            "avisos": _avisos(c), "limitante": limitante(c),
+            "resumen": _titular(c, adquisicion, objetos)}
 
 
 def _avisos(c: Conditions) -> list[dict]:
@@ -424,18 +470,58 @@ def _avisos(c: Conditions) -> list[dict]:
     return salida
 
 
-def _titular(c: Conditions, adquisicion: list) -> str:
-    """Una frase para quien no va a pasar el cursor por nada."""
-    verdes = [f["etiqueta"] for f in adquisicion if f["luz"] == VERDE]
-    rojos = [f["etiqueta"] for f in adquisicion if f["luz"] == ROJO]
+def limitante(c: Conditions) -> str | None:
+    """Cual de las casillas del resumen es la que hoy manda, o None.
+
+    Devuelve la clave de la casilla -- `luna`, `cielo`, `seeing`,
+    `transparencia` u `oscuridad` -- para que la pagina pueda pintarla en rojo.
+    El orden es el de cuanto estropea la noche, no el de la pantalla.
+    """
+    if c.luna_manda and c.moon_illumination >= MOON_MID:
+        return "luna"
+    if c.dust_alert:
+        return "transparencia"
+    if c.seeing_tercile == "desfavorable":
+        return "seeing"
+    if c.k_total is not None and c.k_total > 0.25:
+        return "transparencia"
+    if c.dark_hours and c.dark_hours < 5:
+        return "oscuridad"
+    if c.luna_manda:
+        return "luna"
+    return None
+
+
+def _lista(nombres: list[str]) -> str:
+    if len(nombres) == 1:
+        return nombres[0]
+    return ", ".join(nombres[:-1]) + " y " + nombres[-1]
+
+
+def _titular(c: Conditions, adquisicion: list, objetos: list) -> str:
+    """Todo lo que esta en verde, dicho entero.
+
+    Antes nombraba un verde y un rojo de ejemplo, y eso obliga a leerse las
+    dos filas para saber si te has perdido algo. Si el resumen no es
+    exhaustivo, no es un resumen: es una muestra.
+    """
     if c.open_probability is not None and c.open_probability < 0.5:
         return (f"Noche poco fiable ({c.open_probability*100:.0f} % de que sea "
                 f"utilizable): plan corto y tomas cortas.")
-    if verdes and rojos:
-        return f"Esta noche es de {verdes[0]}; olvídate de {rojos[0]}."
-    if rojos and not verdes:
-        return "Ninguna técnica está cómoda esta noche."
-    if c.dark_hours and c.dark_hours < 5:
-        return (f"Todo verde, pero solo {c.dark_hours:.1f} h de oscuridad: "
-                f"elige un objeto y no lo repartas.")
-    return "Noche sin pegas: gástala en lo que necesite cielo oscuro."
+    tecnicas = [f["etiqueta"] for f in adquisicion if f["luz"] == VERDE]
+    familias = [f["etiqueta"] for f in objetos if f["luz"] == VERDE]
+    if not tecnicas and not familias:
+        return "Ninguna tecnica ni familia esta comoda esta noche."
+    partes = []
+    if tecnicas:
+        partes.append(f"Adelante con {_lista(tecnicas)}")
+    if familias:
+        partes.append(("apunta a " if tecnicas else "Apunta a ")
+                      + _lista([f.lower() for f in familias]))
+    # Punto y coma entre las dos mitades: con "y" la frase encadena dos "y"
+    # seguidas -- "...y Planetaria y lunar y apunta a..." -- y se lee fatal.
+    frase = "; ".join(partes) + "."
+    rojos = [f["etiqueta"] for f in adquisicion + objetos if f["luz"] == ROJO]
+    if rojos:
+        frase += f" Hoy no: {_lista(rojos)}."
+    return frase

@@ -138,5 +138,45 @@ def test_every_row_is_always_present():
     esta decidiendo un plan y necesita ver tambien lo que si puede hacer."""
     for condiciones in (LLENA, NUEVA):
         salida = evaluate(Conditions(**condiciones))
-        assert len(salida["adquisicion"]) == 7
+        assert len(salida["adquisicion"]) == 8      # + infrarrojo, 29-08-2026
         assert len(salida["objetos"]) == 6
+
+
+def test_infrared_is_green_exactly_when_there_is_something_to_get_through():
+    """El IR gana atravesando: Luna, calima o mal seeing. Sin nada de eso su
+    ventaja desaparece, y decir que siempre es buena idea seria vender humo."""
+    from astroweather.advice import Conditions, evaluate, VERDE, AMBAR
+
+    def luz(**kw):
+        salida = evaluate(Conditions(**kw))
+        return next(f for f in salida["adquisicion"] if f["clave"] == "ir")["luz"]
+
+    assert luz(**LLENA) == VERDE                                   # Luna alta
+    assert luz(**{**NUEVA, "dust_alert": True, "aod": 0.31}) == VERDE   # calima
+    assert luz(**NUEVA) == AMBAR                                   # nada que atravesar
+
+
+def test_the_limiting_factor_names_a_tile_of_the_summary():
+    """La casilla que la pagina pinta en rojo sale de aqui, para que no pueda
+    discrepar del semaforo."""
+    from astroweather.advice import Conditions, evaluate
+
+    assert evaluate(Conditions(**LLENA))["limitante"] == "luna"
+    assert evaluate(Conditions(**NUEVA))["limitante"] is None
+    assert evaluate(Conditions(**{**NUEVA, "dust_alert": True,
+                                 "aod": 0.31}))["limitante"] == "transparencia"
+    assert evaluate(Conditions(**{**NUEVA, "seeing_tercile": "desfavorable"}
+                               ))["limitante"] == "seeing"
+
+
+def test_the_headline_lists_every_green_not_a_sample():
+    """Si el resumen no es exhaustivo no es un resumen, es una muestra: obliga
+    a abrir las dos filas para saber si te has perdido algo."""
+    from astroweather.advice import Conditions, evaluate, VERDE
+
+    salida = evaluate(Conditions(**LLENA))
+    verdes = [f["etiqueta"] for f in salida["adquisicion"] + salida["objetos"]
+              if f["luz"] == VERDE]
+
+    for etiqueta in verdes:
+        assert etiqueta.lower() in salida["resumen"].lower(), etiqueta

@@ -98,6 +98,18 @@ def _night(day: dt.datetime, site: Site, root=None, *,
     return {
         "noche": night_report.night.isoformat(),
         "oscuridad_astronomica_h": round(night_report.dark_hours, 1),
+        # Cuando se va el Sol de verdad y cuando vuelve. La duracion sola no
+        # sirve para planificar: lo que se planifica es a que hora empieza.
+        "crepusculo": {
+            "astronomico_desde": (night.dusk_astronomical.isoformat(timespec="minutes")
+                                  if night.dusk_astronomical else None),
+            "astronomico_hasta": (night.dawn_astronomical.isoformat(timespec="minutes")
+                                  if night.dawn_astronomical else None),
+            "ocaso": (night.sunset.isoformat(timespec="minutes")
+                      if night.sunset else None),
+            "orto": (night.sunrise.isoformat(timespec="minutes")
+                     if night.sunrise else None),
+        },
         "luna_iluminacion": round(night_report.moon_illumination, 3),
         # La respuesta a la pregunta 1, que es la que manda.
         "probabilidad_de_abrir": round(night_report.opening_probability, 3),
@@ -207,7 +219,40 @@ def _objeto(resultado) -> dict:
         # Arrays paralelos y no una lista de objetos: son 44 objetos por 59
         # marcos, y con claves repetidas el fichero se iba al triple.
         "alt": alt, "az": az, "rend": rend, "limita": "".join(limita),
+        # Los tres instantes que se marcan en el perfil. El paso por el
+        # meridiano se detecta por el azimut cruzando el sur (o el norte para
+        # circumpolares altas), que es la definicion, y no se confunde con el
+        # maximo cuando el objeto culmina fuera de la ventana de la noche.
+        **_hitos(alt, az),
     }
+
+
+def _hitos(alt: list, az: list) -> dict:
+    """Maximo, minimo y paso por el meridiano, en indices de marco."""
+    validos = [i for i, a in enumerate(alt) if a is not None]
+    if not validos:
+        return {"i_max": None, "i_min": None, "i_meridiano": None}
+    i_max = max(validos, key=lambda i: alt[i])
+    # El minimo UTIL es el mas bajo estando por encima del horizonte: marcar
+    # -4 grados no ayuda a planificar, solo dice que el objeto se ha puesto.
+    arriba = [i for i in validos if alt[i] > 0]
+    i_min = min(arriba, key=lambda i: alt[i]) if arriba else None
+    meridiano = None
+    for j in range(1, len(validos)):
+        a, b = validos[j - 1], validos[j]
+        if alt[a] is None or alt[b] is None:
+            continue
+        # Distancia angular al sur, con el signo: cambia de lado al cruzar.
+        antes = (az[a] - 180.0 + 180.0) % 360.0 - 180.0
+        ahora = (az[b] - 180.0 + 180.0) % 360.0 - 180.0
+        if antes <= 0 < ahora or ahora <= 0 < antes:
+            if abs(antes) < 90 and abs(ahora) < 90:      # cruce por el SUR
+                meridiano = b if abs(ahora) < abs(antes) else a
+                break
+    if meridiano is None and alt[i_max] is not None:
+        # Circumpolar o culminacion al norte: el maximo ES el paso.
+        meridiano = i_max
+    return {"i_max": i_max, "i_min": i_min, "i_meridiano": meridiano}
 
 
 def _condiciones(night_report, turbulence, transparency, darkest, times, site):
