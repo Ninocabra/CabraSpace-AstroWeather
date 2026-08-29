@@ -350,38 +350,103 @@ def verificacion_viento() -> dict:
         return {"factor": 1.0, "applied": False}
 
 
-def _sensores(site: Site) -> dict | None:
-    """El sitio ahora mismo. None si la pagina de AstroCamp no responde."""
+# Columnas del archivo con las que se puede tapar un hueco de la descarga en
+# vivo, y a que campo del panel corresponden. Solo lo que el scraper guarda
+# cada 5 minutos: no se rellena nada que no se este midiendo de verdad.
+DESDE_ARCHIVO = {
+    "temperatura": "t2m", "humedad": "rh", "viento_ms": "wind",
+    "presion": "station_pressure", "punto_rocio": "dew_point",
+    "cielo_ir": "t_sky_ir", "cielo_indice": "sky_index",
+}
+
+
+def _ultimo_del_archivo(columnas: list[str], root=None) -> dict:
+    """El valor mas reciente de cada columna, con su hora. Vacio si no hay."""
+    if not columnas:
+        return {}
+    try:
+        from .queries import connect
+        conexion = connect(root)
+        salida = {}
+        for columna in columnas:
+            fila = conexion.execute(f"""
+                SELECT {columna}, t_utc FROM measurements
+                WHERE {columna} IS NOT NULL
+                  AND t_utc > now() - INTERVAL 6 HOUR
+                ORDER BY t_utc DESC LIMIT 1
+            """).fetchone()
+            if fila:
+                salida[columna] = (fila[0], fila[1])
+        return salida
+    except Exception:
+        return {}
+
+
+def _sensores(site: Site, root=None) -> dict | None:
+    """El sitio ahora mismo. None si la pagina de AstroCamp no responde.
+
+    La pagina VUELVE INCOMPLETA a ratos, y eso no es una hipotesis: el
+    29-08-2026 se publico un panel con dos casillas y `incompleto` diciendo que
+    faltaban "estaciones meteo, techos y registro de seguridad" -- mientras el
+    techo estaba abierto de verdad, 18 de 18. Publicar el hueco tal cual hacia
+    que la pagina pintase AUSENCIA DE DATO como si fuera dato: "0/18 techos" no
+    es "cero techos abiertos", es "no lo se", y se leen igual.
+
+    Asi que lo que falta se completa desde NUESTRO archivo, que el scraper
+    llena cada 5 minutos, y cada valor dice de donde sale y de cuando es. Lo
+    que no se pueda completar se queda a None y la pagina tiene que callarse,
+    no poner un cero.
+    """
     try:
         ahora = site_now.fetch(site=site)
     except Exception:
-        return None
-    return {
-        "leido_utc": ahora.retrieved_at.isoformat(timespec="seconds"),
-        "medido_utc": ahora.t_utc.isoformat(timespec="seconds") if ahora.t_utc else None,
+        ahora = None
+
+    panel = {
+        "leido_utc": (ahora.retrieved_at.isoformat(timespec="seconds")
+                      if ahora else None),
+        "medido_utc": (ahora.t_utc.isoformat(timespec="seconds")
+                       if ahora and ahora.t_utc else None),
         "antiguedad_min": (round(ahora.age_minutes, 1)
-                           if ahora.age_minutes is not None else None),
-        "fresco": ahora.meteo_fresh,
-        "temperatura": ahora.t_out,
-        "humedad": ahora.rh_out,
-        "punto_rocio": ahora.dew_point,
+                           if ahora and ahora.age_minutes is not None else None),
+        "fresco": bool(ahora and ahora.meteo_fresh),
+        "temperatura": getattr(ahora, "t_out", None),
+        "humedad": getattr(ahora, "rh_out", None),
+        "punto_rocio": getattr(ahora, "dew_point", None),
         "margen_rocio": (round(ahora.dew_margin, 1)
-                         if ahora.dew_margin is not None else None),
-        "riesgo_rocio": ahora.dew_risk,
-        "viento_ms": ahora.wind_ms,
-        "viento_dir": ahora.wind_dir,
-        "presion": ahora.pressure,
-        # El CloudWatcher es verdad de nubes INDEPENDIENTE del modelo, y lleva
-        # vivo desde el 27-08-2026 tras cuatro anios muerto.
-        "cielo_ir": ahora.sky_temp,
-        "cielo_indice": ahora.sky_index,
-        "cielo_fresco": ahora.sky_fresh,
-        "cielo_despejado": ahora.sky_clear,
-        "techos_abiertos": ahora.roofs_open,
-        "techos_total": ahora.roofs_total,
-        "estado_seguridad": ahora.safety_status,
-        "incompleto": ahora.missing_note,
+                         if ahora and ahora.dew_margin is not None else None),
+        "riesgo_rocio": getattr(ahora, "dew_risk", "desconocido"),
+        "viento_ms": getattr(ahora, "wind_ms", None),
+        "viento_dir": getattr(ahora, "wind_dir", None),
+        "presion": getattr(ahora, "pressure", None),
+        "cielo_ir": getattr(ahora, "sky_temp", None),
+        "cielo_indice": getattr(ahora, "sky_index", None),
+        "cielo_fresco": bool(ahora and ahora.sky_fresh),
+        "cielo_despejado": getattr(ahora, "sky_clear", None),
+        # 0/0 NO es "ningun techo abierto": es que no vino el bloque. Se
+        # publica None para que la pagina no pueda confundirlos.
+        "techos_abiertos": (ahora.roofs_open if ahora and ahora.roofs_total else None),
+        "techos_total": (ahora.roofs_total if ahora and ahora.roofs_total else None),
+        "estado_seguridad": getattr(ahora, "safety_status", None),
+        "incompleto": getattr(ahora, "missing_note", None) if ahora else "sin respuesta",
     }
+
+    faltan = [campo for campo, columna in DESDE_ARCHIVO.items()
+              if panel.get(campo) is None]
+    archivo = _ultimo_del_archivo([DESDE_ARCHIVO[c] for c in faltan], root)
+    completados = {}
+    for campo in faltan:
+        valor = archivo.get(DESDE_ARCHIVO[campo])
+        if valor is None:
+            continue
+        panel[campo] = valor[0]
+        completados[campo] = valor[1].isoformat(timespec="seconds")
+    if panel["temperatura"] is not None and panel["punto_rocio"] is not None             and panel["margen_rocio"] is None:
+        panel["margen_rocio"] = round(panel["temperatura"] - panel["punto_rocio"], 1)
+    # Que se completo y de cuando: sin esto el panel diria "18 grados" sin decir
+    # que ese 18 es de hace veinte minutos.
+    panel["del_archivo"] = completados
+    return panel
 
 
 # Lo que la cupula necesita y lo que NO. `nightview.build()` da 623 kB: de
@@ -469,7 +534,7 @@ def build(site: Site = NERPIO, *, nights: int = 2, root=None) -> dict:
         # mezcla con ella: va con su antiguedad delante para que la pagina
         # pueda apagar un numero viejo en vez de ensenarlo como si fuera de
         # este minuto.
-        "sensores": _sensores(site),
+        "sensores": _sensores(site, root),
         # La cupula, con la Luna y las nubes proyectadas: lo que hace falta
         # para dibujar CUALQUIER objeto del catalogo sin recalcular nada.
         "cupula": _cupula(site),
