@@ -155,8 +155,8 @@ def build(site: Site = NERPIO, *, nights: int = 2, root=None) -> dict:
 
     avisos = []
     if calibrator is None:
-        avisos.append("La probabilidad NO esta calibrada: es la salida cruda "
-                      "del modelo, que aqui es peor que la climatologia.")
+        avisos.append("La probabilidad NO está calibrada: es la salida cruda "
+                      "del modelo, que aquí es peor que la climatología.")
     else:
         # El aviso del desajuste de modelo viaja tal cual: si la curva se esta
         # aplicando a otro proveedor, quien lea el JSON tiene que enterarse.
@@ -166,10 +166,10 @@ def build(site: Site = NERPIO, *, nights: int = 2, root=None) -> dict:
     avisos.append("El seeing es experimental y sin calibrar con FWHM local: se "
                   "publica en terciles, nunca en arcosegundos sueltos.")
     if salidas and salidas[0]["cielo"]["seeing"]["origen"] == "supuesto":
-        avisos.append("No hay prevision de viento en altura para esta noche: "
+        avisos.append("No hay previsión de viento en altura para esta noche: "
                       "el seeing sale de un valor supuesto.")
     if salidas and salidas[0]["cielo"]["transparencia"]["origen"] == "supuesto":
-        avisos.append("No hay prevision de aerosol para esta noche: la "
+        avisos.append("No hay previsión de aerosol para esta noche: la "
                       "transparencia sale de un valor supuesto.")
 
     return {

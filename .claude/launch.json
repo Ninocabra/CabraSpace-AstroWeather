@@ -4,8 +4,26 @@
     {
       "name": "mockups",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8731", "--directory", "docs/mockups"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8731",
+        "--directory",
+        "docs/mockups"
+      ],
       "port": 8731
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8766",
+        "--directory",
+        "../Pagina Web"
+      ],
+      "port": 8766
     }
   ]
 }

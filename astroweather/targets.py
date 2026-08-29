@@ -143,7 +143,7 @@ CATALOGUE = [
            "bajo_contraste", "el nucleo sale casi siempre; el puente, no"),
     Target("M31", 10.68, 41.27, "galaxy", 0.5, "normal", ""),
     Target("M81", 148.89, 69.07, "galaxy", 0.5, "normal", ""),
-    Target("NGC 7000 (Norteamerica)", 314.75, 44.52, "nebula", 0.0, "narrowband",
+    Target("NGC 7000 (Norteamérica)", 314.75, 44.52, "nebula", 0.0, "narrowband",
            "banda estrecha: aprovecha noches de Luna"),
     Target("Velo (NGC 6960)", 311.66, 30.72, "nebula", 0.0, "narrowband", ""),
     Target("M57 (Anillo)", 283.40, 33.03, "planetary", 1.0, "compacto_resolucion",
@@ -408,7 +408,7 @@ def _reason(target: Target, conditional: float, hours: float,
     if moon_separation < 30 and target.difficulty == "extremo_contraste":
         return f"la Luna pasa a {moon_separation:.0f} grados: imposible para SB extremo"
     if transparency.dust_alert and target.alpha < 0.5:
-        return "calima: los objetos extensos y debiles no cuajan"
+        return "calima: los objetos extensos y débiles no cuajan"
     if target.alpha >= 1.0 and turbulence and turbulence.tercile == "desfavorable":
         return f"seeing {turbulence.tercile}: los detalles finos se pierden"
     if conditional <= 0.01:

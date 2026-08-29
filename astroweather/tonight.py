@@ -150,14 +150,14 @@ def report(day: dt.datetime | None = None, site: Site = NERPIO, root=None) -> Ni
         ))
 
     note = (f"probabilidad calibrada con {calibrator.trained_on} pares "
-            f"(BSS sobre climatologia: "
+            f"(BSS sobre climatología: "
             f"{(1 - calibrator.brier / calibrator.brier_climatology) * 100:+.1f} %)"
             if calibrator else "SIN CALIBRAR: probabilidad no disponible")
     if mismatch:
         # Se dice, no se esconde: una probabilidad calibrada sobre otro modelo
         # sigue siendo mejor que ninguna, pero deja de ser lo que promete.
-        note += ("\n  AVISO: se calibro con " + mismatch + " y esta noche no hay "
-                 "nubes de ese modelo, asi que la curva se esta aplicando a "
+        note += ("\n  AVISO: se calibró con " + mismatch + " y esta noche no hay "
+                 "nubes de ese modelo, así que la curva se está aplicando a "
                  "otro. La probabilidad vale menos de lo que dice el BSS.")
 
     return NightReport(

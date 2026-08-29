@@ -73,9 +73,9 @@ def _rain_risk(precipitation: float | None, probability: float | None,
                observed_rain: bool | None, hours_ahead: float) -> Risk:
     """Rain, weighted by what can actually be known at that horizon."""
     if observed_rain:
-        return Risk("lluvia", "blocked", "el sensor local esta detectando lluvia")
+        return Risk("lluvia", "blocked", "el sensor local está detectando lluvia")
     if precipitation is not None and precipitation > 0.1:
-        return Risk("lluvia", "blocked", f"precipitacion prevista {precipitation:.1f} mm")
+        return Risk("lluvia", "blocked", f"precipitación prevista {precipitation:.1f} mm")
     if probability is not None and probability > PRECIP_PROBABILITY_LIMIT:
         # Far out, a high probability is a warning; close in, it is a decision.
         level = "blocked" if hours_ahead <= 6 else "watch"
@@ -105,7 +105,7 @@ def _storm_risk(cape: float | None, probability: float | None,
         return Risk("tormenta", "ok", "a esta hora mandan el radar y el sensor")
     if cape >= CAPE_HIGH and (probability or 0) > 20:
         return Risk("tormenta", "blocked",
-                    f"CAPE {cape:.0f} J/kg con {probability:.0f} % de precipitacion")
+                    f"CAPE {cape:.0f} J/kg con {probability:.0f} % de precipitación")
     if cape >= CAPE_ELEVATED:
         return Risk("tormenta", "watch",
                     f"CAPE {cape:.0f} J/kg: posible desarrollo convectivo")

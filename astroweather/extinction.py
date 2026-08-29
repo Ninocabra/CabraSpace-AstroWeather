@@ -133,7 +133,7 @@ class Transparency:
     def verdict(self) -> str:
         if self.dust_alert:
             return (f"calima (AOD polvo {self.aod_dust:.2f}): cielo lechoso, "
-                    "la Luna molesta mas y los objetos debiles no cuajan")
+                    "la Luna molesta más y los objetos débiles no cuajan")
         if self.quality > 0.9:
             return "noche transparente"
         if self.quality > 0.7:
