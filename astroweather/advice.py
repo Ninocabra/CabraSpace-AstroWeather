@@ -1,323 +1,441 @@
-"""Que hacer ESTA noche: la base de consejos de adquisicion.
+# -*- coding: utf-8 -*-
+"""Que hacer ESTA noche: semaforo por filtro y por familia de objeto.
 
 El producto ya decia como esta la noche y que objetos rinden. Lo que faltaba es
 lo que un astrofotografo con experiencia te diria al oido: "con esa Luna no
-saques RGB", "hoy Halfa si, OIII no", "el seeing no da para la planetaria",
-"cierra antes de que condense". Eso es lo que hay aqui.
+saques RGB", "hoy Halfa si, OIII no", "el seeing no da para la planetaria".
 
-COMO ESTA CONSTRUIDO, y por que asi:
+FORMA: dos filas de semaforos, no una lista de parrafos. Una lista solo ensena
+lo que va mal; un semaforo con TODAS las filas ensena tambien lo que va bien, y
+de un vistazo. Cada fila trae un veredicto corto y el detalle detras, que la
+pagina saca al pasar el cursor.
 
-Cada consejo es una REGLA con su condicion escrita en numeros, no una frase
-suelta. La condicion se evalua contra la noche real y el consejo sale con los
-numeros que lo disparan dentro. Un consejo sin su porque no vale nada: quien lo
-lee tiene que poder discrepar, y para discrepar necesita ver la cuenta.
+* **Adquisicion**: RGB, luminancia, Halfa, OIII, SII, dual-band, planetaria.
+* **Objetos**: galaxias, nebulosas de emision, de reflexion, planetarias,
+  cumulos, e IFN y halos.
 
-Las reglas cruzan dos ejes:
+Las dos filas se leen cruzadas a proposito: con Luna llena el Halfa esta verde
+y el OIII rojo, asi que "nebulosas de emision" sale en ambar -- se pueden, pero
+solo por un canal. Eso es una decision de plan, y es la que se venia a tomar.
 
-* **Que quieres adquirir**: RGB, luminancia, Halfa, OIII/SII, dual-band,
-  planetaria y lunar, y campo estelar.
-* **Que va mal esta noche**: Luna (brillo y separacion), transparencia y
-  calima, seeing, nubes, humedad y rocio, viento, y crepusculo.
+DE DONDE SALEN LOS UMBRALES. Ninguno se inventa aqui:
 
-No todas las combinaciones existen, y eso es informacion: la Luna llena arruina
-el RGB profundo y no toca la planetaria; la calima mata el OIII y deja pasar el
-Halfa; el seeing malo hunde la planetaria y no molesta al IFN. La tabla dice
-para quien es cada aviso, y el que no aplica no se publica.
-
-CONTRA QUE SE CONTRASTA CADA UMBRAL:
-
-Los cortes por filtro salen de SPEC 2.3, los de cielo de `targets.SKY_GATE`, y
-los de seeing de los terciles de `seeing.py`. No se inventa ninguno aqui: si un
-numero cambia alli, cambia el consejo, y no hay dos verdades.
+* Los cortes de cielo por clase, de `targets.SKY_GATE`; el factor por filtro,
+  de `targets.MOON_FILTER_FACTOR` (SPEC 2.3). Si cambian alli, cambia el
+  semaforo, y no hay dos verdades.
+* Los terciles de seeing, de `seeing.py`.
+* **Separacion a la Luna**: el fondo toca su minimo alrededor de 80-90 grados
+  del disco (Krisciunas & Schaefer; medido tambien en SAAO y en Weihai), y la
+  practica publicada pide **40 grados como minimo para banda ancha** cerca de
+  la llena y **50-60 con la Luna llena**. De ahi MOON_SEP_MIN y MOON_SEP_GOOD.
+* **Filtros estrechos**: 3 nm suprime la luz lunar bastante mejor que 7-12 nm,
+  y Halfa y SII aguantan la Luna mucho mejor que el **OIII**, que cae en la
+  parte azul del espectro donde la dispersion Rayleigh (~lambda^-4) es mucho
+  mas fuerte. Por eso el OIII tiene fila propia y no hereda el indulto del
+  Halfa: es el error tipico de la banda estrecha.
+* **Altura**: a 30 grados se atraviesan ~2 masas de aire y queda ~el 81 % del
+  flujo cenital; por debajo de 30-35 la dispersion atmosferica empieza a tenir
+  los bordes de las estrellas, y la AAVSO recomienda no medir ahi. De ahi
+  ALT_MIN_BUENA.
+* **Rocio**: se condensa cuando la optica ALCANZA el punto de rocio, y la
+  practica es mantener las superficies unos grados por encima. El margen que
+  publicamos es aire menos punto de rocio, que es optimista: el frontal radia
+  al cielo y esta mas frio que el aire.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Callable
+from dataclasses import dataclass
 
 from .targets import MOON_FILTER_FACTOR, SKY_GATE
 
-# Cortes de la Luna, en fraccion iluminada. No son gustos: son los puntos donde
-# el fondo de cielo cruza las puertas de `SKY_GATE` para banda ancha en un sitio
-# de 21,7 mag naturales.
+# Fraccion iluminada de la Luna. Los cortes son los puntos donde el fondo cruza
+# las puertas de banda ancha en un sitio de 21,7 mag naturales.
 MOON_LOW = 0.25
 MOON_MID = 0.55
 MOON_HIGH = 0.80
 
-# Separacion a la Luna por debajo de la cual la aureola manda sobre todo lo
-# demas (K&S: la rama rho<10 grados va como rho^-2).
-MOON_CLOSE_DEG = 30.0
+# Separacion al disco, en grados.
+MOON_SEP_MIN = 40.0
+MOON_SEP_GOOD = 80.0
 
-SEVERITIES = ("evitar", "cuidado", "aprovecha")
+# Altura por debajo de la cual la masa de aire y la dispersion mandan.
+ALT_MIN_BUENA = 30.0
 
+# Margen aire-rocio, en grados.
+DEW_CRITICO = 2.0
+DEW_VIGILAR = 5.0
 
-@dataclass(frozen=True)
-class Advice:
-    """Un consejo, con a quien va dirigido y por que se dispara."""
+# Viento medio, m/s.
+VIENTO_VIGILAR = 5.5
+VIENTO_MALO = 8.3
 
-    key: str
-    technique: str          # 'rgb' | 'luminancia' | 'halfa' | 'oiii' | ...
-    severity: str           # 'evitar' | 'cuidado' | 'aprovecha'
-    problem: str            # 'luna' | 'calima' | 'seeing' | 'nubes' | ...
-    title: str
-    body: str
-    when: Callable[["Conditions"], bool] = field(compare=False, default=lambda c: False)
-
-    def render(self, conditions: "Conditions") -> dict:
-        return {
-            "clave": self.key,
-            "tecnica": self.technique,
-            "problema": self.problem,
-            "severidad": self.severity,
-            "titulo": self.title,
-            "texto": self.body.format(**conditions.as_format()),
-        }
+VERDE, AMBAR, ROJO = "verde", "ambar", "rojo"
+LIGHTS = (VERDE, AMBAR, ROJO)
 
 
 @dataclass
 class Conditions:
-    """Lo que la noche tiene, ya resumido. Todo opcional: lo que no se sabe,
-    no dispara consejos -- callarse es mejor que adivinar."""
+    """Lo que la noche tiene, ya resumido. Lo que no se sabe queda en None y
+    entonces la fila lo dice, en vez de adivinar."""
 
     moon_illumination: float = 0.0
     moon_altitude_max: float | None = None
+    moon_up: bool = True
     sky_mag: float | None = None
     seeing_tercile: str | None = None
     seeing_range: tuple[float, float] | None = None
     aod: float | None = None
     k_total: float | None = None
     dust_alert: bool = False
-    transparency_verdict: str | None = None
     open_probability: float | None = None
     dark_hours: float = 0.0
     humidity: float | None = None
-    dew_margin: float | None = None      # t2m - dew_point, en grados
+    dew_margin: float | None = None
     wind: float | None = None
-    wind_uncalibrated: bool = False
 
-    def as_format(self) -> dict:
-        """Los numeros listos para meter en el texto, ya redondeados."""
-        return {
-            "luna_pct": f"{self.moon_illumination * 100:.0f}",
-            "luna_alt": f"{self.moon_altitude_max:.0f}" if self.moon_altitude_max is not None else "?",
-            "cielo": f"{self.sky_mag:.1f}" if self.sky_mag is not None else "?",
-            "seeing": self.seeing_tercile or "?",
-            "seeing_alto": (f"{self.seeing_range[1]:.1f}" if self.seeing_range else "?"),
-            "aod": f"{self.aod:.3f}" if self.aod is not None else "?",
-            "k": f"{self.k_total:.2f}" if self.k_total is not None else "?",
-            "p_abrir": f"{self.open_probability * 100:.0f}" if self.open_probability is not None else "?",
-            "oscuridad": f"{self.dark_hours:.1f}",
-            "humedad": f"{self.humidity:.0f}" if self.humidity is not None else "?",
-            "margen_rocio": f"{self.dew_margin:.1f}" if self.dew_margin is not None else "?",
-            "viento": f"{self.wind * 3.6:.0f}" if self.wind is not None else "?",
-            "gate_narrow": f"{SKY_GATE['narrowband']:.1f}",
-            "gate_normal": f"{SKY_GATE['normal']:.1f}",
-            "gate_extremo": f"{SKY_GATE['extremo_contraste']:.1f}",
-            "factor_ha": f"{MOON_FILTER_FACTOR.get('narrowband', 1.0):.2f}",
-        }
+    @property
+    def luna_pct(self) -> int:
+        return int(round(self.moon_illumination * 100))
+
+    @property
+    def luna_manda(self) -> bool:
+        """La Luna molesta de verdad solo si esta ARRIBA y da luz."""
+        return self.moon_up and self.moon_illumination >= MOON_LOW
+
+    def cielo(self, decimales: int = 1) -> str:
+        return f"{self.sky_mag:.{decimales}f}" if self.sky_mag is not None else "?"
+
+    def aod_txt(self) -> str:
+        return f"{self.aod:.3f}" if self.aod is not None else "?"
+
+    def k_txt(self) -> str:
+        return f"{self.k_total:.2f}" if self.k_total is not None else "?"
 
 
-def _luna(c: Conditions) -> float:
-    return c.moon_illumination
+def _peor(*luces: str) -> str:
+    for luz in (ROJO, AMBAR, VERDE):
+        if luz in luces:
+            return luz
+    return VERDE
 
 
-RULES: list[Advice] = [
-    # ---------------------------------------------------------------- LUNA --
-    Advice(
-        key="rgb_luna_alta", technique="rgb", problem="luna", severity="evitar",
-        title="Hoy no saques RGB de campo profundo",
-        body="La Luna está al {luna_pct} % y el fondo de cielo se queda en "
-             "{cielo} mag/arcsec², por encima de la puerta de {gate_normal} que "
-             "necesita la banda ancha. El ruido de fondo se come el color antes "
-             "de que el objeto suba. La señal que pierdes esta noche no la "
-             "recuperas apilando: apilar baja el ruido, no el fondo.",
-        when=lambda c: _luna(c) >= MOON_HIGH,
-    ),
-    Advice(
-        key="rgb_luna_media", technique="rgb", problem="luna", severity="cuidado",
-        title="RGB solo en objetos brillantes",
-        body="Con la Luna al {luna_pct} % el color sigue saliendo en cúmulos y "
-             "galaxias brillantes, pero olvídate de las partes débiles: los "
-             "brazos exteriores y el halo se quedan dentro del ruido del fondo.",
-        when=lambda c: MOON_MID <= _luna(c) < MOON_HIGH,
-    ),
-    Advice(
-        key="halfa_luna", technique="halfa", problem="luna", severity="aprovecha",
-        title="Noche de Halfa: aprovéchala",
-        body="La Luna al {luna_pct} % es justo la noche que el Halfa está hecho "
-             "para robar. El filtro deja pasar un factor {factor_ha} de la luz "
-             "lunar, así que el fondo que arruina el RGB aquí casi no existe. "
-             "Es la noche de las nebulosas de emisión.",
-        when=lambda c: _luna(c) >= MOON_MID,
-    ),
-    Advice(
-        key="oiii_luna", technique="oiii", problem="luna", severity="evitar",
-        title="OIII no, aunque sea banda estrecha",
-        body="El OIII cae en la parte del espectro donde la Luna dispersa más "
-             "(Rayleigh va como lambda^-4), así que NO se comporta como el "
-             "Halfa: con la Luna al {luna_pct} % el fondo en OIII sube mucho más "
-             "que en rojo. Si tienes que elegir un filtro esta noche, es el Halfa.",
-        when=lambda c: _luna(c) >= MOON_MID,
-    ),
-    Advice(
-        key="dualband_luna", technique="dual", problem="luna", severity="cuidado",
-        title="Con dual-band, la mitad del filtro trabaja a ciegas",
-        body="Un dual-band Ha+OIII con la Luna al {luna_pct} % te da un canal "
-             "bueno y otro ruidoso: el Halfa aguanta y el OIII no. Si el objeto "
-             "vive del OIII (restos de supernova, planetarias), esta noche va a "
-             "salir desequilibrado.",
-        when=lambda c: _luna(c) >= MOON_MID,
-    ),
-    Advice(
-        key="ifn_luna", technique="luminancia", problem="luna", severity="evitar",
-        title="Nada de IFN ni de halos",
-        body="El contraste extremo necesita {gate_extremo} mag/arcsec² y esta "
-             "noche el cielo se queda en {cielo}. Con la Luna al {luna_pct} % no "
-             "hay integración que valga: el IFN, las colas de marea y los halos "
-             "de galaxia piden Luna nueva o nada.",
-        when=lambda c: _luna(c) >= MOON_LOW,
-    ),
-    Advice(
-        key="luna_nueva", technique="luminancia", problem="luna", severity="aprovecha",
-        title="Sin Luna: gasta la noche en lo débil",
-        body="Luna al {luna_pct} % y {oscuridad} h de oscuridad astronómica. "
-             "Estas noches son las caras: usa el tiempo en luminancia profunda, "
-             "IFN, halos y colas de marea, que es lo unico que NO se puede hacer "
-             "el resto del mes. El RGB y el Halfa esperan.",
-        when=lambda c: _luna(c) < MOON_LOW,
-    ),
-    Advice(
-        key="planetaria_luna", technique="planetaria", problem="luna", severity="aprovecha",
-        title="A la Luna y a los planetas les da igual la Luna",
-        body="Con la Luna al {luna_pct} % el cielo profundo está comprometido, "
-             "pero la planetaria y la lunar no dependen del fondo: son objetos "
-             "brillantes y lo que manda es el seeing. Noche perfecta para eso.",
-        when=lambda c: _luna(c) >= MOON_MID,
-    ),
-
-    # ------------------------------------------------- TRANSPARENCIA/CALIMA --
-    Advice(
-        key="calima_oiii", technique="oiii", problem="calima", severity="evitar",
-        title="Con calima, el OIII es el primero en caer",
-        body="AOD de polvo alto (AOD total {aod}, k={k}): el aerosol dispersa más "
-             "en azul, así que el OIII y el SII se llevan la peor parte. El Halfa "
-             "atraviesa mucho mejor una noche lechosa.",
-        when=lambda c: bool(c.dust_alert),
-    ),
-    Advice(
-        key="calima_rgb", technique="rgb", problem="calima", severity="cuidado",
-        title="La calima te va a cambiar el color",
-        body="Con k={k} el aerosol no solo atenúa, tiñe: el azul pierde más que "
-             "el rojo y el balance de color que calibres esta noche no valdra "
-             "para otra. Si vas a mezclar con datos de otras noches, saca las "
-             "tres tomas seguidas o no mezcles.",
-        when=lambda c: bool(c.dust_alert) or (c.k_total is not None and c.k_total > 0.25),
-    ),
-    Advice(
-        key="transparencia_pobre", technique="luminancia", problem="calima",
-        severity="cuidado",
-        title="Transparencia justa: sube el objeto, no el tiempo",
-        body="Con k={k} cada masa de aire cuesta mucho más de lo normal. Elige "
-             "objetos altos y descarta lo que este por debajo de 40 grados: "
-             "alargar la sesión no compensa una extinción así.",
-        when=lambda c: c.k_total is not None and c.k_total > 0.25,
-    ),
-
-    # -------------------------------------------------------------- SEEING --
-    Advice(
-        key="seeing_malo_planetaria", technique="planetaria", problem="seeing",
-        severity="evitar",
-        title="El seeing no da para planetaria",
-        body="Seeing {seeing} (hasta {seeing_alto} arcsec en el borde "
-             "pesimista de la banda). La planetaria y la lunar de alta "
-             "resolución viven del seeing y esta noche no lo hay. Baja la focal "
-             "o cambia de plan.",
-        when=lambda c: c.seeing_tercile == "desfavorable",
-    ),
-    Advice(
-        key="seeing_malo_compacto", technique="luminancia", problem="seeing",
-        severity="cuidado",
-        title="Objetos pequeños, otra noche",
-        body="Con seeing {seeing} (hasta {seeing_alto} arcsec) las planetarias "
-             "pequeñas, los núcleos y "
-             "cualquier cosa que dependa de resolver detalle salen blandos. Lo "
-             "extenso y de brillo superficial bajo -- nebulosas grandes, IFN -- "
-             "no se entera del seeing: cambia de objetivo, no de noche.",
-        when=lambda c: c.seeing_tercile == "desfavorable",
-    ),
-    Advice(
-        key="seeing_bueno", technique="planetaria", problem="seeing",
-        severity="aprovecha",
-        title="Seeing favorable: gástalo en resolución",
-        body="Seeing {seeing}. Es la noche de la planetaria, de las planetarias "
-             "pequeñas y de los pares cerrados. Lo extenso y débil da igual "
-             "cuando el seeing es bueno: eso lo puedes hacer cualquier noche.",
-        when=lambda c: c.seeing_tercile == "favorable",
-    ),
-
-    # --------------------------------------------------------------- NUBES --
-    Advice(
-        key="nubes_probables", technique="cualquiera", problem="nubes",
-        severity="cuidado",
-        title="Plan corto: la noche no es fiable",
-        body="Solo {p_abrir} % de probabilidad de que la noche sea utilizable. "
-             "Encadena tomas cortas y guarda cada subframe: una sesión partida "
-             "en trozos de 20 minutos se salva; un mosaico de seis paneles, no.",
-        when=lambda c: c.open_probability is not None and c.open_probability < 0.6,
-    ),
-    Advice(
-        key="nubes_bueno", technique="cualquiera", problem="nubes",
-        severity="aprovecha",
-        title="Noche estable: empieza por lo largo",
-        body="{p_abrir} % de probabilidad de noche utilizable. Si tienes un "
-             "proyecto que necesita muchas horas seguidas -- mosaicos, banda "
-             "estrecha profunda -- esta es la noche para adelantarlo.",
-        when=lambda c: c.open_probability is not None and c.open_probability >= 0.85,
-    ),
-
-    # ------------------------------------------------------ HUMEDAD/ROCIO --
-    Advice(
-        key="rocio", technique="cualquiera", problem="rocio", severity="cuidado",
-        title="Vigila el rocío",
-        body="Humedad al {humedad} % y solo {margen_rocio} grados hasta el punto "
-             "de rocío. La resistencia de la lente no es opcional esta noche, y "
-             "conviene revisar el frontal cada media hora: cuando empaña, las "
-             "tomas siguen saliendo y todas valen para nada.",
-        when=lambda c: (c.dew_margin is not None and c.dew_margin < 3.0)
-                       or (c.humidity is not None and c.humidity > 85),
-    ),
-
-    # -------------------------------------------------------------- VIENTO --
-    Advice(
-        key="viento", technique="cualquiera", problem="viento", severity="cuidado",
-        title="El viento te va a costar subframes",
-        body="Viento de {viento} km/h. En focal larga el guiado sufre y una "
-             "racha arruina la toma entera: baja el tiempo de exposición "
-             "individual y da por hecho que vas a descartar más de lo normal.",
-        when=lambda c: c.wind is not None and c.wind >= 5.5,
-    ),
-
-    # ---------------------------------------------------------- CREPUSCULO --
-    Advice(
-        key="noche_corta", technique="cualquiera", problem="crepusculo",
-        severity="cuidado",
-        title="Noche corta: no la repartas",
-        body="Solo {oscuridad} h de oscuridad astronómica. Con tan poco tiempo, "
-             "repartirlo entre dos objetos deja los dos a medias. Elige uno.",
-        when=lambda c: 0 < c.dark_hours < 5.0,
-    ),
-]
+def _fila(clave, etiqueta, luz, resumen, detalle) -> dict:
+    return {"clave": clave, "etiqueta": etiqueta, "luz": luz,
+            "resumen": resumen, "detalle": " ".join(detalle.split())}
 
 
-def evaluate(conditions: Conditions) -> list[dict]:
-    """Los consejos que aplican a ESTA noche, ordenados por lo que mas manda.
+# ============================================================ ADQUISICION ==
+def _banda_ancha(c: Conditions, clave: str, etiqueta: str, gate: float) -> dict:
+    """RGB y luminancia comparten fisica: el fondo se los come."""
+    fondo = c.sky_mag
+    if c.luna_manda and fondo is not None and fondo < gate:
+        return _fila(clave, etiqueta, ROJO,
+                     f"la Luna al {c.luna_pct} % lo tapa",
+                     f"""El fondo de cielo se queda en {c.cielo()} mag/arcsec², por
+                     debajo de los {gate:.1f} que esta técnica necesita. Apilar no
+                     lo arregla: apilar baja el ruido, no el fondo. Y si aun así
+                     sales, mantente a más de {MOON_SEP_MIN:.0f}° del disco — por
+                     debajo de eso el halo domina el encuadre entero.""")
+    if c.luna_manda and c.moon_illumination >= MOON_MID:
+        return _fila(clave, etiqueta, AMBAR, "solo objetos brillantes",
+                     f"""Con la Luna al {c.luna_pct} % el color sale en cúmulos y
+                     galaxias brillantes, pero las partes débiles se quedan dentro
+                     del ruido del fondo. El cielo toca su mínimo a unos
+                     {MOON_SEP_GOOD:.0f}° del disco: elige objetos lejos de ella y
+                     no bajes de {MOON_SEP_MIN:.0f}°.""")
+    if c.dust_alert or (c.k_total is not None and c.k_total > 0.25):
+        return _fila(clave, etiqueta, AMBAR, "la calima te cambia el color",
+                     f"""Con k={c.k_txt()} el aerosol no solo atenúa, tiñe: el azul
+                     pierde más que el rojo. El balance de color que calibres esta
+                     noche no valdrá para otra, así que saca los canales seguidos o
+                     no los mezcles con otras sesiones.""")
+    return _fila(clave, etiqueta, VERDE, "adelante",
+                 f"""Fondo en {c.cielo()} mag/arcsec² contra los {gate:.1f} que pide
+                 la técnica, y la Luna no manda ({c.luna_pct} % iluminada{'' if
+                 c.moon_up else ', y bajo el horizonte'}). Es la noche de gastar el
+                 tiempo en lo que necesita fondo oscuro.""")
 
-    El orden no es alfabetico ni por tecnica: primero lo que hay que evitar,
-    porque es lo que cambia el plan; luego lo que hay que aprovechar, que es lo
-    que lo mejora; y al final los cuidados, que son matices.
+
+def _halfa(c: Conditions) -> dict:
+    factor = MOON_FILTER_FACTOR.get("narrowband", 1.0)
+    if c.dust_alert:
+        return _fila("ha", "Hα", AMBAR, "la calima resta, pero pasa",
+                     f"""El Hα es el filtro que mejor atraviesa una noche lechosa:
+                     el aerosol dispersa mucho más en azul. Con AOD {c.aod_txt()}
+                     pierdes contraste, no la sesión.""")
+    if c.moon_illumination >= MOON_MID:
+        return _fila("ha", "Hα", VERDE, "la noche es suya",
+                     f"""Con la Luna al {c.luna_pct} % el Hα es justo lo que hay que
+                     sacar: el filtro deja pasar un factor {factor:.2f} de la luz
+                     lunar, así que el fondo que arruina el RGB aquí casi no existe.
+                     Con 3 nm la supresión es aún mayor que con 7; si tu filtro es
+                     ancho, sube el número de tomas y descarta sin pena.""")
+    return _fila("ha", "Hα", VERDE, "bien, pero no lo desperdicies",
+                 f"""El Hα funciona, pero con la Luna al {c.luna_pct} % no estás
+                 aprovechando su ventaja: banda estrecha se puede hacer cualquier
+                 noche con Luna, y lo que NO se puede hacer entonces es banda ancha
+                 profunda. Si el cielo está oscuro, gástalo en eso.""")
+
+
+def _oiii(c: Conditions) -> dict:
+    if c.dust_alert:
+        return _fila("oiii", "OIII", ROJO, "la calima se lo come",
+                     f"""El aerosol dispersa mucho más en azul, así que el OIII es el
+                     primero en caer con calima (AOD {c.aod_txt()}, k={c.k_txt()}).
+                     Cambia al Hα y deja el OIII para una noche limpia.""")
+    if c.luna_manda and c.moon_illumination >= MOON_MID:
+        return _fila("oiii", "OIII", ROJO, "no hereda el indulto del Hα",
+                     f"""Este es el error típico de la banda estrecha. El OIII cae en
+                     la parte azul del espectro, donde la dispersión Rayleigh va como
+                     λ⁻⁴, así que la Luna le afecta mucho más que al Hα: con
+                     {c.luna_pct} % iluminada el fondo en OIII sube de largo. Si solo
+                     puedes elegir un filtro esta noche, es el Hα.""")
+    if c.luna_manda:
+        return _fila("oiii", "OIII", AMBAR, "vigila la separación",
+                     f"""Con la Luna al {c.luna_pct} % el OIII aún trabaja, pero es el
+                     filtro más sensible que tienes: mantén el objeto por encima de
+                     {MOON_SEP_GOOD:.0f}° del disco, que es donde el fondo toca su
+                     mínimo.""")
+    return _fila("oiii", "OIII", VERDE, "condiciones suyas",
+                 f"""Sin Luna que dispersar en azul y con k={c.k_txt()}, el OIII da lo
+                 que puede dar. Es la señal más difícil de la banda estrecha:
+                 aprovéchalo en restos de supernova y planetarias.""")
+
+
+def _sii(c: Conditions) -> dict:
+    if c.dust_alert:
+        return _fila("sii", "SII", AMBAR, "aguanta la calima",
+                     """El SII está aún más al rojo que el Hα, así que la calima le
+                     afecta menos que a nadie. Lo que le sobra de robustez le falta
+                     de señal: es la línea más débil de las tres y necesita bastante
+                     más integración.""")
+    if c.moon_illumination >= MOON_MID:
+        return _fila("sii", "SII", VERDE, "aguanta como el Hα",
+                     f"""El SII es tan robusto a la Luna como el Hα y por lo mismo:
+                     está en el rojo. Con {c.luna_pct} % iluminada se saca sin
+                     problema. Cuenta con integrar más que en Hα, porque la línea es
+                     intrínsecamente más débil.""")
+    return _fila("sii", "SII", VERDE, "adelante",
+                 """Sin Luna, el SII no gana nada especial respecto a otras noches: si
+                 la paleta que buscas lo necesita, adelante, pero el cielo oscuro
+                 rinde más en banda ancha profunda.""")
+
+
+def _dual(c: Conditions) -> dict:
+    if c.luna_manda and c.moon_illumination >= MOON_MID:
+        return _fila("dual", "Dual-band", AMBAR, "medio filtro a ciegas",
+                     f"""Un dual Hα+OIII con la Luna al {c.luna_pct} % te da un canal
+                     bueno y otro ruidoso: el Hα aguanta y el OIII no. Si el objeto
+                     vive del OIII — restos de supernova, planetarias grandes — la
+                     toma va a salir desequilibrada y lo verás al combinar. En
+                     emisión pura de Hα no lo notarás.""")
+    if c.dust_alert:
+        return _fila("dual", "Dual-band", AMBAR, "el canal azul sufre",
+                     """Con calima el canal OIII pierde y el Hα no: el mismo
+                     desequilibrio que con Luna, por otra causa.""")
+    return _fila("dual", "Dual-band", VERDE, "los dos canales trabajan",
+                 """Sin Luna alta ni calima, los dos canales del dual rinden a la vez,
+                 que es la única situación en la que el filtro hace lo que
+                 promete.""")
+
+
+def _planetaria(c: Conditions) -> dict:
+    alto = f"{c.seeing_range[1]:.1f}" if c.seeing_range else "?"
+    if c.seeing_tercile == "desfavorable":
+        return _fila("planetaria", "Planetaria y lunar", ROJO, "el seeing no da",
+                     f"""Seeing {c.seeing_tercile} (hasta {alto}" en el borde
+                     pesimista de la banda). La alta resolución vive del seeing y
+                     esta noche no lo hay: baja la focal o cambia de plan. El fondo
+                     de cielo, en cambio, le da igual — la Luna no es el problema
+                     aquí.""")
+    if c.wind is not None and c.wind >= VIENTO_MALO:
+        return _fila("planetaria", "Planetaria y lunar", AMBAR,
+                     "el viento vibra el tubo",
+                     f"""Con {c.wind * 3.6:.0f} km/h la vibración se ve a focal larga
+                     aunque el seeing acompañe. Vídeos cortos y mucho descarte.""")
+    if c.seeing_tercile == "favorable":
+        return _fila("planetaria", "Planetaria y lunar", VERDE,
+                     "gástalo en resolución",
+                     f"""Seeing {c.seeing_tercile} (banda hasta {alto}"): es la noche
+                     de la planetaria, de las planetarias pequeñas y de los pares
+                     cerrados. Que la Luna esté al {c.luna_pct} % no le afecta — son
+                     objetos brillantes y aquí manda la turbulencia, no el fondo.""")
+    return _fila("planetaria", "Planetaria y lunar", AMBAR, "seeing del montón",
+                 f"""Seeing {c.seeing_tercile or 'sin dato'} (banda hasta {alto}"): se
+                 puede intentar, pero no es la noche de batir tu mejor imagen. La
+                 Luna al {c.luna_pct} % no estorba a esta técnica.""")
+
+
+# ================================================================ OBJETOS ==
+def _familia(c: Conditions, clave, etiqueta, gate_clave, *, extra="") -> dict:
+    """Una familia de objetos contra la puerta de cielo de su clase."""
+    gate = SKY_GATE[gate_clave]
+    fondo = c.sky_mag
+    if fondo is not None and c.luna_manda and fondo < gate:
+        return _fila(clave, etiqueta, ROJO, f"pide {gate:.1f} y hay {c.cielo()}",
+                     f"""El cielo se queda en {c.cielo()} mag/arcsec² y esta familia
+                     necesita {gate:.1f} para que la señal salga del fondo. Con la
+                     Luna al {c.luna_pct} % no hay integración que lo compense.
+                     {extra}""")
+    if fondo is not None and fondo < gate + 0.6:
+        return _fila(clave, etiqueta, AMBAR, "justo en el límite",
+                     f"""El cielo está en {c.cielo()} contra los {gate:.1f} de la
+                     clase: sale, pero sin margen. Sube el objeto por encima de
+                     {ALT_MIN_BUENA:.0f}° — a esa altura ya cruzas dos masas de aire
+                     y pierdes cerca de un 20 % del flujo. {extra}""")
+    return _fila(clave, etiqueta, VERDE, "condiciones de sobra",
+                 f"""Cielo en {c.cielo()} contra los {gate:.1f} que pide la clase.
+                 {extra or f'Elige por altura: por encima de {ALT_MIN_BUENA:.0f}° la '
+                            'masa de aire deja de ser el problema.'}""")
+
+
+def _emision(c: Conditions) -> dict:
+    """La unica familia que cruza las dos filas: depende del FILTRO."""
+    ha, oiii = _halfa(c), _oiii(c)
+    if ha["luz"] == VERDE and oiii["luz"] == ROJO:
+        return _fila("emision", "Nebulosas de emisión", AMBAR,
+                     "sí, pero solo en Hα",
+                     f"""Es la familia que salva la noche con Luna: con {c.luna_pct} %
+                     iluminada y el cielo en {c.cielo()}, en Hα está verde y en OIII
+                     rojo. Si tu objeto es emisión pura — Norteamérica, Corazón,
+                     Roseta — adelante. Si vive del OIII, como el Velo o una
+                     planetaria grande, déjalo para otra noche.""")
+    return _fila("emision", "Nebulosas de emisión", _peor(ha["luz"], oiii["luz"]),
+                 "según el filtro",
+                 f"""Hα: {ha['resumen']}. OIII: {oiii['resumen']}. La familia entera
+                 depende de por qué canal vive tu objeto.""")
+
+
+def _ifn(c: Conditions) -> dict:
+    fila = _familia(c, "ifn", "IFN, halos y colas de marea", "extremo_contraste",
+                    extra="Es el objetivo más exigente en contraste que existe: "
+                          "o Luna nueva, o nada.")
+    if fila["luz"] == VERDE and c.dark_hours and c.dark_hours < 5:
+        return _fila("ifn", "IFN, halos y colas de marea", AMBAR,
+                     "cielo sí, tiempo no",
+                     f"""El fondo da, pero solo hay {c.dark_hours:.1f} h de oscuridad
+                     astronómica. Este tipo de señal se construye con muchas horas:
+                     repartir una noche corta entre dos objetos deja los dos a
+                     medias.""")
+    return fila
+
+
+def _cumulos(c: Conditions) -> dict:
+    """Los cumulos no se miden con la puerta de brillo superficial.
+
+    `SKY_GATE` describe cuanto fondo aguanta una SUPERFICIE extendida, y un
+    cumulo son estrellas: fuentes puntuales cuya senal no se diluye con el
+    fondo del mismo modo. Pasarlos por la puerta "normal" los pintaba en rojo
+    con Luna llena, y eso es falso -- un globular brillante se saca con Luna
+    llena y sale bien. Lo que se pierde son las estrellas debiles del halo y
+    cualquier nebulosidad de fondo, no el cumulo.
     """
-    orden = {"evitar": 0, "aprovecha": 1, "cuidado": 2}
-    disparados = [regla for regla in RULES if regla.when(conditions)]
-    disparados.sort(key=lambda r: (orden.get(r.severity, 9), r.technique))
-    return [regla.render(conditions) for regla in disparados]
+    if c.luna_manda and c.moon_illumination >= MOON_MID:
+        return _fila("cumulos", "Cúmulos", AMBAR, "el cúmulo sí, el fondo no",
+                     f"""Son estrellas, no superficie: con la Luna al {c.luna_pct} %
+                     un globular brillante sale igual, y por eso son el mejor plan B
+                     de una noche mala. Lo que pierdes son las estrellas débiles del
+                     halo y cualquier nebulosidad alrededor. Ojo al enfoque, que aquí
+                     lo notas todo, y a no saturar el núcleo.""")
+    return _fila("cumulos", "Cúmulos", VERDE, "siempre disponibles",
+                 f"""Es lo último que pierde una noche mediocre. Con el cielo en
+                 {c.cielo()} salen hasta las estrellas débiles del halo. Lo que los
+                 decide de verdad es el seeing, que esta noche es
+                 {c.seeing_tercile or 'desconocido'}.""")
+
+
+def _planetarias_obj(c: Conditions) -> dict:
+    if c.seeing_tercile == "desfavorable":
+        alto = f'{c.seeing_range[1]:.1f}"' if c.seeing_range else "sin banda"
+        return _fila("planetarias", "Nebulosas planetarias", AMBAR,
+                     "las pequeñas, no",
+                     f"""Son compactas y de alto brillo superficial: el fondo les
+                     molesta poco y el seeing mucho. Con la turbulencia de esta noche
+                     (hasta {alto}), las grandes sí y las pequeñas salen blandas.""")
+    alto = f'{c.seeing_range[1]:.1f}"' if c.seeing_range else "sin banda"
+    return _fila("planetarias", "Nebulosas planetarias", VERDE,
+                 "toleran el fondo",
+                 f"""Alto brillo superficial: con el cielo en {c.cielo()} aguantan la
+                 Luna mejor que ninguna otra familia. Lo que las decide es el seeing,
+                 y esta noche es {c.seeing_tercile or 'desconocido'} (hasta {alto}).
+                 Ojo si tu objeto vive del OIII, que es donde muchas tienen su
+                 señal.""")
+
+
+# ============================================================== EVALUACION ==
+def evaluate(conditions: Conditions) -> dict:
+    """Las dos filas de semaforos. Siempre TODAS, verdes incluidas.
+
+    Devolver solo lo que va mal seria mas corto y menos util: quien mira esto
+    esta decidiendo un plan, y para decidir necesita ver tambien lo que SI
+    puede hacer.
+    """
+    c = conditions
+    adquisicion = [
+        _banda_ancha(c, "rgb", "RGB / color", SKY_GATE["normal"]),
+        _banda_ancha(c, "luminancia", "Luminancia", SKY_GATE["bajo_contraste"]),
+        _halfa(c), _oiii(c), _sii(c), _dual(c), _planetaria(c),
+    ]
+    objetos = [
+        _familia(c, "galaxias", "Galaxias", "normal"),
+        _emision(c),
+        _familia(c, "reflexion", "Nebulosas de reflexión", "bajo_contraste",
+                 extra="Son luz de estrellas reflejada en polvo: banda ancha "
+                       "obligatoria, y por eso la Luna les hace todo el daño. "
+                       "Nada de banda estrecha aquí."),
+        _planetarias_obj(c),
+        _cumulos(c),
+        _ifn(c),
+    ]
+    return {"adquisicion": adquisicion, "objetos": objetos,
+            "avisos": _avisos(c), "resumen": _titular(c, adquisicion)}
+
+
+def _avisos(c: Conditions) -> list[dict]:
+    """Lo que no es tecnica ni objeto: el equipo y la noche."""
+    salida = []
+    if c.dew_margin is not None and c.dew_margin < DEW_VIGILAR:
+        luz = ROJO if c.dew_margin < DEW_CRITICO else AMBAR
+        salida.append(_fila(
+            "rocio", "Rocío", luz, f"{c.dew_margin:.1f}° de margen",
+            f"""El aire está a {c.dew_margin:.1f}° del punto de rocío, y este margen
+            es OPTIMISTA: el frontal radia al cielo y está más frío que el aire, así
+            que condensa antes. Resistencia puesta y parasol largo; cuando empaña,
+            las tomas siguen saliendo y todas valen para nada."""))
+    if c.wind is not None and c.wind >= VIENTO_VIGILAR:
+        luz = ROJO if c.wind >= VIENTO_MALO else AMBAR
+        salida.append(_fila(
+            "viento", "Viento", luz, f"{c.wind * 3.6:.0f} km/h",
+            f"""A focal larga el guiado sufre y una racha arruina la toma entera:
+            baja el tiempo de exposición individual y cuenta con descartar más de lo
+            normal. Aviso: la racha prevista no está calibrada contra ninguna verdad
+            terreno y el modelo se ha medido corto en viento medio."""))
+    if c.open_probability is not None and c.open_probability < 0.6:
+        salida.append(_fila(
+            "nubes", "Nubes", AMBAR, f"{c.open_probability*100:.0f} % utilizable",
+            """Encadena tomas cortas y guarda cada subframe: una sesión partida en
+            trozos de veinte minutos se salva; un mosaico de seis paneles, no."""))
+    if c.dark_hours and c.dark_hours < 5:
+        salida.append(_fila(
+            "noche_corta", "Noche corta", AMBAR, f"{c.dark_hours:.1f} h de oscuridad",
+            """Con tan poco tiempo, repartirlo entre dos objetos deja los dos a
+            medias. Elige uno."""))
+    return salida
+
+
+def _titular(c: Conditions, adquisicion: list) -> str:
+    """Una frase para quien no va a pasar el cursor por nada."""
+    verdes = [f["etiqueta"] for f in adquisicion if f["luz"] == VERDE]
+    rojos = [f["etiqueta"] for f in adquisicion if f["luz"] == ROJO]
+    if c.open_probability is not None and c.open_probability < 0.5:
+        return (f"Noche poco fiable ({c.open_probability*100:.0f} % de que sea "
+                f"utilizable): plan corto y tomas cortas.")
+    if verdes and rojos:
+        return f"Esta noche es de {verdes[0]}; olvídate de {rojos[0]}."
+    if rojos and not verdes:
+        return "Ninguna técnica está cómoda esta noche."
+    if c.dark_hours and c.dark_hours < 5:
+        return (f"Todo verde, pero solo {c.dark_hours:.1f} h de oscuridad: "
+                f"elige un objeto y no lo repartas.")
+    return "Noche sin pegas: gástala en lo que necesite cielo oscuro."

@@ -151,7 +151,7 @@ def _night(day: dt.datetime, site: Site, root=None, *,
         # Solo en la primera noche: el buscador y la cupula son de HOY, y las
         # trazas de la segunda duplicaban el peso del fichero (38 kB de 44) sin
         # que nadie las mire.
-        "objetos": ([_objeto(t, times) for t in sorted(
+        "objetos": ([_objeto(t, times, night.hours(30), site) for t in sorted(
             targets, key=lambda t: (-t.q_expected, t.target.name))]
             if with_catalogue else []),
         # Lo que un astrofotografo te diria al oido, con los numeros dentro.
@@ -160,14 +160,38 @@ def _night(day: dt.datetime, site: Site, root=None, *,
     }
 
 
-def _objeto(resultado, times) -> dict:
-    """Un objeto del catalogo con lo que hace falta para buscarlo y pintarlo."""
-    traza = [
-        {"t": t.isoformat(timespec="minutes"),
-         "alt": round(paso["alt"], 1), "az": round(paso["az"], 1)}
-        for i, (t, paso) in enumerate(zip(times, resultado.trace))
-        if i % 3 == 0 and not paso.get("too_low")
-    ]
+LIMITA_CODIGO = {"cielo": "c", "luna": "l", "fondo": "f", "altura": "a",
+                 "ninguno": "n"}
+
+
+def _objeto(resultado, times, dome_times, site) -> dict:
+    """Un objeto del catalogo, con lo que hace falta para buscarlo y pintarlo.
+
+    La traza va sobre la rejilla de la CUPULA y no sobre la del recomendador, y
+    esa es toda la diferencia: asi el punto `i` de la traza es el marco `i` del
+    deslizador, y el objeto se mueve al mover la hora. Con la rejilla adaptativa
+    -- que ademas recortaba los tramos bajo el horizonte -- el marcador se
+    quedaba clavado media noche y lo unico que se veia moverse era la Luna.
+
+    El rendimiento se remuestrea por hora mas cercana desde la traza del
+    recomendador. Es una funcion suave del tiempo, asi que remuestrear no
+    inventa nada; y se hace asi, y no reevaluando, para que el numero que
+    colorea la curva sea EL MISMO que da las horas de SNR publicadas.
+    """
+    alturas, azimuts, _ = resultado.target.positions(dome_times, site)
+    marcas = [t.timestamp() for t in times]
+
+    alt, az, rend, limita = [], [], [], []
+    for indice, cuando in enumerate(dome_times):
+        objetivo = cuando.timestamp()
+        cercano = min(range(len(marcas)), key=lambda i: abs(marcas[i] - objetivo))
+        paso = resultado.trace[cercano] if cercano < len(resultado.trace) else {}
+        alt.append(round(float(alturas[indice]), 1))
+        az.append(round(float(azimuts[indice]), 1))
+        rend.append(round(float(paso.get("yield") or 0.0), 3))
+        limita.append("-" if paso.get("too_low", True)
+                      else LIMITA_CODIGO.get(paso.get("limiting"), "n"))
+
     return {
         "nombre": resultado.target.name,
         "tipo": resultado.target.kind,
@@ -187,7 +211,9 @@ def _objeto(resultado, times) -> dict:
                        if resultado.best_hour else None),
         "veredicto": resultado.verdict,
         "porque": resultado.reason,
-        "traza": traza,
+        # Arrays paralelos y no una lista de objetos: son 44 objetos por 27
+        # marcos, y con claves repetidas el fichero se iba al triple.
+        "alt": alt, "az": az, "rend": rend, "limita": "".join(limita),
     }
 
 
@@ -199,23 +225,24 @@ def _condiciones(night_report, turbulence, transparency, darkest, times, site):
         ahora = site_now.fetch(site=site)
     except Exception:
         pass                       # la pagina de AstroCamp se cae a ratos
-    viento = verificacion_viento()
+    altura_maxima = max((m.altitude for m in lunas), default=None)
     return Conditions(
         moon_illumination=night_report.moon_illumination,
-        moon_altitude_max=max((m.altitude for m in lunas), default=None),
+        moon_altitude_max=altura_maxima,
+        # Una Luna llena que no sale no molesta a nadie, y el semaforo lo tiene
+        # que saber: la fase sola manda a rojo noches que estan limpias.
+        moon_up=bool(altura_maxima is not None and altura_maxima > 0),
         sky_mag=darkest,
         seeing_tercile=turbulence.tercile,
         seeing_range=turbulence.range_arcsec,
         aod=transparency.aod_site,
         k_total=transparency.k_total,
         dust_alert=transparency.dust_alert,
-        transparency_verdict=transparency.verdict,
         open_probability=night_report.opening_probability,
         dark_hours=night_report.dark_hours,
         humidity=getattr(ahora, "rh_out", None),
         dew_margin=getattr(ahora, "dew_margin", None),
         wind=getattr(ahora, "wind_ms", None),
-        wind_uncalibrated=not viento.get("applied", False),
     )
 
 
