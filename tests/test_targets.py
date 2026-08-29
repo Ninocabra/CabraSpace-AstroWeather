@@ -98,3 +98,56 @@ def test_every_verdict_carries_its_reason():
         assert result.reason
         assert result.verdict in ("recomendado", "posible", "poco rentable",
                                   "no observable")
+
+
+def test_the_answer_does_not_depend_on_how_finely_the_night_was_sampled():
+    """La misma noche, tres rejillas: el veredicto tiene que ser el mismo.
+
+    `evaluate_night` tomaba el paso como `times[1] - times[0]` y lo aplicaba a
+    toda la noche. En una rejilla uniforme eso es un error de poste; en la
+    ADAPTATIVA es un factor, porque `adaptive_hours` abre en crepusculo a 30
+    minutos y luego baja a 10: cada muestra oscura contaba triple. Medido el
+    2026-08-29 sobre la noche del 28-08, NGC 7000 daba 11,97 h de SNR en la
+    cupula contra 4,66 en el exportador -- la misma noche, 2,7x.
+
+    El margen es del 8 % y no del 1 % porque lo que queda es discretizacion
+    real, no el peso: las rejillas cubren ventanas que difieren hasta 50
+    minutos (`hours()` corta en `<= window_end`) y el rendimiento cambia
+    deprisa en los bordes. Medido sobre 10 objetos y cuatro pasos, lo que
+    queda entre rejillas finas es <= 5 %.
+    """
+    night = night_for(NEW_MOON)
+    rejillas = [night.adaptive_hours(10, 30), night.hours(30), night.hours(15)]
+    resultados = []
+    for times in rejillas:
+        resultados.append({
+            r.target.name: r.q_conditional
+            for r in evaluate_night(CATALOGUE, times,
+                                    usable_probability=[1.0] * len(times),
+                                    turbulence=integrate(20.0),
+                                    aod_total=0.06, aod_dust=0.01)})
+
+    # Solo los objetos con margen: cerca del corte de su clase el rendimiento
+    # es una funcion escarpada del tiempo y la dispersion es fisica (el IFN de
+    # M81 se mueve un 15 % entre rejillas finas, sobre un valor de 1,2).
+    observables = [n for n, q in resultados[0].items() if q > 2.0]
+    assert observables, "la noche de Luna nueva tiene que dar algo observable"
+    for nombre in observables:
+        valores = [r[nombre] for r in resultados]
+        assert max(valores) <= 1.08 * min(valores), (
+            f"{nombre}: la rejilla cambia el resultado -- {valores}")
+
+
+def test_the_night_is_never_longer_than_itself():
+    """Las horas que se reparten entre las muestras suman el vano, no mas.
+
+    La comprobacion directa de lo anterior: sea cual sea el espaciado, los
+    pesos del trapecio suman exactamente lo que dura la rejilla. Con el paso
+    fijo antiguo, la adaptativa sumaba 29,00 h sobre un vano de 12,83.
+    """
+    from astroweather.targets import _sample_weights
+
+    night = night_for(NEW_MOON)
+    for times in (night.adaptive_hours(10, 30), night.hours(60), night.hours(5)):
+        vano = (times[-1] - times[0]).total_seconds() / 3600
+        assert sum(_sample_weights(times)) == pytest.approx(vano, abs=1e-9)

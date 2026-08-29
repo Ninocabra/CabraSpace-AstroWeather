@@ -60,7 +60,14 @@ def _night(day: dt.datetime, site: Site, root=None) -> dict | None:
         return None
 
     night = night_for(day, site)
-    times = night.hours(60)
+    # La MISMA rejilla que la vista de la cupula (`nightview`), y por la misma
+    # razon: fina donde se planifica, gruesa donde no se observa. Con una hora
+    # de paso el recomendador esta limitado por la discretizacion, no por el
+    # modelo -- M13 salia a 2,74 h de SNR contra 3,14 con cualquier paso mas
+    # fino, un 13 % (medido el 2026-08-29 sobre la noche del 11-09). Y sobre
+    # todo: el numero que se PUBLICA y el que se DIBUJA salen ahora de la misma
+    # rejilla, asi que no pueden discrepar.
+    times = night.adaptive_hours(10, 30, site)
     forecast = night_inputs(times[0], times[-1], site.site_id, root)
     turbulence = integrate(forecast["jet_speed"])
     transparency = evaluate_transparency(

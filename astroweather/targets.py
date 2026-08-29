@@ -213,6 +213,31 @@ def hourly_yield(*, airmass: float, sky_mag: float, seeing_arcsec: float,
                  * min(sharpness, MAX_SHARPNESS_GAIN))
 
 
+def _sample_weights(times: list[dt.datetime]) -> list[float]:
+    """Hours each sample stands for, read off the grid instead of assumed.
+
+    This used to be `times[1] - times[0]`, applied to every sample of the
+    night. On a uniform grid that is a fencepost error -- n samples of one hour
+    each cover n hours where the night only spans n-1 -- and on the ADAPTIVE
+    grid it is a factor: `adaptive_hours` opens in twilight at 30 minutes and
+    then switches to 10, so every dark sample was counted at triple weight and
+    the night came out 2.26x too long (58 samples, 12.83 h of span, 29.00 h
+    scored; measured 2026-08-29).
+
+    The trapezoid rule fixes both at once: each sample takes half the distance
+    to each neighbour, the ends take their single half, and the weights sum to
+    exactly the span of the grid whatever the spacing. Yield is a smooth
+    function of time, so there is no reason to integrate it any other way.
+    """
+    if len(times) < 2:
+        # Not a night, and nothing builds one: keep the old one-hour
+        # convention rather than silently scoring a degenerate grid at zero.
+        return [1.0] * len(times)
+    return [(times[min(index + 1, len(times) - 1)]
+             - times[max(index - 1, 0)]).total_seconds() / 7200
+            for index in range(len(times))]
+
+
 def evaluate_night(targets: list[Target], times: list[dt.datetime],
                    *, usable_probability: list[float],
                    turbulence: Turbulence | None = None,
@@ -235,6 +260,9 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
     zenith_natural_flux = {t: mag_to_nl(v) for t, v in zip(times, zenith_natural)}
     moon = {p.t_utc: p for p in moon_positions(times, site)}
     phase = moon_phase_angle(times[len(times) // 2])
+    # How much of the night each sample speaks for. Depends only on the grid,
+    # so it is computed once and shared by every target.
+    weights = _sample_weights(times)
 
     results = []
     for target in targets:
@@ -262,8 +290,7 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
                                      f"de {MIN_ALTITUDE:.0f}"})
                 continue
             airmass = 1.0 / np.sin(np.radians(altitude))
-            hours += 1.0 / len(times) * (
-                (times[-1] - times[0]).total_seconds() / 3600)
+            hours += weights[index]
 
             # predict() already carries the Moon AT THE ZENITH; here we need it
             # at the TARGET's real separation, which is the whole point of the
@@ -312,9 +339,8 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
                                  seeing_arcsec=seeing,
                                  k_total=transparency.k_total, alpha=target.alpha,
                                  difficulty=target.difficulty)
-            step = (times[1] - times[0]).total_seconds() / 3600 if len(times) > 1 else 1
-            conditional += value * step
-            expected += value * step * usable_probability[index]
+            conditional += value * weights[index]
+            expected += value * weights[index] * usable_probability[index]
             if value > best_value:
                 best_value, best = value, when
             # Which of the three penalties is actually costing this hour.
