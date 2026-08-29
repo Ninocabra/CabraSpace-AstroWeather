@@ -151,7 +151,7 @@ def _night(day: dt.datetime, site: Site, root=None, *,
         # Solo en la primera noche: el buscador y la cupula son de HOY, y las
         # trazas de la segunda duplicaban el peso del fichero (38 kB de 44) sin
         # que nadie las mire.
-        "objetos": ([_objeto(t, times, night.hours(30), site) for t in sorted(
+        "objetos": ([_objeto(t) for t in sorted(
             targets, key=lambda t: (-t.q_expected, t.target.name))]
             if with_catalogue else []),
         # Lo que un astrofotografo te diria al oido, con los numeros dentro.
@@ -164,32 +164,25 @@ LIMITA_CODIGO = {"cielo": "c", "luna": "l", "fondo": "f", "altura": "a",
                  "ninguno": "n"}
 
 
-def _objeto(resultado, times, dome_times, site) -> dict:
+def _objeto(resultado) -> dict:
     """Un objeto del catalogo, con lo que hace falta para buscarlo y pintarlo.
 
-    La traza va sobre la rejilla de la CUPULA y no sobre la del recomendador, y
-    esa es toda la diferencia: asi el punto `i` de la traza es el marco `i` del
-    deslizador, y el objeto se mueve al mover la hora. Con la rejilla adaptativa
-    -- que ademas recortaba los tramos bajo el horizonte -- el marcador se
-    quedaba clavado media noche y lo unico que se veia moverse era la Luna.
+    La traza sale de `resultado.trace`, que ya trae altura y azimut de CADA
+    muestra -- tambien de las que estan bajo el minimo -- y esta sobre la misma
+    rejilla adaptativa que usa `nightview` para los marcos de la cupula. Asi el
+    punto `i` de la traza ES el marco `i` del deslizador, sin remuestrear nada
+    y sin una segunda pasada de efemerides.
 
-    El rendimiento se remuestrea por hora mas cercana desde la traza del
-    recomendador. Es una funcion suave del tiempo, asi que remuestrear no
-    inventa nada; y se hace asi, y no reevaluando, para que el numero que
-    colorea la curva sea EL MISMO que da las horas de SNR publicadas.
+    Es lo que estaba roto hasta hoy: la traza venia de otra rejilla y recortada
+    a los tramos sobre el horizonte, el marcador se buscaba "por tiempo mas
+    cercano" y se quedaba clavado media noche.
     """
-    alturas, azimuts, _ = resultado.target.positions(dome_times, site)
-    marcas = [t.timestamp() for t in times]
-
     alt, az, rend, limita = [], [], [], []
-    for indice, cuando in enumerate(dome_times):
-        objetivo = cuando.timestamp()
-        cercano = min(range(len(marcas)), key=lambda i: abs(marcas[i] - objetivo))
-        paso = resultado.trace[cercano] if cercano < len(resultado.trace) else {}
-        alt.append(round(float(alturas[indice]), 1))
-        az.append(round(float(azimuts[indice]), 1))
+    for paso in resultado.trace:
+        alt.append(paso.get("alt"))
+        az.append(paso.get("az"))
         rend.append(round(float(paso.get("yield") or 0.0), 3))
-        limita.append("-" if paso.get("too_low", True)
+        limita.append("-" if paso.get("too_low")
                       else LIMITA_CODIGO.get(paso.get("limiting"), "n"))
 
     return {
@@ -211,7 +204,7 @@ def _objeto(resultado, times, dome_times, site) -> dict:
                        if resultado.best_hour else None),
         "veredicto": resultado.verdict,
         "porque": resultado.reason,
-        # Arrays paralelos y no una lista de objetos: son 44 objetos por 27
+        # Arrays paralelos y no una lista de objetos: son 44 objetos por 59
         # marcos, y con claves repetidas el fichero se iba al triple.
         "alt": alt, "az": az, "rend": rend, "limita": "".join(limita),
     }
@@ -288,22 +281,32 @@ def _sensores(site: Site) -> dict | None:
     }
 
 
+# Lo que la cupula necesita y lo que NO. `nightview.build()` da 623 kB: de
+# ellos, `lanes` son 536 -- las trazas de solo diez objetos, que aqui ya viajan
+# en `objetos` para los 44 y alineadas con los marcos -- y `galaxy` son 58 de la
+# version antigua de la Via Lactea, la de 2.600 puntos a mano que el 28-08 se
+# sustituyo por la panoramica. Ninguno de los dos se publica.
+CUPULA_FUERA = ("lanes", "galaxy", "roof", "advice")
+
+
 def _cupula(site: Site) -> dict | None:
-    """La cupula de esta noche. Sin nubes si la rejilla no contesta."""
+    """La noche entera, lista para pintar. None si algo no responde.
+
+    Sale de `nightview`, que es exactamente lo que come el mockup de la cupula:
+    asi la web pinta la MISMA noche que la vista interna, con la misma fisica y
+    los mismos numeros, en vez de una version parecida que acabaria
+    discrepando. Lo que se pinta por pixel -- el fondo natural, la Via Lactea,
+    la dispersion lunar, el crepusculo, la nube iluminada -- se calcula en el
+    navegador a partir de estos datos, y esa es la unica fisica que corre ahi:
+    es un RENDER, no una segunda opinion sobre la noche.
+    """
     try:
-        from .dome import build as build_dome
-        cupula = build_dome(site=site)
+        from .nightview import build as build_nightview
+        cupula = build_nightview(site=site)
     except Exception:
         return None
-    return {
-        "noche": cupula["night"],
-        "luna": cupula["moon"],
-        "marcos": [{"t": f["t"], "etiqueta": f["label"],
-                    "sol_alt": f["sun_alt"], "luna_alt": f["moon_alt"],
-                    "luna_az": f["moon_az"], "cielo_mag": f["sky_mag"],
-                    "nubes": f["clouds"]}
-                   for f in cupula["frames"]],
-    }
+    return {clave: valor for clave, valor in cupula.items()
+            if clave not in CUPULA_FUERA}
 
 
 def build(site: Site = NERPIO, *, nights: int = 2, root=None) -> dict:
