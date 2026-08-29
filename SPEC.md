@@ -379,6 +379,31 @@ cualquier máquina.
 - **Licencia de lo nuestro:** CC BY 4.0, con la atribución de las fuentes de
   partida dentro del propio JSON y en el README del repo de datos.
 
+## 7.2 Dónde vive el archivo (decidido y medido 29-08-2026)
+
+`data/` deja de estar en un solo disco. Copia en
+`Ninocabra/CabraSpace-AstroWeather-Archive`, **privado**, actualizada a diario
+por el trabajo `archivo` del scheduler. El criterio es **peso contra
+relevancia**, y las tres decisiones salen de medir:
+
+1. **Lo canónico se copia tal cual** porque el almacén ya es de solo-añadir:
+   cada escritura crea un fichero nuevo con marca de tiempo y nada se reescribe.
+   En git eso significa que el historial pesa lo que pesan los datos **una vez**,
+   no una copia por cada día que se toque. 36 MB hoy, ~10 MB/año.
+2. **Los scrapes de AstroCamp se agrupan por día terminado** en `.tar.xz`, en
+   claro dentro del tar: los 181 ficheros del 28-08 pesan 826 kB sueltos y
+   **23 kB** juntos (**35,8×**), porque son la misma página cada 5 minutos.
+   470 MB/año pasan a ~13 MB. Por DÍA y no por mes: con cierre mensual lo
+   irrecuperable pasaba hasta 30 días sin más hogar que el PC de captura, que
+   es el agujero que encontró la auditoría externa de "A + Releases".
+3. **El raw del fotómetro no sube**: 37,3 MB, el 93 % del raw, recuperable
+   entero con `fetch_tess` y con sus valores ya en `measurements/`.
+
+**Privado a propósito.** El permiso de AstroCamp cubre el uso de sus endpoints,
+que no es lo mismo que republicar sus series; y hacerlo público es
+irreversible, porque el historial de git no se borra. Es una decisión aparte y
+no está tomada.
+
 # 8. REFERENCIAS ESENCIALES
 
 Krisciunas & Schaefer 1991 (PASP 103) · Falchi+ 2016 · Hufnagel-Valley (Roddier 1981) · Masciadri+ 2020 (MNRAS 492, AR) · Lyman+ 2020 (Maunakea WRF) · Milli+ 2019 (nowcasting ML Paranal) · Noll+ 2012 / Jones+ 2013 (SkyCalc) · Leinert+ 1998 (zodiacal) · Patat 2008 (airglow) · Kyba+ 2011 (nubes×LP) · Brunt 1932 (emisividad) · Stull 1988 (Ri) · Prospero & Carlson 1972 (SAL) · Giles+ 2019 (AERONET v3) · Durre+ 2018 (IGRA). Lista completa y URLs: v7 §8.

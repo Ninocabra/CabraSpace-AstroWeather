@@ -90,6 +90,14 @@ def _job_web():
     return str(write())
 
 
+def _job_archive():
+    from .archivepush import push, repo_path
+    if repo_path() is None:
+        return "sin clon del archivo en esta maquina: no se archiva"
+    commit = push()
+    return commit or "el archivo ya estaba al dia"
+
+
 def _job_publish():
     from .webpublish import publish, repo_path
     if repo_path() is None:
@@ -207,6 +215,10 @@ JOBS = {
     # Cheap, daily, and it is the only thing standing between a quiet key
     # expiry and a source that stops without anyone noticing.
     "credenciales": (CronTrigger(hour=10, minute=5), _job_credentials),
+    # Y lo ultimo del dia: sacar el archivo de este disco. Va despues de la
+    # verificacion para que suba tambien lo que ella escriba, y agrupa solo
+    # dias TERMINADOS, asi que a esta hora el de ayer ya esta cerrado.
+    "archivo": (CronTrigger(hour=10, minute=20), _job_archive),
 }
 
 

@@ -140,6 +140,29 @@ c.execute("""
 
 `data/` no va al repo (ver `.gitignore`): son datos, no código.
 
+## Dónde vive el archivo
+
+`data/` **ya no vive solo en este disco**. La copia está en
+[CabraSpace-AstroWeather-Archive](https://github.com/Ninocabra/CabraSpace-AstroWeather-Archive)
+(privado), y el criterio no es subirlo todo, es peso contra relevancia:
+
+- lo canónico (`measurements`, `forecasts`, `daily_observations`) se copia tal
+  cual, y sale barato porque el almacén es de **solo-añadir**: nada se reescribe,
+  así que el historial de git pesa lo que pesan los datos una vez;
+- los scrapes de AstroCamp se agrupan en **un `.tar.xz` por día terminado** —
+  826 kB sueltos contra 23 kB juntos, medido: **35,8×**, porque son la misma
+  página cada 5 minutos y de uno en uno no se aprovecha la repetición;
+- el raw del fotómetro **no sube**: 37,3 MB, el 93 % de todo el raw, y es lo
+  único grande recuperable entero (`fetch_tess`), con sus valores ya dentro de
+  `measurements/`.
+
+```bash
+python -m astroweather.archivepush
+```
+
+Busca el clon en `../AstroWeather-Archive` o donde diga
+`ASTROWEATHER_ARCHIVE_REPO`; si no está, no archiva y no falla.
+
 ## Dónde sale el producto
 
 El motor es privado; **lo que predice es público**, en su propio repositorio de
