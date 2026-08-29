@@ -44,9 +44,15 @@ jobs:
   archivar:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # v5 y v6 corren sobre Node 24. Las anteriores (checkout@v4,
+      # setup-python@v5) declaran Node 20, que GitHub ya esta retirando y
+      # fuerza a 24 con un aviso en cada ejecucion. No cambia nada aqui: de
+      # estas dos acciones solo se usan el checkout por defecto y
+      # `python-version`, que se comportan igual, y lo que corre nuestro
+      # codigo es Python, no Node.
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
