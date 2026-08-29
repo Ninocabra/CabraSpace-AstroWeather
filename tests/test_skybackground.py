@@ -5,6 +5,7 @@ import datetime as dt
 import pytest
 
 from astroweather.skybackground import (
+    epoch_floor,
     NATURAL_FLOOR_MAG, airglow_excess, budget, integration_penalty,
     zodiacal_excess,
 )
@@ -34,7 +35,12 @@ def test_airglow_follows_solar_activity_slowly():
 
 def test_the_budget_says_where_every_magnitude_came_from():
     entry = budget([NIGHT])[0]
-    assert entry.natural_floor == NATURAL_FLOOR_MAG
+    # Contra el suelo EN USO, no contra la constante: desde el 29-08-2026 el
+    # suelo se remide cada dia contra el fotometro, porque el cielo de aqui
+    # se ha oscurecido 0,56 mag desde 2019 y una constante no describe
+    # ningun anio. La constante sigue siendo el respaldo cuando no hay
+    # archivo, y por eso este test vale en las dos situaciones.
+    assert entry.natural_floor == epoch_floor()
     assert entry.zodiacal <= 0            # brightening, so it lowers the number
     assert "suelo natural" in entry.breakdown
     assert 20.5 < entry.total_mag < 22.2
@@ -50,9 +56,14 @@ def test_light_pollution_adds_in_flux_not_in_magnitudes():
 
 def test_each_magnitude_of_sky_costs_a_factor_in_exposure():
     """The number that turns 21.0 instead of 21.9 into something actionable."""
-    assert integration_penalty(NATURAL_FLOOR_MAG) == pytest.approx(1.0)
-    assert integration_penalty(NATURAL_FLOOR_MAG - 1) == pytest.approx(2.512, rel=1e-3)
-    assert integration_penalty(NATURAL_FLOOR_MAG - 2) == pytest.approx(6.31, rel=1e-2)
+    # Penalizacion 1 contra el suelo en uso, sea el medido o el de respaldo.
+    assert integration_penalty(epoch_floor()) == pytest.approx(1.0)
+    # Una magnitud por debajo del suelo EN USO cuesta un factor 2,512. Antes
+    # se restaba a la constante, y eso mezclaba dos afirmaciones: la del
+    # factor por magnitud, que es fisica, y la del valor del suelo, que ahora
+    # se remide cada dia.
+    assert integration_penalty(epoch_floor() - 1) == pytest.approx(2.512, rel=1e-3)
+    assert integration_penalty(epoch_floor() - 2) == pytest.approx(6.31, rel=1e-2)
 
 
 def test_the_sky_is_not_one_number_the_zenith_is_not_the_sky():

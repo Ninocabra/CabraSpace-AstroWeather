@@ -90,6 +90,11 @@ def _job_web():
     return str(write())
 
 
+def _job_suelo():
+    from .skybackground import fit_epoch_floor
+    return fit_epoch_floor()
+
+
 def _job_tess_live():
     from .workers import fetch_tess
     return fetch_tess.run_live()
@@ -239,6 +244,10 @@ JOBS = {
     "allsky": (CronTrigger(hour="*/4", minute=40), _job_allsky),
     # Late morning, once the previous night is complete.
     "verificacion": (CronTrigger(hour=10, minute=0), _job_verification),
+    # El suelo del cielo, remedido cada dia contra el fotometro. Va DESPUES del
+    # relleno del TESS y ANTES de la exportacion: el numero que usa el
+    # recomendador tiene que ser el de hoy, no el de hace siete anios.
+    "suelo": (CronTrigger(hour=10, minute=10), _job_suelo),
     # Cheap, daily, and it is the only thing standing between a quiet key
     # expiry and a source that stops without anyone noticing.
     "credenciales": (CronTrigger(hour=10, minute=5), _job_credentials),

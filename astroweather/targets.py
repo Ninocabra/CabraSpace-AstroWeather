@@ -42,7 +42,7 @@ from .extinction import evaluate as evaluate_transparency
 from .moonsky import mag_to_nl, moon_brightness, nl_to_mag
 from .seeing import Turbulence
 from .site import NERPIO, Site
-from .skybackground import NATURAL_FLOOR_MAG, natural_background
+from .skybackground import epoch_floor, natural_background
 from .skymodel import predict
 
 # Reference night: the yield of one hour under these conditions is 1.0.
@@ -308,7 +308,10 @@ def hourly_yield(*, airmass: float, sky_mag: float, seeing_arcsec: float,
     if admissible <= 0.0:
         return 0.0
     extinction = 10 ** (-0.8 * k_total * (airmass - 1.0))
-    background = min(1.0, 10 ** (0.4 * (sky_mag - NATURAL_FLOOR_MAG)))
+    # Contra el suelo de la EPOCA, no contra una constante de siete anios:
+    # el cielo de aqui se ha oscurecido 0,56 mag desde 2019 y ese error
+    # entraba en el rendimiento de cada hora.
+    background = min(1.0, 10 ** (0.4 * (sky_mag - epoch_floor())))
     if alpha > 0:
         sharpness = (FWHM_REFERENCE / max(seeing_arcsec, 0.3)) ** (2 * alpha)
     else:
@@ -451,7 +454,7 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
             # The recommendation is worth little if it cannot say why.
             gate = SKY_GATE.get(target.difficulty, 20.0)
             extinction_loss = 1 - 10 ** (-0.8 * transparency.k_total * (airmass - 1))
-            background_loss = 1 - min(1.0, 10 ** (0.4 * (sky_mag - NATURAL_FLOOR_MAG)))
+            background_loss = 1 - min(1.0, 10 ** (0.4 * (sky_mag - epoch_floor())))
             moon_up = moon[when].altitude > 0
             if value <= 0.0:
                 limiting = "cielo"

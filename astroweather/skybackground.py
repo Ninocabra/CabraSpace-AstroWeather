@@ -54,6 +54,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import lru_cache
 
 import numpy as np
 from astropy.coordinates import AltAz, SkyCoord, get_sun
@@ -73,6 +74,131 @@ from .site import NERPIO, Site
 # compare TESS against; converting it to V needs an explicit, versioned
 # calibration that does not exist yet.
 NATURAL_FLOOR_MAG = 21.71
+
+# ...y ESE es el problema, porque el suelo DERIVA. Medido el 29-08-2026 sobre
+# 9.814 horas del fotometro sin Luna y en noche cerrada, la mediana por anio:
+#
+#   2019 21,300   2021 21,300   2023 21,440   2025 21,680
+#   2020 21,280   2022 21,405   2024 21,520   2026 21,865
+#
+# +0,565 mag en siete anios, monotona. Una constante no describe ningun anio:
+# 21,71 se queda 0,15 corta para 2026 y sobra 0,41 para 2019, y ese error entra
+# en TODAS las puertas del recomendador -- el rendimiento de cada hora se mide
+# contra este numero.
+#
+# Asi que el suelo pasa a medirse de la epoca. La constante se queda como
+# respaldo declarado para cuando no hay archivo (otra maquina, un test), no
+# como la verdad.
+FLOOR_VENTANA_DIAS = 400
+FLOOR_MIN_HORAS = 200
+# El suelo medido se guarda en disco y se vuelve a medir una vez al dia, como
+# el calibrador de nubes. No se calcula al vuelo a proposito: medirlo son miles
+# de horas de fotometro contra efemerides, y `hourly_yield` lo pide 58.000 veces
+# por pasada. Un numero central no puede costar lo que cuesta medirlo.
+FLOOR_FICHERO = "sky_floor.json"
+
+
+@lru_cache(maxsize=1)
+def epoch_floor() -> float:
+    """El suelo natural de la EPOCA, o la constante si no se ha medido aun.
+
+    Nunca lanza y nunca tarda: lee un fichero. Si no esta, devuelve la
+    constante de siete anios y el producto sigue funcionando -- peor, pero
+    funcionando -- que es lo que tiene que hacer un numero tan central.
+    """
+    try:
+        from .archive import DATA_ROOT
+        ruta = DATA_ROOT / FLOOR_FICHERO
+        if not ruta.exists():
+            return NATURAL_FLOOR_MAG
+        import json
+        datos = json.loads(ruta.read_text(encoding="utf-8"))
+        suelo = float(datos["suelo"])
+        # Un suelo fuera de lo fisicamente razonable es un fichero corrupto, no
+        # un descubrimiento.
+        return suelo if 20.0 <= suelo <= 22.5 else NATURAL_FLOOR_MAG
+    except Exception:
+        return NATURAL_FLOOR_MAG
+
+
+def fit_epoch_floor(dias: int = FLOOR_VENTANA_DIAS, root=None) -> dict:
+    """Mide el suelo con el fotometro y lo deja escrito. Una vez al dia.
+
+    Se miden las horas SIN Luna (disco a mas de 6 grados bajo el horizonte) en
+    noche astronomica y con lectura fisicamente posible, y se toma la mediana.
+    Es la misma definicion con la que se obtuvo la constante, aplicada a una
+    ventana movil en vez de a siete anios.
+
+    La ventana es de algo mas de un anio a proposito: mas corta y manda la
+    estacion -- el cielo de invierno y el de verano no son el mismo -- y mas
+    larga vuelve a promediar epocas que ya sabemos que difieren.
+    """
+    import json
+    from .ephem import moon_positions, sun_positions
+    from .queries import connect
+    from .archive import DATA_ROOT, utcnow
+
+    filas = connect(root).execute(f"""
+        SELECT date_trunc('hour', t_utc) AS h, median(sky_mag_raw) AS m
+        FROM measurements
+        WHERE instrument_type = 'TESS' AND sky_mag_raw IS NOT NULL
+          AND t_utc > now() - INTERVAL {int(dias)} DAY
+        GROUP BY 1 HAVING count(*) >= 20 ORDER BY 1
+    """).fetchall()
+    if not filas:
+        return {"medido": False, "porque": "sin lecturas del fotometro"}
+    tiempos = [f[0].replace(tzinfo=timezone.utc) for f in filas]
+    medidos = [float(f[1]) for f in filas]
+    # Solo el Sol y la Luna: `predict` haria el modelo entero y son miles de
+    # horas. Aqui basta con saber si era de noche y si la Luna estaba fuera.
+    soles = sun_positions(tiempos, NERPIO)
+    lunas = moon_positions(tiempos, NERPIO)
+    limpios = [(t, m) for t, m, sol, luna in zip(tiempos, medidos, soles, lunas)
+               if sol.altitude < -18.0 and luna.altitude <= -6.0 and 18.0 < m < 22.6]
+    limpias = sorted(m for _, m in limpios)
+    if len(limpias) < FLOOR_MIN_HORAS:
+        return {"medido": False, "n": len(limpias),
+                "porque": f"solo {len(limpias)} horas limpias, hacen falta {FLOOR_MIN_HORAS}"}
+    # Y ahora lo que de verdad hace falta: no la mediana del cielo medido, sino
+    # el suelo que hace que EL MODELO acierte en esas mismas horas.
+    #
+    # No son lo mismo, y confundirlos era el error. La prediccion sin Luna no es
+    # el suelo: es el suelo mas el zodiacal mas la Via Lactea, todos expresados
+    # como excesos sobre el, asi que la prediccion entera se desplaza 1:1 con el
+    # suelo. Medido el 29-08-2026, el modelo sale 0,246 mag mas brillante que el
+    # fotometro en horas sin Luna, con dispersion 0,219 -- la mas apretada de
+    # los cuatro regimenes lunares, o sea un desfase de verdad y no ruido. Con
+    # la Luna alta el sesgo es -0,026: la ley lunar no tiene la culpa.
+    from .skymodel import predict
+    tiempos_limpios = [t for t, _ in limpios]
+    medidos_limpios = [m for _, m in limpios]
+    diferencias = [p.predicted_mag - m
+                   for p, m in zip(predict(tiempos_limpios, NERPIO), medidos_limpios)
+                   if p.is_night and p.is_trustworthy]
+    sesgo = sum(diferencias) / len(diferencias) if diferencias else 0.0
+    suelo_usado = epoch_floor()
+    n = len(limpias)
+    resultado = {
+        "medido": True,
+        # El suelo que anula el sesgo. Restarlo es exacto porque el
+        # desplazamiento es 1:1, no una aproximacion.
+        "suelo": round(suelo_usado - sesgo, 3),
+        "mediana_medida": round(limpias[n // 2], 3),
+        "sesgo_corregido": round(sesgo, 3),
+        "suelo_anterior": suelo_usado,
+        "n_sesgo": len(diferencias),
+        "n": n, "ventana_dias": dias,
+        "p10": round(limpias[n // 10], 3), "p90": round(limpias[9 * n // 10], 3),
+        "constante_anterior": NATURAL_FLOOR_MAG,
+        "ajustado_el": utcnow().isoformat(),
+    }
+    ruta = (root or DATA_ROOT) / FLOOR_FICHERO
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(json.dumps(resultado, indent=1), encoding="utf-8")
+    epoch_floor.cache_clear()
+    return resultado
+
+
 # Zodiacal excess at the ecliptic over the floor, in magnitudes, and the
 # latitude scale over which it decays.
 ZODIACAL_AMPLITUDE_MAG = 0.27
@@ -231,7 +357,7 @@ def natural_background(times: list[datetime], altitudes_deg, azimuths_deg,
     elongations = np.abs(((np.asarray(ecliptic.lon.deg, dtype=float)
                            - np.asarray(sun.lon.deg, dtype=float) + 180) % 360) - 180)
     galactic_latitudes = np.asarray(pointing.galactic.b.deg, dtype=float)
-    floor_flux = mag_to_nl(NATURAL_FLOOR_MAG)
+    floor_flux = mag_to_nl(epoch_floor())
     airglow = airglow_excess(f107)
     values = []
     for index in range(len(latitudes)):
@@ -256,7 +382,7 @@ def budget(times: list[datetime], site: Site = NERPIO, *,
     """
     latitudes, elongations = zenith_ecliptic(times, site)
     galactic_latitudes = zenith_galactic(times, site)
-    floor_flux = mag_to_nl(NATURAL_FLOOR_MAG)
+    floor_flux = mag_to_nl(epoch_floor())
     results = []
     for index, when in enumerate(times):
         zodiacal = zodiacal_excess(float(latitudes[index]), float(elongations[index]))
@@ -276,7 +402,7 @@ def budget(times: list[datetime], site: Site = NERPIO, *,
         total = nl_to_mag(natural_flux + pollution_flux)
         results.append(SkyBudget(
             t_utc=when,
-            natural_floor=NATURAL_FLOOR_MAG,
+            natural_floor=epoch_floor(),
             zodiacal=-zodiacal,
             galactic=-galactic,
             airglow=-airglow,
@@ -288,12 +414,17 @@ def budget(times: list[datetime], site: Site = NERPIO, *,
     return results
 
 
-def integration_penalty(mag_sky: float, reference_mag: float = NATURAL_FLOOR_MAG) -> float:
+def integration_penalty(mag_sky: float, reference_mag: float | None = None) -> float:
     """How much longer you must expose because the sky is brighter.
 
     Background-limited imaging: the time to a fixed SNR scales with the sky
     FLUX, so each magnitude of sky lost costs a factor 2.512 in exposure. This
     is the number that turns "21.0 instead of 21.9" into something an imager
     can act on.
+
+    El suelo de referencia es el de la EPOCA, no una constante de siete anios:
+    el cielo de aqui se ha oscurecido 0,56 mag desde 2019, y una penalizacion
+    medida contra un suelo que ya no existe no significa nada.
     """
-    return float(10 ** (0.4 * (reference_mag - mag_sky)))
+    referencia = epoch_floor() if reference_mag is None else reference_mag
+    return float(10 ** (0.4 * (referencia - mag_sky)))

@@ -6,6 +6,7 @@ but "somebody reverted a correction without knowing why it was there".
 """
 
 import numpy as np
+import pytest
 
 from astroweather.calibration import (CLEAR_LEVEL_CENTRE, CLEAR_LEVEL_TOLERANCE,
                                       CLEAR_SCATTER_THRESHOLD)
@@ -82,11 +83,22 @@ def test_class_gate_is_a_shoulder_not_a_cliff():
     assert abs(above - below) < 0.685 / 8
 
     # The gate keeps its meaning: half value where the hard cut used to be.
+    #
+    # La comparacion se hace contra lo que el fondo aporta, no contra un rango
+    # fijo. `hourly_yield` es hombro POR fondo, y el fondo se mide respecto al
+    # suelo natural -- que desde el 29-08-2026 se remide cada dia contra el
+    # fotometro en vez de ser una constante. Con el rango fijo, este test
+    # afirmaba a la vez algo sobre el hombro y algo sobre el valor del suelo, y
+    # fallaba al cambiar el segundo aunque el primero siguiera intacto.
+    from astroweather.skybackground import epoch_floor
+    suelo = epoch_floor()
+    fondo = lambda mag: min(1.0, 10 ** (0.4 * (mag - suelo)))
     dark = hourly_yield(airmass=1.0, sky_mag=gate + 1.0, seeing_arcsec=2.0,
                         k_total=0.18, alpha=0.0, difficulty="extremo_contraste")
     at_gate = hourly_yield(airmass=1.0, sky_mag=gate, seeing_arcsec=2.0,
                            k_total=0.18, alpha=0.0, difficulty="extremo_contraste")
-    assert 0.3 < at_gate / dark < 0.7
+    esperado = 0.5 * fondo(gate) / fondo(gate + 1.0)
+    assert at_gate / dark == pytest.approx(esperado, rel=0.05)
 
     # It must still reach zero and full value at the ends of the shoulder.
     assert hourly_yield(airmass=1.0, sky_mag=gate - GATE_SHOULDER_MAG,
@@ -118,7 +130,6 @@ def test_twilight_never_extrapolates_past_its_fit():
     that had been measured.
     """
     import datetime as dt
-
     from astroweather.skymodel import DAYLIGHT_ZENITH_MAG, TWILIGHT_FIT_MAX, predict
 
     times = [dt.datetime(2026, 8, 27, 12, tzinfo=dt.timezone.utc),

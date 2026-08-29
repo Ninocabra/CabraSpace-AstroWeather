@@ -38,7 +38,7 @@ from .queries import night_inputs
 from .skymodel import predict
 from .skyobjects import (milky_way_field, planet_positions, sidereal_degrees,
                          visible_stars)
-from .skybackground import NATURAL_FLOOR_MAG as NATURAL_FLOOR
+from .skybackground import epoch_floor
 from .targets import CATALOGUE, MIN_ALTITUDE, SKY_GATE, evaluate_night
 
 # Cloud within this many degrees of a target's azimuth is cloud that matters
@@ -356,7 +356,7 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
         outlook = None
 
     darkest = max((f["sky_mag"] for f in frames if f["sky_mag_trustworthy"]),
-                  default=NATURAL_FLOOR)
+                  default=epoch_floor())
     middle = frames[len(frames) // 2]
     sky_tercile = _tercile(darkest, *SKY_TERCILES, higher_is_better=True)
     aod_tercile = _tercile(transparency.aod_site, *AOD_TERCILES, higher_is_better=False)

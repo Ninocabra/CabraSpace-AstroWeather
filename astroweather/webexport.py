@@ -266,6 +266,22 @@ def _suben_esta_noche(times, site) -> list:
     return [objetivo for objetivo, alto in zip(objetivos, pico) if alto >= MIN_ALTITUDE]
 
 
+def _suelo_publicado() -> dict:
+    """El suelo en uso y de donde sale, para que se pueda auditar."""
+    try:
+        import json
+        from .archive import DATA_ROOT
+        from .skybackground import FLOOR_FICHERO, NATURAL_FLOOR_MAG, epoch_floor
+        ruta = DATA_ROOT / FLOOR_FICHERO
+        datos = json.loads(ruta.read_text(encoding="utf-8")) if ruta.exists() else {}
+        return {"en_uso": epoch_floor(), "constante": NATURAL_FLOOR_MAG,
+                "medido": bool(datos.get("medido")),
+                "n": datos.get("n"), "ventana_dias": datos.get("ventana_dias"),
+                "ajustado_el": datos.get("ajustado_el")}
+    except Exception:
+        return {}
+
+
 def _calibracion_fotometro() -> dict:
     """Envoltorio para poder sustituirlo en los tests sin tocar la BD."""
     try:
@@ -681,6 +697,10 @@ def build(site: Site = NERPIO, *, nights: int = 2, root=None) -> dict:
                 if calibrator else None),
             "modelo_calibrado": calibrator.trained_on_model if calibrator else None,
             "curva_ajustada_el": calibrator.fitted_at if calibrator else None,
+            # El suelo natural que usa el recomendador. Ya no es la constante de
+            # siete anios: se remide cada dia contra el fotometro, porque el
+            # cielo de aqui se ha oscurecido 0,56 mag desde 2019.
+            "suelo_cielo": _suelo_publicado(),
             "avisos": avisos,
         },
     }
