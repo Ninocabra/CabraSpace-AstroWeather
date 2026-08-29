@@ -53,8 +53,10 @@ DEFAULT_REPO = Path(__file__).resolve().parent.parent.parent / "AstroWeather-Arc
 # Almacenes canonicos: Parquet de solo-anadir, se copian tal cual.
 MIRRORED = ("measurements", "forecasts", "daily_observations")
 
-# Raw que se agrupa por dia porque llega cada pocos minutos.
-BUNDLED = ("astrocamp_cloudhtml",)
+# Raw que se agrupa por dia. Los scrapes porque llegan cada 5 minutos; la
+# allsky porque cada consulta trae 5 h de serie y las consultas se solapan
+# una hora, asi que entre ficheros hay mucho identico que comprimir junto.
+BUNDLED = ("astrocamp_cloudhtml", "astrocamp_allsky")
 
 # Raw que no sube, con el motivo. Se declara aqui y se repite en el README del
 # archivo: una exclusion sin motivo escrito es un olvido esperando a que le den

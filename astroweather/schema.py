@@ -122,6 +122,11 @@ MEASUREMENT_SCHEMA = pa.schema(
         # comprobacion cruzada gratis (SPEC v8 seccion 2.6).
         pa.field("dew_point", pa.float32()),
         pa.field("k_extinction", pa.float32()),
+        # Estrellas que la allsky detecta en la imagen. Es verdad de
+        # nubes INDEPENDIENTE del modelo y del fotometro: con cielo
+        # cubierto cae a cero sin depender de ninguna calibracion.
+        # Cero de dia es correcto, no es un fallo.
+        pa.field("star_count", pa.int32()),
         # IR sky sensor: store WHICH field it is, semantics are not obvious
         # (raw IR, Ts-Ta, or the vendor's corrected sky temperature).
         pa.field("t_sky_ir", pa.float32()),

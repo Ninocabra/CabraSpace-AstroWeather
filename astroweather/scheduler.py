@@ -90,6 +90,11 @@ def _job_web():
     return str(write())
 
 
+def _job_allsky():
+    from .workers import fetch_allsky
+    return fetch_allsky.run()
+
+
 def _job_archive():
     from .archivepush import push, repo_path
     if repo_path() is None:
@@ -210,6 +215,10 @@ JOBS = {
     "aemet": (CronTrigger(hour=8, minute=0), _job_aemet),
     # The photometer archive is served by month; topping up daily is enough.
     "tess": (CronTrigger(hour=9, minute=0), _job_tess),
+    # La allsky sirve 19,2 h como mucho (medido) a 15 s de cadencia. Cada 4
+    # horas pidiendo 5 deja una hora de solape: una caida corta no abre hueco,
+    # y lo repetido lo quita la vista deduplicada.
+    "allsky": (CronTrigger(hour="*/4", minute=40), _job_allsky),
     # Late morning, once the previous night is complete.
     "verificacion": (CronTrigger(hour=10, minute=0), _job_verification),
     # Cheap, daily, and it is the only thing standing between a quiet key
