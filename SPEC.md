@@ -348,6 +348,37 @@ PROVEEDORES → RAW ARCHIVE → NORMALIZACIÓN → QC → MODELOS FÍSICOS → C
 
 1. Producto = tres salidas + recomendador con E[Q]; score único eliminado. 2. Nerpio primero; la app mundial es un segundo producto con sus propias garantías (no condiciona el MVP). 3. ECMWF híbrido 9 km/0.25°. 4. Física analítica como champion día-1; ML como challenger (nunca al revés hasta que gane). 5. Sensores locales mandan sobre estimaciones (rocío, nubes 0–1 h, fondo). 6. Todo lo irrecuperable se archiva desde el día 1 (miembros EPS, FWHM, sensores). 7. Publicar incertidumbre y estado de calibración siempre; terciles antes que decimales. 8. Especificación corta y vigente; historia en CHANGELOG; el autor no audita su propio documento (auditoría cruzada + verificación empírica antes de cada versión mayor).
 
+## 7.1 Dónde vive el producto (decidido 29-08-2026)
+
+**El producto se publica en un repositorio de datos PÚBLICO propio**,
+`Ninocabra/CabraSpace-AstroWeather-Data`, y el motor sigue privado. La URL
+estable es
+`https://raw.githubusercontent.com/Ninocabra/CabraSpace-AstroWeather-Data/main/noche.json`,
+que sirve con `access-control-allow-origin: *` — o sea, legible desde
+cualquier página sin servidor, sin VPS y sin CORS (verificado: HTTP 200,
+`max-age=300`).
+
+Se descartaron las otras dos: commitear el JSON en el repo de la web funcionaba
+hoy pero mete en producción un fichero que cambia cada 6 h, y un asset de
+Release es público pero con URL incómoda. Ésta además **desbloquea el scheduler
+24/7**: si el producto vive en su propio repo, quien lo genera puede ser
+cualquier máquina.
+
+- **El historial es el `git log`.** El fichero se sobrescribe SIEMPRE en la
+  misma ruta, así que el log de `noche.json` es el registro diffeable de lo que
+  dijimos y cuándo. Una previsión que se puede reescribir sin dejar rastro no
+  se puede verificar, y verificarnos es medio proyecto.
+- **Un commit por CAMBIO, no por pasada.** `generado_utc` cambia siempre; si
+  contara para el diff, el historial sería un latido de cuatro commits diarios
+  diciendo lo mismo. Se compara la previsión sin él.
+- **El raw de terceros NO se republica.** Lo que sale es nuestra previsión.
+  AstroCamp, STARS4ALL, AEMET, Open-Meteo y CAMS tienen cada uno sus
+  condiciones, y §9 deja escrito que el permiso por escrito de AstroCamp y
+  STARS4ALL para uso continuado sigue **pendiente**. Publicar sus series
+  crudas es una decisión aparte y no está tomada.
+- **Licencia de lo nuestro:** CC BY 4.0, con la atribución de las fuentes de
+  partida dentro del propio JSON y en el README del repo de datos.
+
 # 8. REFERENCIAS ESENCIALES
 
 Krisciunas & Schaefer 1991 (PASP 103) · Falchi+ 2016 · Hufnagel-Valley (Roddier 1981) · Masciadri+ 2020 (MNRAS 492, AR) · Lyman+ 2020 (Maunakea WRF) · Milli+ 2019 (nowcasting ML Paranal) · Noll+ 2012 / Jones+ 2013 (SkyCalc) · Leinert+ 1998 (zodiacal) · Patat 2008 (airglow) · Kyba+ 2011 (nubes×LP) · Brunt 1932 (emisividad) · Stull 1988 (Ri) · Prospero & Carlson 1972 (SAL) · Giles+ 2019 (AERONET v3) · Durre+ 2018 (IGRA). Lista completa y URLs: v7 §8.

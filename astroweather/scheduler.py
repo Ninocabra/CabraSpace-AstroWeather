@@ -90,6 +90,14 @@ def _job_web():
     return str(write())
 
 
+def _job_publish():
+    from .webpublish import publish, repo_path
+    if repo_path() is None:
+        return "sin repo de datos en esta maquina: no se publica"
+    commit = publish()
+    return commit or "la prevision no ha cambiado"
+
+
 def _job_prediction():
     from .workers import archive_prediction
     return archive_prediction.run(NERPIO)
@@ -184,6 +192,11 @@ JOBS = {
     # Y detras, el JSON que lee la web: se regenera con cada pasada nueva, que
     # es lo unico que puede cambiarlo.
     "web": (CronTrigger(hour="*/6", minute=30), _job_web),
+    # Y cinco minutos despues sale del disco duro. Va en su propio trabajo y no
+    # dentro de `web` a proposito: un fallo de red al empujar no puede marcar
+    # en rojo la generacion, que si ha funcionado. En una maquina sin el clon
+    # del repo de datos no hace nada y no es un error.
+    "publicar": (CronTrigger(hour="*/6", minute=35), _job_publish),
     # CAMS queues, so it runs once a day well away from anything interactive.
     "aerosol": (CronTrigger(hour=7, minute=30), _job_aerosol),
     "aemet": (CronTrigger(hour=8, minute=0), _job_aemet),

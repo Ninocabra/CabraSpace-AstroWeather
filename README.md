@@ -120,6 +120,8 @@ python -m astroweather.workers.fetch_aerosol --dust       # AOD total + calima d
 python -m astroweather.workers.backfill_history --start 2024-01-01
 python -m astroweather.verification                       # el panel
 python -m astroweather.workers.fwhm_pipeline "E:\ASTRO Sin Procesar\Observatorio Nerpio\Imagenes\M826-01-11\LIGHT"
+python -m astroweather.webexport                          # el JSON de la noche, a data/web/
+python -m astroweather.webpublish                         # y de ahi al repo publico
 python -m pytest tests/ -q
 ```
 
@@ -137,6 +139,25 @@ c.execute("""
 ```
 
 `data/` no va al repo (ver `.gitignore`): son datos, no código.
+
+## Dónde sale el producto
+
+El motor es privado; **lo que predice es público**, en su propio repositorio de
+datos ([CabraSpace-AstroWeather-Data](https://github.com/Ninocabra/CabraSpace-AstroWeather-Data)):
+
+```
+https://raw.githubusercontent.com/Ninocabra/CabraSpace-AstroWeather-Data/main/noche.json
+```
+
+URL estable, `access-control-allow-origin: *`, se reescribe cada 6 h. El
+historial de lo que dijimos **es el `git log` de ese fichero**, porque siempre
+se sobrescribe la misma ruta; y un commit significa que cambió la previsión, no
+que volvimos a calcularla.
+
+`webpublish` necesita el clon del repo de datos: por defecto lo busca al lado
+de éste (`../AstroWeather-Data`), o donde diga `ASTROWEATHER_DATA_REPO`. En una
+máquina que no lo tenga, no publica y no falla. **El raw de terceros no se
+republica**: ver SPEC §7.1.
 
 ## Reglas de la casa
 
