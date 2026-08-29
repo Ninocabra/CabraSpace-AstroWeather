@@ -224,13 +224,18 @@ def _objeto(resultado) -> dict:
     a los tramos sobre el horizonte, el marcador se buscaba "por tiempo mas
     cercano" y se quedaba clavado media noche.
     """
-    alt, az, rend, limita = [], [], [], []
+    alt, az, rend, limita, sep = [], [], [], [], []
     for paso in resultado.trace:
         alt.append(paso.get("alt"))
         az.append(paso.get("az"))
         rend.append(round(float(paso.get("yield") or 0.0), 3))
         limita.append("-" if paso.get("too_low")
                       else LIMITA_CODIGO.get(paso.get("limiting"), "n"))
+        # La separacion a la Luna YA la calculaba el recomendador para cada
+        # muestra y se tiraba: solo sobrevivia el minimo de la noche. Y es la
+        # que cambia -- la Luna se mueve y el objeto tambien -- asi que el
+        # numero util es el de CADA momento, no el peor de todos.
+        sep.append(paso.get("moon_sep"))
 
     return {
         "nombre": resultado.target.name,
@@ -254,6 +259,7 @@ def _objeto(resultado) -> dict:
         # Arrays paralelos y no una lista de objetos: son 44 objetos por 59
         # marcos, y con claves repetidas el fichero se iba al triple.
         "alt": alt, "az": az, "rend": rend, "limita": "".join(limita),
+        "sep_luna": sep,
         # Los tres instantes que se marcan en el perfil. El paso por el
         # meridiano se detecta por el azimut cruzando el sur (o el norte para
         # circumpolares altas), que es la definicion, y no se confunde con el
