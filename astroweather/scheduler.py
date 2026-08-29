@@ -122,6 +122,11 @@ def _job_forecast():
     return sum(counts.values())
 
 
+def _job_aemet_hourly():
+    from .workers import fetch_aemet
+    return fetch_aemet.run_hourly()
+
+
 def _job_aerosol():
     from .workers import fetch_aerosol
     return fetch_aerosol.run(NERPIO, days=5, with_dust=True)
@@ -213,6 +218,10 @@ JOBS = {
     # CAMS queues, so it runs once a day well away from anything interactive.
     "aerosol": (CronTrigger(hour=7, minute=30), _job_aerosol),
     "aemet": (CronTrigger(hour=8, minute=0), _job_aemet),
+    # Y la observacion HORARIA, que no tiene historico que pedir: la ventana
+    # es de ~12 h y lo que no se sondee hoy no existe manana. Tres veces al
+    # dia y no dos, para que un retraso no abra un hueco irrecuperable.
+    "aemet_horario": (CronTrigger(hour="2,10,18", minute=15), _job_aemet_hourly),
     # The photometer archive is served by month; topping up daily is enough.
     "tess": (CronTrigger(hour=9, minute=0), _job_tess),
     # La allsky sirve 19,2 h como mucho (medido) a 15 s de cadencia. Cada 4

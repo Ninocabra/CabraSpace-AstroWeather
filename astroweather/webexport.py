@@ -34,6 +34,7 @@ from .site import NERPIO, Site
 from .skymodel import predict
 from .targets import CATALOGUE, evaluate_night
 from .tonight import report
+from .verification import wind_correction
 
 # Cuantos objetos se publican. La lista curada tiene diez; sacar los tres
 # mejores es una recomendacion, sacar los diez es un listado.
@@ -165,6 +166,19 @@ def build(site: Site = NERPIO, *, nights: int = 2, root=None) -> dict:
                 avisos.append(linea.strip())
     avisos.append("El seeing es experimental y sin calibrar con FWHM local: se "
                   "publica en terciles, nunca en arcosegundos sueltos.")
+    # La racha alimenta una puerta de SEGURIDAD y no tiene verdad terreno en
+    # ninguna fuente. Lo que si se mide es el viento medio, y sale corto: eso
+    # es exactamente el sentido en el que una puerta no puede fallar en
+    # silencio, asi que se publica.
+    viento = wind_correction()
+    if not viento.get("applied") and viento.get("bias") is not None:
+        avisos.append(
+            f"La puerta de viento NO está calibrada y el modelo se queda CORTO: "
+            f"sobre {viento['n']} horas medidas contra la estacion del sitio "
+            f"prevé el {viento['ratio']*100:.0f} % del viento medio real "
+            f"({viento['bias']:+.1f} m/s). La racha, que es la que decide, no "
+            f"tiene verdad terreno en ninguna fuente. Trata el veredicto de "
+            f"abrir como optimista en viento.")
     if salidas and salidas[0]["cielo"]["seeing"]["origen"] == "supuesto":
         avisos.append("No hay previsión de viento en altura para esta noche: "
                       "el seeing sale de un valor supuesto.")

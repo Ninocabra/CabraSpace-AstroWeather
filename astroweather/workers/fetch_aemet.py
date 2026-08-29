@@ -9,9 +9,18 @@ What this gives us, verified 2026-08-27:
 * daily T (mean/min/max with the hours of the extremes), RH (mean/min/max),
   precipitation and its peak intensity, from 2019 onwards (2010 and 2015 come
   back empty: the station simply did not exist).
-* NOT hourly. AEMET's `observacion/convencional` endpoint only serves the last
-  ~12 hours, so the hourly MOS leans on the TESS archive instead.
-* NOT wind or sunshine for this particular station (both come back null).
+* Hourly TOO, desde el 29-08-2026 (`run_hourly`). El endpoint
+  `observacion/convencional` solo sirve las ultimas ~12 h -- medido: 11
+  registros de 00:00 a 10:00 a las 11:57 UTC -- asi que no da historico, pero
+  sondeandolo tres veces al dia la serie horaria se construye HACIA ADELANTE
+  con solape. Nadie lo estaba sondeando: cada dia que pasaba era una serie
+  horaria que no se podia recuperar despues.
+* NOT wind, en NINGUNA de las tres. Verificado el 29-08-2026 sobre el endpoint
+  horario: los campos con valor son `ta`, `hr`, `prec` (mas `tamax`/`tamin`) y
+  `vv`, `vmax` y `dv` no vienen. Importa mas de lo que parece: el `gust`
+  alimenta una puerta de SEGURIDAD y esto cierra la ultima esperanza de verdad
+  terreno externa para el viento. La unica que queda es la estacion de
+  AstroCamp, que publica viento medio y no rachas.
 
 Its real value is verification: was that night actually rainy, and does the
 NWP surface temperature carry a bias at this altitude.
@@ -104,6 +113,66 @@ def _to_rows(payload: list[dict], site: Site, station_id: str, retrieved_at: dat
     return rows
 
 
+def _to_hourly_rows(payload: list[dict], site: Site, station_id: str,
+                    retrieved_at: datetime):
+    """De la observacion convencional a filas de `measurements`.
+
+    Son de una estacion EXTERNA, a 11,5 km y 165 m por debajo del observatorio,
+    y la fila lo dice en `quality_flags`: confundirla con dato del sitio seria
+    exactamente el error que este proyecto lleva dos dias persiguiendo.
+    """
+    meta = STATIONS.get(station_id, {})
+    rows = []
+    for entry in payload:
+        marca = entry.get("fint")
+        if not marca:
+            continue
+        cuando = datetime.strptime(marca, "%Y-%m-%dT%H:%M:%S%z").astimezone(timezone.utc)
+        rows.append({
+            "site_id": site.site_id,
+            "t_utc": cuando.replace(microsecond=0),
+            "t2m": _number(entry.get("ta")),
+            "rh": _number(entry.get("hr")),
+            "station_pressure": _number(entry.get("pres")),
+            "wind": _number(entry.get("vv")),      # vacio en las tres estaciones
+            "gust": _number(entry.get("vmax")),    # idem
+            "source": f"aemet_{station_id}_horario",
+            "quality_flags": (f"external_station;{meta.get('distance_km')}km;"
+                              f"{meta.get('elevation')}m;hourly_observation"),
+            "retrieved_at": retrieved_at,
+        })
+    return rows
+
+
+def run_hourly(site: Site = NERPIO, *, stations: tuple[str, ...] | None = None,
+               pause: float = 2.0) -> int:
+    """Las ultimas ~12 h de observacion, de todas las estaciones cercanas.
+
+    No hay historico que pedir: lo que no se sondee hoy, no existe manana. Por
+    eso esto corre tres veces al dia y no dos -- la ventana es de 12 h y con dos
+    pasadas cualquier retraso abre un hueco irrecuperable.
+    """
+    key = _api_key()
+    total = 0
+    for station in (stations or tuple(STATIONS)):
+        retrieved_at = utcnow()
+        payload, note = _get(f"/observacion/convencional/datos/estacion/{station}", key)
+        if not payload:
+            print(f"[fetch_aemet horario] {station}: sin datos ({note})")
+            time.sleep(pause)
+            continue
+        store_raw(payload, source=f"aemet_{station}_horario", site_id=site.site_id,
+                  retrieved_at=retrieved_at)
+        rows = _to_hourly_rows(payload, site, station, retrieved_at)
+        write_canonical(rows, dataset="measurements", site_id=site.site_id)
+        total += len(rows)
+        print(f"[fetch_aemet horario] {station}: {len(rows):>3} horas "
+              f"({rows[0]['t_utc']:%H:%M} -> {rows[-1]['t_utc']:%H:%M} UTC)"
+              if rows else f"[fetch_aemet horario] {station}: 0 horas")
+        time.sleep(pause)
+    return total
+
+
 def _chunks(start: date, end: date, months: int = 6):
     """AEMET caps the span per request, so walk it in half-year windows."""
     cursor = start
@@ -151,8 +220,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--station", default=DEFAULT_STATION)
     parser.add_argument("--start", help="YYYY-MM-DD (por defecto 2019-01-01)")
+    parser.add_argument("--hourly", action="store_true",
+                        help="las ultimas ~12 h de observacion de las tres estaciones")
     args = parser.parse_args()
-    run(
-        station=args.station,
-        start=date.fromisoformat(args.start) if args.start else None,
-    )
+    if args.hourly:
+        run_hourly()
+    else:
+        run(
+            station=args.station,
+            start=date.fromisoformat(args.start) if args.start else None,
+        )

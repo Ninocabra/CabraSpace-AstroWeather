@@ -108,6 +108,85 @@ def temperature_scores(root=None) -> list[dict]:
     return [{"model": r[0], "n": r[1], "bias": r[2], "mae": r[3]} for r in rows]
 
 
+# Pares minimos antes de dejar que la medida del viento corrija nada. Es el
+# mismo criterio que MIN_CLOUD_PAIRS y por la misma razon: una correccion de
+# SEGURIDAD sacada de una veintena de horas es ruido con autoridad.
+MIN_WIND_PAIRS = 200
+
+
+def wind_scores(root=None) -> list[dict]:
+    """Sesgo del viento MEDIO previsto contra la estacion del sitio.
+
+    La racha no tiene verdad terreno en ninguna fuente -- ni AstroCamp, que
+    publica viento medio, ni las tres estaciones AEMET cercanas, donde `vv`,
+    `vmax` y `dv` vienen vacios (verificado el 29-08-2026 sobre el endpoint
+    horario). Y la racha es la que alimenta la puerta de seguridad.
+
+    Lo que si se puede medir es el viento medio, y lo que sale importa: el
+    modelo se queda CORTO. Con n=29 el sesgo es -1,80 m/s sobre una media
+    medida de 3,99 -- prevee el 55 % del viento real. Si la racha comparte ese
+    sesgo, la puerta avisa tarde, que es el peor sentido en el que puede
+    fallar una puerta de seguridad.
+    """
+    connection = connect(root)
+    try:
+        rows = connection.execute("""
+            WITH medido AS (
+                SELECT site_id, date_trunc('hour', t_utc) AS hora,
+                       median(wind) AS viento
+                FROM measurements
+                WHERE wind IS NOT NULL AND source = 'astrocamp_meteo'
+                GROUP BY 1, 2
+            ),
+            previsto AS (
+                SELECT site_id, valid_utc AS hora, model,
+                       median(wind10m) AS viento
+                FROM forecasts WHERE wind10m IS NOT NULL AND member IS NULL
+                GROUP BY 1, 2, 3
+            )
+            SELECT p.model, count(*) AS n,
+                   avg(p.viento - m.viento) AS bias,
+                   sqrt(avg(pow(p.viento - m.viento, 2))) AS rmse,
+                   avg(m.viento) AS observado,
+                   avg(p.viento) AS previsto
+            FROM previsto p JOIN medido m USING (site_id, hora)
+            GROUP BY p.model ORDER BY n DESC
+        """).fetchall()
+    except Exception:
+        return []
+    return [{"model": r[0], "n": r[1], "bias": r[2], "rmse": r[3],
+             "observed": r[4], "forecast": r[5],
+             # Cuanto del viento real llega a prever. >1 es que se pasa.
+             "ratio": (r[5] / r[4]) if r[4] else None,
+             "trustworthy": r[1] >= MIN_WIND_PAIRS}
+            for r in rows]
+
+
+def wind_correction(root=None, model: str | None = None) -> dict:
+    """El factor por el que multiplicar la racha prevista, si se puede.
+
+    Devuelve `factor=1.0` mientras no haya pares suficientes, y dice por que.
+    No se fuerza: una correccion sacada de 29 horas de agosto no sabe nada del
+    viento de enero, y esto decide si se abre un techo.
+    """
+    puntuaciones = [s for s in wind_scores(root)
+                    if model is None or s["model"] == model]
+    if not puntuaciones:
+        return {"factor": 1.0, "n": 0, "applied": False,
+                "why": "sin pares de viento previsto contra medido"}
+    mejor = max(puntuaciones, key=lambda s: s["n"])
+    if not mejor["trustworthy"] or not mejor["ratio"]:
+        return {"factor": 1.0, "n": mejor["n"], "applied": False,
+                "ratio": mejor["ratio"], "bias": mejor["bias"],
+                "why": (f"solo {mejor['n']} pares, hacen falta {MIN_WIND_PAIRS}: "
+                        f"se mide un sesgo de {mejor['bias']:+.2f} m/s pero NO se "
+                        f"corrige, y la puerta de viento queda sin calibrar")}
+    return {"factor": 1.0 / mejor["ratio"], "n": mejor["n"], "applied": True,
+            "ratio": mejor["ratio"], "bias": mejor["bias"],
+            "why": (f"medido sobre {mejor['n']} horas: el modelo prevee el "
+                    f"{mejor['ratio']*100:.0f} % del viento medio real")}
+
+
 def baselines(root=None) -> dict:
     """Persistence and climatology: the two scores any forecast must beat."""
     connection = connect(root)
