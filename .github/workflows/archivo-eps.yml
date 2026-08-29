@@ -17,10 +17,19 @@ name: Archivo del EPS
 
 on:
   schedule:
-    # Las mismas horas que el scheduler local, para que se solapen en vez de
-    # turnarse: si los dos corren, el deduplicador de `queries.py` se encarga.
-    - cron: "10 6 * * *"
-    - cron: "10 18 * * *"
+    # A las y 43, no a las y 10. Los cron de GitHub van a una cola compartida y
+    # los primeros minutos de cada hora son los mas congestionados: la primera
+    # cita de este workflow -- 06:10 UTC del 29-08-2026 -- no llego a existir
+    # (`0 workflow runs` dos horas despues), y sin embargo lanzado a mano tardo
+    # 20 segundos. El schedule es best-effort, asi que no es la unica red.
+    #
+    # Y no se solapan con el scheduler de este PC, se turnan: 06:43 y 18:43 UTC
+    # son 08:43 y 20:43 locales, y el scheduler dispara a las 06:10 y 18:10
+    # LOCALES, que son las 04:10 y 16:10 UTC. Para archivar, turnarse es mejor
+    # que solaparse: son cuatro oportunidades al dia en vez de dos. Si aun asi
+    # los dos cogen la misma pasada, el deduplicador de `queries.py` se encarga.
+    - cron: "43 6 * * *"
+    - cron: "43 18 * * *"
   workflow_dispatch:
 
 # Dos ejecuciones a la vez chocarian al hacer push. La segunda espera.
