@@ -102,6 +102,10 @@ class Conditions:
     humidity: float | None = None
     dew_margin: float | None = None
     wind: float | None = None
+    # Planetas que pasan de ALT_MIN_BUENA en algun momento de la noche, con su
+    # altura maxima. La familia "Planetas y Luna" no se decide por el fondo de
+    # cielo sino por si hay algo que apuntar y por el seeing.
+    planets_up: tuple[tuple[str, float], ...] = ()
 
     @property
     def luna_pct(self) -> int:
@@ -414,6 +418,46 @@ def _ifn(c: Conditions) -> dict:
     return fila
 
 
+def _planetas(c: Conditions) -> dict:
+    """Planetas y Luna COMO OBJETIVO, que es otra cosa que la tecnica.
+
+    No se decide por el fondo de cielo -- son objetos brillantes y el fondo les
+    da igual -- sino por dos cosas: que haya algo apuntable arriba, y el
+    seeing. Por eso esta fila puede estar verde la misma noche en que todo lo
+    demas esta rojo, y esa es justo la informacion que hace falta cuando la
+    Luna arruina el cielo profundo.
+    """
+    nombres = [n for n, _ in c.planets_up]
+    hay_luna = c.moon_up and c.moon_altitude_max is not None and c.moon_altitude_max > ALT_MIN_BUENA
+    if not nombres and not hay_luna:
+        return _fila("planetas", "Planetas y Luna", ROJO, "no hay nada arriba",
+                     f"""Ningun planeta pasa de {ALT_MIN_BUENA:.0f}° esta noche y la
+                     Luna tampoco sube lo suficiente. No es cuestion de
+                     condiciones: es que no hay a que apuntar.""")
+    lista = ", ".join(f"{n} ({a:.0f}°)" for n, a in c.planets_up)
+    if hay_luna:
+        lista = (lista + " y la Luna" if lista else "la Luna") +                 f" ({c.moon_altitude_max:.0f}°)"
+    alto = f'{c.seeing_range[1]:.1f}"' if c.seeing_range else "sin banda"
+    if c.seeing_tercile == "desfavorable":
+        return _fila("planetas", "Planetas y Luna", AMBAR, "hay objetivo, falta seeing",
+                     f"""Arriba tienes {lista}. Lo que decide aqui no es el fondo de
+                     cielo -- son objetos brillantes y les da igual -- sino la
+                     turbulencia, y esta noche llega hasta {alto}. Baja la focal,
+                     graba videos cortos y descarta mucho.""")
+    if c.seeing_tercile == "favorable":
+        return _fila("planetas", "Planetas y Luna", VERDE, "objetivo y seeing",
+                     f"""Arriba tienes {lista}, y el seeing es
+                     {c.seeing_tercile} (hasta {alto}). Es la combinacion que hace
+                     falta: aqui manda la turbulencia y no el fondo, asi que esta
+                     familia puede estar verde la misma noche en que el cielo
+                     profundo esta perdido.""")
+    return _fila("planetas", "Planetas y Luna", AMBAR, "hay objetivo",
+                 f"""Arriba tienes {lista}. El seeing es
+                 {c.seeing_tercile or 'sin dato'} (hasta {alto}): se puede
+                 intentar, pero no es la noche de batir tu mejor imagen. El fondo
+                 de cielo no interviene.""")
+
+
 def _cumulos(c: Conditions) -> dict:
     """Los cumulos no se miden con la puerta de brillo superficial.
 
@@ -480,6 +524,7 @@ def evaluate(conditions: Conditions) -> dict:
                        "Nada de banda estrecha aquí."),
         _planetarias_obj(c),
         _cumulos(c),
+        _planetas(c),
         _ifn(c),
     ]
     return {"adquisicion": adquisicion, "objetos": objetos,

@@ -139,7 +139,7 @@ def test_every_row_is_always_present():
     for condiciones in (LLENA, NUEVA):
         salida = evaluate(Conditions(**condiciones))
         assert len(salida["adquisicion"]) == 8      # + infrarrojo, 29-08-2026
-        assert len(salida["objetos"]) == 6
+        assert len(salida["objetos"]) == 7      # + planetas y Luna, 29-08-2026
 
 
 def test_infrared_is_green_exactly_when_there_is_something_to_get_through():

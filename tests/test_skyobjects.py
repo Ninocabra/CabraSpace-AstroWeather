@@ -86,5 +86,6 @@ def test_southern_stars_that_never_rise_are_dropped():
 
 def test_planets_are_labelled_as_nominal_brightness():
     planets = planet_positions(WHEN, NERPIO)
-    assert {p["name"] for p in planets} >= {"Venus", "Jupiter", "Marte", "Saturno"}
+    # Con tilde desde el 29-08-2026: el nombre sale en la web, no en un log.
+    assert {p["name"] for p in planets} >= {"Venus", "Júpiter", "Marte", "Saturno"}
     assert all(p["magnitude_is_nominal"] for p in planets)

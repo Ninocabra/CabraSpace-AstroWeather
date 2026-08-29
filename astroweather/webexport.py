@@ -299,6 +299,22 @@ def _condiciones(night_report, turbulence, transparency, darkest, times, site):
     except Exception:
         pass                       # la pagina de AstroCamp se cae a ratos
     altura_maxima = max((m.altitude for m in lunas), default=None)
+    # Que planetas suben de verdad esta noche. Sin esto, la fila "Planetas y
+    # Luna" solo podia hablar de condiciones, y la primera pregunta no es como
+    # esta el cielo sino si hay algo a lo que apuntar.
+    arriba = []
+    try:
+        from .skyobjects import planet_positions
+        from .targets import Target
+        for planeta in planet_positions(times[len(times) // 2], site):
+            alturas, _, _ = Target(planeta["name"], planeta["ra"], planeta["dec"],
+                                   "planet", 1.0, "normal").positions(times, site)
+            pico = float(alturas.max())
+            if pico >= 30.0:
+                arriba.append((planeta["name"], round(pico, 1)))
+    except Exception:
+        arriba = []
+    arriba.sort(key=lambda p: -p[1])
     return Conditions(
         moon_illumination=night_report.moon_illumination,
         moon_altitude_max=altura_maxima,
@@ -316,6 +332,7 @@ def _condiciones(night_report, turbulence, transparency, darkest, times, site):
         humidity=getattr(ahora, "rh_out", None),
         dew_margin=getattr(ahora, "dew_margin", None),
         wind=getattr(ahora, "wind_ms", None),
+        planets_up=tuple(arriba),
     )
 
 

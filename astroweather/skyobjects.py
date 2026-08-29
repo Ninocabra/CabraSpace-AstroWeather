@@ -92,7 +92,7 @@ BRIGHT_STARS: list[tuple[str, float, float, float]] = [
 
 # Nominal magnitudes, flagged as such wherever they are shown.
 PLANETS: dict[str, float] = {
-    "Venus": -4.0, "Jupiter": -2.2, "Marte": 0.5, "Saturno": 0.6, "Mercurio": 0.0,
+    "Venus": -4.0, "Júpiter": -2.2, "Marte": 0.5, "Saturno": 0.6, "Mercurio": 0.0,
 }
 
 
@@ -198,7 +198,7 @@ def planet_positions(when: dt.datetime, site: Site = NERPIO) -> list[dict]:
     where = location(site)
     results = []
     for name, magnitude in PLANETS.items():
-        body = {"Venus": "venus", "Jupiter": "jupiter", "Marte": "mars",
+        body = {"Venus": "venus", "Júpiter": "jupiter", "Marte": "mars",
                 "Saturno": "saturn", "Mercurio": "mercury"}[name]
         position = get_body(body, time, where).icrs
         results.append({"name": name, "ra": round(float(position.ra.deg), 3),
