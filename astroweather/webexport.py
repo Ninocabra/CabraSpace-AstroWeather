@@ -34,7 +34,8 @@ from .seeing import integrate
 from . import site_now
 from .site import NERPIO, Site
 from .skymodel import predict
-from .targets import CATALOGUE, evaluate_night
+from .catalog import candidatos
+from .targets import CATALOGUE, MIN_ALTITUDE, evaluate_night
 from .tonight import report
 from .verification import wind_correction
 
@@ -83,14 +84,19 @@ def _night(day: dt.datetime, site: Site, root=None, *,
     # exacta fallaba siempre y dejaba E[Q] en cero. Se empareja por la hora.
     usable = {h.t_utc.replace(minute=0, second=0, microsecond=0):
               h.usable_probability for h in night_report.hours}
+    # Con catalogo grande solo en la primera noche: la segunda no lleva trazas
+    # ni ranking, asi que no hace falta puntuar mil objetos para ella.
+    universo = _suben_esta_noche(times, site) if with_catalogue else list(CATALOGUE)
     targets = evaluate_night(
-        CATALOGUE, times,
+        universo, times,
         usable_probability=[
             usable.get(t.replace(minute=0, second=0, microsecond=0), 0.0)
             for t in times],
         turbulence=turbulence, aod_total=forecast["aod_total"],
         aod_dust=forecast["aod_dust"], site=site)
 
+    ordenados = sorted(targets, key=lambda t: (-t.q_expected, -t.q_conditional,
+                                              t.target.name))
     window = night_report.best_window
     skies = predict([t for t in times if night.window_start], site)
     darkest = min((s.predicted_mag for s in skies if s.is_night), default=None)
@@ -182,9 +188,27 @@ def _night(day: dt.datetime, site: Site, root=None, *,
         # Solo en la primera noche: el buscador y la cupula son de HOY, y las
         # trazas de la segunda duplicaban el peso del fichero (38 kB de 44) sin
         # que nadie las mire.
-        "objetos": ([_objeto(t) for t in sorted(
-            targets, key=lambda t: (-t.q_expected, t.target.name))]
-            if with_catalogue else []),
+        # Los mejores, con su traza completa: son los que la cupula dibuja y los
+        # carriles detallan.
+        "objetos": ([_objeto(t) for t in ordenados[:CON_TRAZA]]
+                    if with_catalogue else []),
+        # Y el ranking de la noche para el desplegable, sin trazas: nombre,
+        # clase y horas es todo lo que hace falta para elegir.
+        "ranking": ([{"nombre": t.target.name, "tipo": t.target.kind,
+                      "clase": t.target.difficulty,
+                      # Con coordenadas: asi el buscador puede coger cualquiera
+                      # del ranking y situarlo en la cupula aunque no lleve
+                      # traza, con la misma geometria que los objetos de fuera.
+                      "ra": t.target.ra_deg, "dec": t.target.dec_deg,
+                      "alias": list(t.target.aliases)[:4],
+                      "horas_si_despeja": round(t.q_conditional, 1),
+                      "horas_esperadas": round(t.q_expected, 1),
+                      "altura_maxima": round(t.max_altitude, 0),
+                      "separacion_luna": round(t.min_moon_separation, 0),
+                      "veredicto": t.verdict}
+                     for t in ordenados[:EN_RANKING] if t.q_conditional > 0]
+                    if with_catalogue else []),
+        "catalogo_evaluado": len(universo) if with_catalogue else 0,
         # Lo que un astrofotografo te diria al oido, con los numeros dentro.
         "consejos": evaluate_advice(_condiciones(
             night_report, turbulence, transparency, darkest, times, site)),
@@ -193,6 +217,42 @@ def _night(day: dt.datetime, site: Site, root=None, *,
 
 LIMITA_CODIGO = {"cielo": "c", "luna": "l", "fondo": "f", "altura": "a",
                  "ninguno": "n"}
+
+
+# Cuantos objetos se publican con su traza completa -- los que la cupula puede
+# dibujar y los carriles detallar -- y cuantos entran en el ranking del
+# desplegable, que solo necesita nombre y horas.
+CON_TRAZA = 40
+EN_RANKING = 150
+
+
+def _suben_esta_noche(times, site) -> list:
+    """Los candidatos que pasan del minimo de altura en algun momento.
+
+    Prefiltro puramente GEOMETRICO, y por eso no puede cambiar ningun veredicto:
+    lo que nunca sube del minimo puntua cero por definicion. Sirve para no
+    pasarle 1.774 objetos al recomendador cuando 800 de ellos estan bajo el
+    horizonte toda la noche.
+
+    Y va vectorizado: una sola transformacion de astropy para todo el catalogo
+    (1.774 x 59) tarda menos de un segundo, mientras que hacerlo objeto a objeto
+    dentro del recomendador serian 35 ms cada uno.
+    """
+    import numpy as np
+    from astropy.coordinates import AltAz, EarthLocation, SkyCoord
+    from astropy.time import Time
+    import astropy.units as u
+
+    objetivos = list(candidatos())
+    lugar = EarthLocation(lat=site.latitude * u.deg, lon=site.longitude * u.deg,
+                          height=site.site_elevation * u.m)
+    cuando = Time([t.astimezone(dt.timezone.utc) for t in times])
+    coords = SkyCoord(ra=[t.ra_deg for t in objetivos] * u.deg,
+                      dec=[t.dec_deg for t in objetivos] * u.deg)
+    alturas = np.asarray(coords[:, None].transform_to(
+        AltAz(obstime=cuando, location=lugar)).alt.deg)
+    pico = alturas.max(axis=1)
+    return [objetivo for objetivo, alto in zip(objetivos, pico) if alto >= MIN_ALTITUDE]
 
 
 def _horas_oscuras(night_report, night) -> float | None:
