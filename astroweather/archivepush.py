@@ -67,7 +67,16 @@ SKIPPED = {
 }
 
 # Ficheros sueltos de `data/` que son estado del producto y valen su peso.
-LOOSE = ("cloud_calibration.json", "open_hours_nerpio.json", "roof_climatology.json")
+#
+# `sky_floor.json` entro el 30-08-2026 y faltaba: es el suelo del cielo medido
+# cada dia -- la constante de siete anios se jubilo el 29-08 por promediar una
+# deriva -- y sin viajar aqui, una maquina que empiece de cero se cae al
+# respaldo y el recomendador puntua contra un cielo que no es el de esta epoca.
+# `estado_colector.json` entro el mismo dia y es lo que hace posible que la
+# recogida viva en un runner que se destruye: sin el, cada pasada creeria que
+# no ha corrido nunca nada.
+LOOSE = ("cloud_calibration.json", "open_hours_nerpio.json",
+         "roof_climatology.json", "sky_floor.json", "estado_colector.json")
 
 
 def repo_path(repo: Path | None = None) -> Path | None:
@@ -193,6 +202,11 @@ def push(root: Path | None = None, repo: Path | None = None, *,
     _git(repo, "commit", "-m", f"Archivo al dia: {nuevos} ficheros nuevos\n\n" +
          "\n".join(f"  {k}: {v}" for k, v in sorted(resumen.items()) if v))
     if push_remote:
+        # Alguien pudo empujar mientras corriamos -- otra pasada del colector, o
+        # este PC. Rebase antes de empujar: sin esto, dos recogidas seguidas se
+        # pisan y la segunda muere con "non-fast-forward" dejando en el runner,
+        # que se destruye, lo unico que la habia guardado.
+        _git(repo, "pull", "--rebase", "--autostash")
         subido = _git(repo, "push")
         if subido.returncode != 0:
             raise RuntimeError(f"archivado en local pero sin subir: {subido.stderr.strip()}")

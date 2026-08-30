@@ -28,6 +28,7 @@ from typing import Any
 import requests
 
 from ..archive import DATA_ROOT, store_raw, utcnow, write_canonical
+from ..secretos import leer as leer_secreto
 from ..site import NERPIO, Site
 
 AIR_QUALITY_URL = "https://air-quality-api.open-meteo.com/v1/air-quality"
@@ -118,13 +119,8 @@ def air_quality_rows(payload: dict, site: Site, retrieved_at: datetime) -> list[
 def _ads_client():
     import cdsapi
 
-    env_path = Path(__file__).resolve().parent.parent.parent / ".env"
-    env = {}
-    for line in env_path.read_text(encoding="utf-8").splitlines():
-        if "=" in line and not line.startswith("#"):
-            key, value = line.split("=", 1)
-            env[key.strip()] = value.strip()
-    return cdsapi.Client(url=env["ADS_URL"], key=env["ADS_KEY"], quiet=True)
+    return cdsapi.Client(url=leer_secreto("ADS_URL"),
+                         key=leer_secreto("ADS_KEY"), quiet=True)
 
 
 def fetch_dust(site: Site, *, day: str | None = None, root: Path | None = None) -> Path:

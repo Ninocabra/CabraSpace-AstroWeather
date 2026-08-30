@@ -153,14 +153,27 @@ def run_live(site: Site = NERPIO, *, station: str = DEFAULT_STATION,
 
 
 def _months(start: datetime, end: datetime) -> Iterator[tuple[datetime, datetime]]:
+    """Trozos de como mucho un mes, empezando en `start` DE VERDAD.
+
+    Redondear el primer trozo al dia 1 del mes esta bien para el relleno
+    historico y es un desastre para ponerse al dia: `top_up` pedia dos horas de
+    hueco y se traia el mes entero, 42.000 filas repetidas que el deduplicador
+    esconde y el archivo paga.
+    """
     cursor = start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     while cursor < end:
         following = (cursor + timedelta(days=32)).replace(day=1)
-        yield cursor, min(following, end)
+        yield max(cursor, start), min(following, end)
         cursor = following
 
 
 def _already_done(site: Site, month: datetime, root: Path | None = None) -> bool:
+    """Si ese mes ya tiene fichero. Sirve para el relleno HISTORICO y solo ahi.
+
+    Un mes con algun parquet dentro no es un mes completo, y el mes EN CURSO
+    nunca lo es: por eso `top_up` existe y `run(resume=True)` no se usa para
+    ponerse al dia.
+    """
     from ..archive import DATA_ROOT
 
     base = root or DATA_ROOT
@@ -171,6 +184,60 @@ def _already_done(site: Site, month: datetime, root: Path | None = None) -> bool
     return directory.exists() and any(directory.glob("*.parquet"))
 
 
+def ultima_archivada(station: str = DEFAULT_STATION,
+                     root: Path | None = None) -> datetime | None:
+    """La medida mas reciente que ya esta en el archivo, o None si no hay nada."""
+    from ..queries import connect
+
+    try:
+        fila = connect(root).execute(
+            "SELECT max(t_utc) FROM measurements WHERE instrument_id = ?",
+            [station]).fetchone()
+    except Exception:
+        return None
+    if not fila or fila[0] is None:
+        return None
+    marca = fila[0]
+    return marca if marca.tzinfo else marca.replace(tzinfo=timezone.utc)
+
+
+def top_up(site: Site = NERPIO, *, station: str = DEFAULT_STATION,
+           root: Path | None = None, solape: timedelta = timedelta(hours=2),
+           pause: float = 1.0) -> int:
+    """Pedir SOLO lo que falta: de la ultima medida archivada hasta ahora.
+
+    ESTO ES LO QUE FALTABA, y el sintoma fue un agujero. `run(resume=True)`
+    salta un mes en cuanto tiene un parquet dentro, asi que el mes EN CURSO no
+    se rellenaba nunca: lo unico que entraba del mes vivo era lo que pillara
+    `tess_vivo` con la maquina encendida. La noche del 28-08-2026 el PC no
+    estuvo, y esa noche se quedo sin UNA sola fila de fotometro -- mientras
+    STARS4ALL la servia perfectamente.
+
+    Se pide desde la ultima archivada MENOS un solape, no exactamente desde
+    ella: la serie llega por minutos y cortar al segundo exacto es como se
+    pierde la fila del borde. Lo repetido lo quita la vista deduplicada.
+
+    Y se pide por meses, no de una tirada, porque la fuente sirve por meses y
+    porque un hueco de tres anios en una sola peticion es como se tumba un
+    servicio comunitario.
+    """
+    desde = ultima_archivada(station, root)
+    if desde is None:
+        # Archivo vacio: esto no es ponerse al dia, es el relleno historico.
+        return run(site, station=station, root=root, pause=pause)
+
+    desde = desde - solape
+    hasta = utcnow()
+    if desde >= hasta:
+        print(f"[fetch_tess] al dia (ultima {desde + solape:%Y-%m-%d %H:%M} UTC)")
+        return 0
+
+    print(f"[fetch_tess] al dia desde {desde:%Y-%m-%d %H:%M} UTC "
+          f"({(hasta - desde).total_seconds() / 3600:.1f} h de hueco)")
+    return run(site, station=station, start=desde, end=hasta,
+               resume=False, root=root, pause=pause)
+
+
 def run(
     site: Site = NERPIO,
     *,
@@ -178,15 +245,20 @@ def run(
     start: datetime | None = None,
     end: datetime | None = None,
     resume: bool = True,
+    root: Path | None = None,
     pause: float = 1.0,
 ) -> int:
-    """Backfill (or top up) the photometer series, one month per request."""
+    """Relleno HISTORICO, un mes por peticion.
+
+    Para ponerse al dia se usa `top_up`, que pide solo el hueco: `resume` aqui
+    salta meses que ya tienen fichero, y el mes en curso siempre lo tiene.
+    """
     start = start or HISTORY_START
     end = end or utcnow()
     total = 0
 
     for month_start, month_end in _months(start, end):
-        if resume and _already_done(site, month_start):
+        if resume and _already_done(site, month_start, root):
             print(f"[fetch_tess] {month_start:%Y-%m} ya archivado, salto")
             continue
 
@@ -197,9 +269,9 @@ def run(
             continue
 
         store_raw(series, source=f"tess_{station}", site_id=site.site_id,
-                  retrieved_at=retrieved_at)
+                  retrieved_at=retrieved_at, root=root)
         rows = _to_rows(series, site, station, retrieved_at)
-        write_canonical(rows, dataset="measurements", site_id=site.site_id)
+        write_canonical(rows, dataset="measurements", site_id=site.site_id, root=root)
         valid = sum(1 for row in rows if row["sky_mag_raw"] is not None)
         total += len(rows)
         print(f"[fetch_tess] {month_start:%Y-%m}: {len(rows):>6} muestras "

@@ -49,9 +49,18 @@ def test_the_photometer_and_fits_are_not_paced_like_live_sensors():
 
 
 def test_sensor_polling_is_fast_enough_to_build_a_series():
-    """cloud.html only shows 'now', so a slow poll means no history at all."""
-    trigger, _ = scheduler.JOBS["sensores"]
-    assert trigger.interval.total_seconds() <= 600
+    """cloud.html only shows "now", so a slow poll means no history at all.
+
+    Desde que la recogida vive en GitHub Actions (30-08-2026) el ritmo REAL lo
+    marca el cron del workflow, no este periodo: lo que aqui se afirma es que
+    el trabajo nunca sea el cuello de botella, o sea que este vencido en
+    cualquier pasada que arranque. Si alguien le pusiera media hora, las
+    pasadas del cuarto de hora de la ventana de decision rasparian una de cada
+    dos y el archivo saldria plano sin que nada fallara.
+    """
+    import datetime as dt
+
+    assert scheduler.JOBS["sensores"].periodo <= dt.timedelta(minutes=10)
 
 
 def test_jobs_never_overlap_themselves():

@@ -25,6 +25,7 @@ proyecto.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import os
 import subprocess
@@ -63,7 +64,8 @@ def _git(repo: Path, *args: str) -> subprocess.CompletedProcess:
 
 
 def publish(site: Site = NERPIO, *, nights: int = 2, root=None,
-            repo: Path | None = None, push: bool = True) -> str | None:
+            repo: Path | None = None, push: bool = True,
+            payload: dict | None = None) -> str | None:
     """Genera la noche y la publica. Devuelve el commit, o None si no hizo falta.
 
     No lanza si el repo no esta clonado: el scheduler corre en maquinas que no
@@ -73,7 +75,7 @@ def publish(site: Site = NERPIO, *, nights: int = 2, root=None,
     if repo is None:
         return None
 
-    payload = build(site, nights=nights, root=root)
+    payload = payload if payload is not None else build(site, nights=nights, root=root)
     destination = repo / FILENAME
     if destination.exists():
         try:
@@ -92,11 +94,70 @@ def publish(site: Site = NERPIO, *, nights: int = 2, root=None,
     generated = payload.get("generado_utc", "")
     _git(repo, "commit", "-m", f"Prevision de {generated}")
     if push:
+        # Rebase antes de empujar. Cuando esto corria en un PC, un push
+        # rechazado dejaba el commit en local y la pasada siguiente lo
+        # reintentaba; desde que la recogida vive en un runner que se DESTRUYE
+        # al terminar, "queda en local" significa que se ha perdido.
+        _git(repo, "pull", "--rebase", "--autostash")
         pushed = _git(repo, "push")
         if pushed.returncode != 0:
-            # Se queda commiteado en local y la proxima pasada lo reintenta:
-            # perder el commit por un fallo de red seria peor que no publicar.
             raise RuntimeError(f"publicado en local pero sin subir: {pushed.stderr.strip()}")
+    return _git(repo, "rev-parse", "--short", "HEAD").stdout.strip()
+
+
+# El fichero pequeno. `noche.json` son 660 kB y cuesta 26 s de calculo; esto
+# son ~1,5 kB y cuesta 0,1 s de raspado.
+FICHERO_AHORA = "ahora.json"
+
+
+def publicar_ahora(site: Site = NERPIO, *, root=None, repo: Path | None = None,
+                   push: bool = True) -> str | None:
+    """Solo los sensores del sitio, para que el panel este fresco sin rehacer nada.
+
+    POR QUE UN SEGUNDO FICHERO. La previsión cambia cada 6 h -- es cuando llega
+    modelo nuevo -- pero los sensores cambian cada minuto, y es lo que mira
+    quien entra a las nueve de la noche a decidir si sube. Meterlos en
+    `noche.json` obligaba a elegir entre un panel viejo o republicar 660 kB
+    cada cuarto de hora: a 48 publicaciones diarias eso son 11 GB al ano de
+    historial en un repo publico, por 1,5 kB de informacion nueva.
+
+    `generado_utc` NO se toca aqui, y es deliberado: lo que se refresca son los
+    sensores, no la prevision. Poner la hora de ahora encima de un modelo de
+    hace cinco horas seria decir que es reciente cuando no lo es. Cada bloque
+    lleva su propia marca y la pagina las lee por separado.
+    """
+    repo = repo or repo_path()
+    if repo is None:
+        return None
+
+    from .webexport import _sensores
+
+    contenido = {
+        "leido_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+        "sensores": _sensores(site, root),
+    }
+    destino = repo / FICHERO_AHORA
+    if destino.exists():
+        try:
+            previo = json.loads(destino.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            previo = None
+        # Mismo criterio que con la noche: se compara SIN la hora de lectura,
+        # o el historial seria un latido diciendo lo mismo 48 veces al dia.
+        if previo is not None and previo.get("sensores") == contenido["sensores"]:
+            return None
+
+    destino.write_text(json.dumps(contenido, indent=1, ensure_ascii=False),
+                       encoding="utf-8")
+    _git(repo, "add", FICHERO_AHORA)
+    if _git(repo, "diff", "--cached", "--quiet").returncode == 0:
+        return None
+    _git(repo, "commit", "-m", f"Sensores de {contenido['leido_utc']}")
+    if push:
+        _git(repo, "pull", "--rebase", "--autostash")
+        subido = _git(repo, "push")
+        if subido.returncode != 0:
+            raise RuntimeError(f"sensores sin subir: {subido.stderr.strip()}")
     return _git(repo, "rev-parse", "--short", "HEAD").stdout.strip()
 
 

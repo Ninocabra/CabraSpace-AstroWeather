@@ -129,7 +129,15 @@ class Target:
     # un idioma es medio buscador.
     aliases: tuple[str, ...] = ()
 
-    def positions(self, times: list[dt.datetime], site: Site = NERPIO):
+    def positions(self, times: list[dt.datetime], site: Site = NERPIO,
+                  luna: tuple[np.ndarray, np.ndarray] | None = None):
+        """Altura, azimut y separacion a la Luna de este objeto, muestra a muestra.
+
+        `luna` son las alturas y azimuts de la Luna en esos MISMOS instantes,
+        que quien puntua una noche entera ya tiene calculados. Pasarlos ahorra
+        recalcular la Luna una vez por objeto: con 983 objetos eran 17 de los
+        50 segundos de una exportacion, y la Luna es la misma para todos.
+        """
         when = Time([t.astimezone(dt.timezone.utc) for t in times])
         frame = AltAz(obstime=when, location=location(site))
         coordinates = SkyCoord(ra=self.ra_deg * u.deg, dec=self.dec_deg * u.deg)
@@ -156,11 +164,27 @@ class Target:
         # theta es la distancia cenital de la Luna (90 - altura) y no pasa por
         # aqui. Y ahora la separacion del motor y la que dibuja la cupula en el
         # navegador son la misma cuenta, que era la otra mitad del problema.
-        moon = get_body("moon", when, location=location(site)).transform_to(frame)
-        separations = altaz.separation(moon).deg
-        return (np.asarray(altaz.alt.deg, dtype=float),
-                np.asarray(altaz.az.deg, dtype=float),
-                np.asarray(separations, dtype=float))
+        alturas = np.asarray(altaz.alt.deg, dtype=float)
+        azimuts = np.asarray(altaz.az.deg, dtype=float)
+        if luna is None:
+            posicion = get_body("moon", when, location=location(site)).transform_to(frame)
+            luna = (np.asarray(posicion.alt.deg, dtype=float),
+                    np.asarray(posicion.az.deg, dtype=float))
+        return alturas, azimuts, separacion_angular(alturas, azimuts, *luna)
+
+
+def separacion_angular(alt1, az1, alt2, az2):
+    """Separacion sobre la esfera, en grados, desde alturas y azimuts.
+
+    La misma cuenta que hace la cupula del navegador, a proposito: es la unica
+    forma de que el motor y el dibujo no puedan discrepar, y discrepaban en 38
+    grados hasta el 30-08-2026 por comparar marcos con una traslacion de una
+    unidad astronomica entre medias.
+    """
+    a1, z1, a2, z2 = (np.radians(np.asarray(x, dtype=float))
+                      for x in (alt1, az1, alt2, az2))
+    coseno = np.sin(a1) * np.sin(a2) + np.cos(a1) * np.cos(a2) * np.cos(z1 - z2)
+    return np.degrees(np.arccos(np.clip(coseno, -1.0, 1.0)))
 
 
 # A curated list. Fifty well-understood objects beat twenty thousand with
@@ -395,9 +419,14 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
     # so it is computed once and shared by every target.
     weights = _sample_weights(times)
 
+    # La Luna, UNA vez para toda la noche y para todos los objetos. Antes se
+    # recalculaba dentro de `positions()` en cada uno de los 983 objetivos.
+    luna_altaz = (np.array([moon[t].altitude for t in times], dtype=float),
+                  np.array([moon[t].azimuth for t in times], dtype=float))
+
     results = []
     for target in targets:
-        altitudes, azimuths, separations = target.positions(times, site)
+        altitudes, azimuths, separations = target.positions(times, site, luna_altaz)
         # The natural background along THIS target's own track: one coordinate
         # transform per target, vectorised over the night. The field is smooth
         # (26.5 deg of scale) so no grid is needed -- it is cheaper and exact to

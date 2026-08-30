@@ -36,6 +36,7 @@ from pathlib import Path
 import requests
 
 from ..archive import store_raw, utcnow, write_canonical
+from ..secretos import leer as leer_secreto
 from ..site import NERPIO, Site
 
 BASE = "https://opendata.aemet.es/opendata/api"
@@ -52,12 +53,8 @@ DEFAULT_STATION = "7067Y"
 
 
 def _api_key() -> str:
-    """Read the key from .env; it is a 3-month token, never committed."""
-    env = Path(__file__).resolve().parent.parent.parent / ".env"
-    for line in env.read_text(encoding="utf-8").splitlines():
-        if line.startswith("AEMET_API_KEY="):
-            return line.split("=", 1)[1].strip()
-    raise RuntimeError("AEMET_API_KEY missing from .env")
+    """A 3-month token, never committed. Environment first, then .env."""
+    return leer_secreto("AEMET_API_KEY")
 
 
 def _get(path: str, key: str):

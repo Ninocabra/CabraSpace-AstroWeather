@@ -1,0 +1,21 @@
+# Lo que necesita UNA PASADA de recogida, y nada mas.
+#
+# En un runner que se paga por minutos, cada paquete que no se instala son
+# segundos de cada pasada -- y hay 48 al dia. Aqui NO estan:
+#
+#   apscheduler  el planificador de proceso vivo. El colector efimero no
+#                planifica: mira que esta vencido y lo hace (`colector.py`).
+#   photutils    solo lo usa el pipeline de FWHM, que corre a mano sobre FITS
+#                que ya estan en disco y por eso esta fuera del scheduler.
+#
+# Las versiones van fijadas por MINOR (`~=`) y son las que corren en el
+# escritorio: sin fijar, una version nueva de astropy o de numpy cambia numeros
+# publicados sin que nadie lo pida, y este proyecto archiva lo que dijo para
+# poder auditarlo despues.
+astropy~=8.0
+cdsapi~=0.7.7
+duckdb~=1.5.5
+numpy~=2.4.4
+pyarrow~=25.0
+requests~=2.34
+scipy~=1.18.1

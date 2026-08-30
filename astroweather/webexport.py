@@ -799,10 +799,18 @@ def build(site: Site = NERPIO, *, nights: int = 2, root=None) -> dict:
 
 
 def write(path: Path | None = None, site: Site = NERPIO, *, nights: int = 2,
-          root=None) -> Path:
+          root=None, payload: dict | None = None) -> Path:
+    """Escribe la noche. Con `payload`, la ya construida en vez de rehacerla.
+
+    Construir cuesta 26 segundos -- 983 objetos por 59 instantes -- y hasta hoy
+    el trabajo que escribia el fichero y el que lo publicaba llamaban cada uno
+    al suyo: 52 segundos para obtener DOS VECES el mismo JSON. En un disco
+    propio eso no se nota; en un runner que se paga por minutos, es la mitad de
+    la pasada.
+    """
     path = path or DEFAULT_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = build(site, nights=nights, root=root)
+    payload = payload if payload is not None else build(site, nights=nights, root=root)
     path.write_text(json.dumps(payload, indent=1, ensure_ascii=False),
                     encoding="utf-8")
     return path

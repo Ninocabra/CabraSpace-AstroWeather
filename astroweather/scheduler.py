@@ -22,14 +22,16 @@ from __future__ import annotations
 import argparse
 import logging
 import traceback
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-
-from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
+from typing import Callable, NamedTuple
 
 from .site import NERPIO
+
+# APScheduler se importa DENTRO de `build()`, no aqui: el colector efimero
+# (`astroweather.ci`) lee esta misma tabla de trabajos y no tiene por que
+# instalar un planificador que no va a usar. En un runner que se paga por
+# minutos, cada dependencia que no se instala son segundos.
 
 LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "scheduler.log"
 
@@ -85,9 +87,17 @@ def _job_ensemble():
     return fetch_ensemble.run(NERPIO, forecast_days=7)
 
 
-def _job_web():
-    from .webexport import write
-    return str(write())
+def _job_ahora():
+    """Los sensores solos al repo de datos: 1,5 kB y 0,1 s.
+
+    Es lo que permite que el panel este fresco en la tarde-noche sin rehacer
+    los 660 kB de la prevision, que cuestan 26 s de calculo y otro tanto de
+    historial en un repo publico.
+    """
+    from .webpublish import publicar_ahora, repo_path
+    if repo_path() is None:
+        return "sin repo de datos en esta maquina"
+    return publicar_ahora() or "los sensores no han cambiado"
 
 
 def _job_suelo():
@@ -114,10 +124,22 @@ def _job_archive():
 
 
 def _job_publish():
+    """Construye la noche UNA vez, la deja en disco y la publica.
+
+    Eran dos trabajos, `web` y `publicar`, y cada uno llamaba a `build()`: 52
+    segundos para obtener dos veces el mismo JSON. Se separaron para que un
+    fallo de red al empujar no marcase en rojo la generacion, y eso se sigue
+    cumpliendo -- lo que se escribe en disco ya esta escrito cuando falla el
+    push -- pero sin pagar el calculo dos veces.
+    """
+    from .webexport import build, write
     from .webpublish import publish, repo_path
+
+    payload = build()
+    local = write(payload=payload)
     if repo_path() is None:
-        return "sin repo de datos en esta maquina: no se publica"
-    commit = publish()
+        return f"{local} (sin repo de datos en esta maquina: no se publica)"
+    commit = publish(payload=payload)
     return commit or "la prevision no ha cambiado"
 
 
@@ -151,12 +173,17 @@ def _job_aemet():
 
 
 def _job_tess():
+    """Pide SOLO el hueco: de la ultima medida archivada hasta ahora.
+
+    Antes se re-pedia el MES ENTERO cada dia (`start` = dia 1, `resume=False`).
+    Funcionaba, pero reescribia ~40.000 filas repetidas diarias -- que la vista
+    deduplicada esconde y el archivo paga igual -- y solo tapaba el hueco si la
+    maquina estaba encendida a su hora. La noche del 28-08-2026 no lo estuvo y
+    esa noche se quedo sin una sola fila de fotometro, mientras STARS4ALL la
+    servia entera.
+    """
     from .workers import fetch_tess
-    from datetime import datetime as dt, timedelta
-    # Resume from the current month; already-archived months are skipped.
-    start = dt.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0,
-                                         microsecond=0)
-    return fetch_tess.run(NERPIO, start=start, resume=False)
+    return fetch_tess.top_up(NERPIO)
 
 
 # Credentials that expire. A key that dies silently takes a source with it,
@@ -205,66 +232,103 @@ def _heartbeat():
                 f"  <-- CON FALLOS: {', '.join(failing)}" if failing else "")
 
 
-# name -> (trigger, callable). The pace of each job is set by how fast its
-# source forgets, not by how often the underlying value changes.
-JOBS = {
-    # cloud.html only ever shows "now": not scraping is not observing.
-    "sensores": (IntervalTrigger(minutes=5), _job_sensors),
-    # EPS members expire upstream in ~4 days; twice a day is cheap insurance.
-    "ensemble": (CronTrigger(hour="6,18", minute=10), _job_ensemble),
-    "forecast": (CronTrigger(hour="*/6", minute=20), _job_forecast),
+class Trabajo(NamedTuple):
+    """Un trabajo y CADA CUANTO tiene que correr. Nada mas.
+
+    Antes el ritmo vivia en un `trigger` de APScheduler, y eso ataba la
+    recogida a un proceso vivo en una maquina concreta. El periodo es la misma
+    informacion sin el planificador dentro: sirve para montar el scheduler
+    local (`build`) y sirve para que un runner efimero decida que le toca
+    (`astroweather.ci`), y al ser UNA tabla no pueden discrepar.
+    """
+
+    funcion: Callable[[], object]
+    periodo: timedelta
+    # ...y nunca antes de esta hora UTC. Solo para lo que necesita que la noche
+    # anterior este CERRADA: verificar o remedir el suelo sobre una noche a
+    # medias no es que sea impreciso, es que es otra cosa.
+    desde_hora_utc: int | None = None
+
+
+# El ritmo de cada trabajo lo marca lo deprisa que OLVIDA su fuente, no lo a
+# menudo que cambia el valor.
+JOBS: dict[str, Trabajo] = {
+    # cloud.html solo publica el "ahora": no raspar es no observar. El periodo
+    # es de 10 minutos para que este vencido en CUALQUIER pasada: quien decide
+    # el ritmo de verdad es el cron del workflow, y como el runner ya esta
+    # pagado, raspar en cada arranque sale gratis. Asi la resolucion del
+    # archivo sigue a la cadencia de la noche -- cuarto de hora en la ventana
+    # de decision -- en vez de ser plana.
+    "sensores": Trabajo(_job_sensors, timedelta(minutes=10)),
+    # Los miembros del EPS caducan aguas arriba en ~4 dias.
+    "ensemble": Trabajo(_job_ensemble, timedelta(hours=12)),
+    "forecast": Trabajo(_job_forecast, timedelta(hours=6)),
     # Justo despues del forecast: lo que NOSOTROS decimos, guardado antes de
     # que pase. Sin esto, cambiar el calibrador cambia retroactivamente lo que
     # dijimos que dijimos, y no hay auditoria posible.
-    "prediccion": (CronTrigger(hour="*/6", minute=25), _job_prediction),
-    # Y detras, el JSON que lee la web: se regenera con cada pasada nueva, que
-    # es lo unico que puede cambiarlo.
-    "web": (CronTrigger(hour="*/6", minute=30), _job_web),
-    # Y cinco minutos despues sale del disco duro. Va en su propio trabajo y no
-    # dentro de `web` a proposito: un fallo de red al empujar no puede marcar
-    # en rojo la generacion, que si ha funcionado. En una maquina sin el clon
-    # del repo de datos no hace nada y no es un error.
-    "publicar": (CronTrigger(hour="*/6", minute=35), _job_publish),
-    # CAMS queues, so it runs once a day well away from anything interactive.
-    "aerosol": (CronTrigger(hour=7, minute=30), _job_aerosol),
-    "aemet": (CronTrigger(hour=8, minute=0), _job_aemet),
-    # Y la observacion HORARIA, que no tiene historico que pedir: la ventana
-    # es de ~12 h y lo que no se sondee hoy no existe manana. Tres veces al
-    # dia y no dos, para que un retraso no abra un hueco irrecuperable.
-    "aemet_horario": (CronTrigger(hour="2,10,18", minute=15), _job_aemet_hourly),
-    # The photometer archive is served by month; topping up daily is enough.
-    "tess": (CronTrigger(hour=9, minute=0), _job_tess),
-    # Y el fotometro EN VIVO cada diez minutos. El relleno por meses construye
-    # el archivo; esto es para que el panel pueda ensenar el fondo de cielo
+    "prediccion": Trabajo(_job_prediction, timedelta(hours=6)),
+    # Y detras, el JSON que lee la web: se genera y se publica en el mismo
+    # trabajo porque construirlo cuesta 26 s y hacerlo dos veces era la mitad
+    # de la pasada.
+    "publicar": Trabajo(_job_publish, timedelta(hours=6)),
+    # Y los SENSORES aparte, en cada pasada. La prevision cambia cada 6 h; los
+    # sensores cambian cada minuto y son lo que mira quien entra a las nueve de
+    # la noche. Diez minutos de periodo para que este vencido siempre: lo que
+    # decide su ritmo de verdad es cada cuanto arranca el runner.
+    "ahora": Trabajo(_job_ahora, timedelta(minutes=10)),
+    # CAMS encola, asi que una vez al dia y sin prisa.
+    "aerosol": Trabajo(_job_aerosol, timedelta(hours=24)),
+    "aemet": Trabajo(_job_aemet, timedelta(hours=24)),
+    # La observacion HORARIA no tiene historico que pedir: la ventana es de
+    # ~12 h y lo que no se sondee hoy no existe manana.
+    "aemet_horario": Trabajo(_job_aemet_hourly, timedelta(hours=8)),
+    # El archivo del fotometro se sirve por meses; rellenar a diario basta, y
+    # es lo que hace que `tess_vivo` no sea la unica copia de nada.
+    "tess": Trabajo(_job_tess, timedelta(hours=24)),
+    # Y el fotometro EN VIVO, para que el panel pueda ensenar el fondo de cielo
     # medido de ahora en vez de uno de hace un dia.
-    "tess_vivo": (IntervalTrigger(minutes=10), _job_tess_live),
+    "tess_vivo": Trabajo(_job_tess_live, timedelta(minutes=10)),
     # La allsky sirve 19,2 h como mucho (medido) a 15 s de cadencia. Cada 4
-    # horas pidiendo 5 deja una hora de solape: una caida corta no abre hueco,
-    # y lo repetido lo quita la vista deduplicada.
-    "allsky": (CronTrigger(hour="*/4", minute=40), _job_allsky),
-    # Late morning, once the previous night is complete.
-    "verificacion": (CronTrigger(hour=10, minute=0), _job_verification),
+    # horas pidiendo 5 deja una hora de solape: una caida corta no abre hueco.
+    "allsky": Trabajo(_job_allsky, timedelta(hours=4)),
+    "verificacion": Trabajo(_job_verification, timedelta(hours=24), desde_hora_utc=8),
     # El suelo del cielo, remedido cada dia contra el fotometro. Va DESPUES del
-    # relleno del TESS y ANTES de la exportacion: el numero que usa el
-    # recomendador tiene que ser el de hoy, no el de hace siete anios.
-    "suelo": (CronTrigger(hour=10, minute=10), _job_suelo),
-    # Cheap, daily, and it is the only thing standing between a quiet key
-    # expiry and a source that stops without anyone noticing.
-    "credenciales": (CronTrigger(hour=10, minute=5), _job_credentials),
-    # Y lo ultimo del dia: sacar el archivo de este disco. Va despues de la
-    # verificacion para que suba tambien lo que ella escriba, y agrupa solo
-    # dias TERMINADOS, asi que a esta hora el de ayer ya esta cerrado.
-    "archivo": (CronTrigger(hour=10, minute=20), _job_archive),
+    # relleno del TESS: el numero que usa el recomendador tiene que ser el de
+    # hoy, no el de hace siete anios.
+    "suelo": Trabajo(_job_suelo, timedelta(hours=24), desde_hora_utc=8),
+    # Barato, diario, y es lo unico que hay entre una clave que caduca en
+    # silencio y una fuente que deja de responder sin que nadie se entere.
+    "credenciales": Trabajo(_job_credentials, timedelta(hours=24)),
+    # Y sacar el archivo de este disco. CADA pasada y no una vez al dia: en un
+    # runner efimero el disco se destruye al terminar, asi que lo que no se
+    # empuje aqui no ha existido. Agrupar por dias sigue esperando a que el dia
+    # TERMINE, que es cosa de `archivepush` y no del ritmo.
+    "archivo": Trabajo(_job_archive, timedelta(minutes=10)),
 }
 
 
-def build(only: set[str] | None = None) -> BlockingScheduler:
+def build(only: set[str] | None = None):
+    """El scheduler de proceso vivo, armado desde la MISMA tabla de periodos.
+
+    Se queda como respaldo -- una maquina con el proceso arriba recoge igual --
+    pero la recogida de verdad vive ya en GitHub Actions: mientras dependia de
+    este PC, lo que no estuviera encendido no se observaba, y el fotometro de
+    la noche del 29-08-2026 lo demostro parandose a las 00:01 locales.
+    """
+    from apscheduler.schedulers.blocking import BlockingScheduler
+    from apscheduler.triggers.cron import CronTrigger
+    from apscheduler.triggers.interval import IntervalTrigger
+
     scheduler = BlockingScheduler(timezone="UTC")
-    for name, (trigger, function) in JOBS.items():
+    for name, trabajo in JOBS.items():
         if only and name not in only:
             continue
+        if trabajo.desde_hora_utc is not None:
+            disparo = CronTrigger(hour=trabajo.desde_hora_utc, minute=20)
+        else:
+            disparo = IntervalTrigger(seconds=int(trabajo.periodo.total_seconds()))
         scheduler.add_job(
-            guarded(name, function), trigger, id=name, name=name,
+            guarded(name, trabajo.funcion), disparo, id=name, name=name,
             max_instances=1,        # never overlap a slow run with the next tick
             coalesce=True,          # after a suspend, catch up once, not N times
             misfire_grace_time=1800,
@@ -275,10 +339,10 @@ def build(only: set[str] | None = None) -> BlockingScheduler:
 
 def run_once(only: set[str] | None = None) -> None:
     """Run every job a single time: smoke test, and catch-up after downtime."""
-    for name, (_, function) in JOBS.items():
+    for name, trabajo in JOBS.items():
         if only and name not in only:
             continue
-        guarded(name, function)()
+        guarded(name, trabajo.funcion)()
     _heartbeat()
 
 
@@ -300,8 +364,9 @@ def main() -> None:
     scheduler = build(only)
     logger.info("scheduler arrancado; trabajos: %s",
                 ", ".join(job.id for job in scheduler.get_jobs()))
-    logger.info("mientras corra en este PC solo se recoge dato con el equipo "
-                "encendido; el VPS de la fase 1 lo resuelve")
+    logger.info("OJO: esto es el RESPALDO. La recogida vive en GitHub Actions "
+                "(.github/workflows/colector.yml); los dos a la vez solo "
+                "duplican trabajo, que el deduplicador absorbe")
     try:
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):
