@@ -12,6 +12,53 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 30-08-2026 — «Cielo más oscuro» publicaba el instante más brillante de la noche
+
+**Cómo salió:** Nino preguntó por qué el panel daba **17,14** para esta noche
+—sin nubes— cuando la noche anterior el fotómetro había medido **20** con la Luna
+*más* llena. No era una contradicción entre el modelo y la medida: era un signo.
+
+En mag/arcsec² **más grande es más oscuro** (21,9 es cielo negro, 17 es cielo con
+la Luna alta). `webexport._night` calculaba
+`darkest = min(s.predicted_mag for s in skies if s.is_night)`, o sea el instante
+**más brillante**, y lo publicaba en un campo llamado `mag_cenit_mas_oscuro` y
+rotulado «Cielo más oscuro». Estaba así desde que nació el fichero (`54ba594`).
+`nightview.py` calcula lo mismo con `max()` y `higher_is_better=True` desde
+siempre: **dos ficheros, el mismo concepto, signos opuestos, y el que se
+publicaba era el malo.**
+
+**Qué decía la medida, comprobado contra el archivo.** La noche del 29-08 (Luna
+96,9 %) el fotómetro subió a **20,30** a las 21:56 locales, con la Luna a 6,6°
+recién salida, y bajó a 18,46 a las 23:55 con la Luna a 29°. El modelo la seguía
+con **+0,36 mag** de desvío en la parte oscura. Para esta noche (Luna 92,2 %) el
+modelo predice la misma forma: **20,19** al cerrar el crepúsculo y **17,05** en
+la culminación lunar. El «20» de Nino era el MEJOR momento de anoche y el «17»
+del panel el PEOR de hoy — la misma noche, dos extremos, y el rótulo decía que
+era el mismo tipo de número. (No hay medida del fondo de la madrugada del 30
+porque el fotómetro deja de reportar entre las 00:01 y las 05:40 locales.)
+
+**Corregido, y en dos números en vez de uno**, porque en noche con Luna uno solo
+no describe nada: entre el mejor instante y el habitual hay tres magnitudes, o
+sea un **factor 16** de fondo.
+
+- `mag_cenit_mas_oscuro` pasa a ser el **máximo** — lo que dice su nombre.
+- Nuevo `mag_cenit_tipico`: la **mediana** sobre la oscuridad astronómica, que
+  es lo que uno se va a encontrar de verdad. El panel lo enseña al lado.
+- **Al semáforo de consejos va el típico, no un extremo.** Sus textos dicen «el
+  fondo de cielo se queda en X», y eso solo es cierto de un valor
+  representativo: con el mejor instante recomendaría galaxias por veinte minutos
+  de cielo bueno. Medido sobre esta noche, los semáforos salen **idénticos** con
+  la mediana y con el mínimo de antes, y distintos con el máximo — o sea que el
+  arreglo corrige el número que se cita sin cambiar el consejo.
+
+**Y el fallo de método:** el único test que tocaba este campo lo llevaba como
+**dato de entrada** (`"mag_cenit_mas_oscuro": 17.08`, copiado de una salida real
+y por tanto equivocada), así que enseñaba el valor malo en vez de protegerlo.
+Ahora hay uno que compara contra `max()` y `median()` recalculados, y se ha
+comprobado que falla volviendo a poner `min()`.
+
+---
+
 ## 30-08-2026 — La separación a la Luna se medía desde el baricentro del sistema solar
 
 **Cómo salió:** haciendo que el buscador de la web encontrara M31. Al comprobar

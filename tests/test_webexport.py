@@ -24,7 +24,8 @@ def _noche(recomendaciones, origen_seeing="ecmwf", origen_aod="cams"):
         "mejor_ventana": None,
         "horas": [],
         "cielo": {
-            "mag_cenit_mas_oscuro": 17.08,
+            "mag_cenit_mas_oscuro": 20.19,
+            "mag_cenit_tipico": 17.63,
             "seeing": {"tercil": "favorable", "rango_arcsec": [0.8, 1.3],
                        "jet_ms": 18.0, "origen": origen_seeing, "calibrado": False},
             "transparencia": {"aod": 0.053, "k_total": 0.2,
@@ -91,3 +92,38 @@ def test_writing_it_creates_the_directory(tmp_path, monkeypatch):
     destino = tmp_path / "sub" / "noche.json"
     assert webexport.write(destino, nights=1) == destino
     assert json.loads(destino.read_text(encoding="utf-8"))["noches"]
+
+
+def test_lo_mas_oscuro_es_lo_mas_oscuro_y_no_lo_contrario():
+    """En mag/arcsec2 MAS GRANDE ES MAS OSCURO, y el campo se llama "mas oscuro".
+
+    Hasta el 30-08-2026 salia de un `min()`, o sea que publicaba el instante mas
+    BRILLANTE de la noche: el panel decia 17,05 cuando el cielo de esa noche
+    llegaba a 20,19 y el fotometro habia medido 20,30 la anterior con MAS Luna.
+    Parecia una contradiccion entre el modelo y la medida y era un signo.
+    `nightview.py` calculaba lo mismo con `max()` desde siempre.
+
+    Y el tipico tiene que quedar por DEBAJO del mas oscuro (mas brillante), o
+    los dos numeros se han intercambiado.
+    """
+    import statistics
+
+    from astroweather.ephem import night_for
+    from astroweather.site import NERPIO
+    from astroweather.skymodel import predict
+
+    night = night_for(dt.datetime(2026, 8, 30, tzinfo=dt.timezone.utc), NERPIO)
+    times = night.adaptive_hours(10, 30, NERPIO)
+    de_noche = [s.predicted_mag for s in predict(times, NERPIO) if s.is_night]
+    assert de_noche
+
+    publicado = webexport._night(
+        dt.datetime(2026, 8, 30, tzinfo=dt.timezone.utc), NERPIO)
+    if publicado is None:
+        pytest.skip("sin datos de esa noche en el archivo local")
+
+    cielo = publicado["cielo"]
+    assert cielo["mag_cenit_mas_oscuro"] == pytest.approx(max(de_noche), abs=0.01)
+    assert cielo["mag_cenit_tipico"] == pytest.approx(
+        statistics.median(de_noche), abs=0.01)
+    assert cielo["mag_cenit_tipico"] <= cielo["mag_cenit_mas_oscuro"]

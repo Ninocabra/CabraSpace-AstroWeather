@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import statistics
 from pathlib import Path
 
 from .advice import Conditions, evaluate as evaluate_advice
@@ -128,8 +129,30 @@ def _night(day: dt.datetime, site: Site, root=None, *,
     ordenados = sorted(targets, key=lambda t: (-t.q_expected, -t.q_conditional,
                                               t.target.name))
     window = night_report.best_window
-    skies = predict([t for t in times if night.window_start], site)
-    darkest = min((s.predicted_mag for s in skies if s.is_night), default=None)
+    # EL CIELO DE LA NOCHE, EN DOS NUMEROS QUE NO SON EL MISMO, y hasta hoy se
+    # confundian en uno solo -- y encima con el signo cambiado.
+    #
+    # `mag_cenit_mas_oscuro` salia de un `min()` sobre magnitudes, y en
+    # magnitudes por segundo de arco al cuadrado MAS GRANDE ES MAS OSCURO: 21,9
+    # es cielo negro y 17 es cielo con Luna alta. O sea que el campo llamado "lo
+    # mas oscuro" publicaba el instante MAS BRILLANTE de la noche. La noche del
+    # 30-08-2026 el panel decia 17,05 cuando el cielo llegaba a 20,19, y el
+    # fotometro habia medido 20,30 la noche anterior con MAS Luna: el numero
+    # parecia una contradiccion con la medida y era un signo.
+    #
+    # `nightview.py` calcula esto mismo con `max()` y `higher_is_better=True`
+    # desde siempre. Dos ficheros, el mismo concepto, signos opuestos, y el que
+    # se publicaba era el malo.
+    #
+    # Y son dos numeros porque uno solo no describe una noche con Luna: el mejor
+    # instante (20,19, justo al cerrar el crepusculo con la Luna aun baja) y el
+    # tipico (17,63, con la Luna arriba) se llevan tres magnitudes, que es un
+    # factor 16 de fondo. Publicar solo el mejor invita a creer que el cielo
+    # esta asi toda la noche.
+    skies = predict(times, site) if night.window_start else []
+    de_noche = [s.predicted_mag for s in skies if s.is_night]
+    darkest = max(de_noche) if de_noche else None
+    typical = statistics.median(de_noche) if de_noche else None
 
     return {
         "noche": night_report.night.isoformat(),
@@ -193,6 +216,12 @@ def _night(day: dt.datetime, site: Site, root=None, *,
             "mag_cenit_corregido": (round(darkest + calibracion["sesgo"] * -1, 2)
                                     if darkest and calibracion.get("aplicable")
                                     else None),
+            # Lo TIPICO de la noche, que en noche con Luna es lo que de verdad
+            # se va a encontrar: la mediana sobre la oscuridad astronomica.
+            "mag_cenit_tipico": round(typical, 2) if typical else None,
+            "mag_cenit_tipico_corregido": (round(typical + calibracion["sesgo"] * -1, 2)
+                                           if typical and calibracion.get("aplicable")
+                                           else None),
             "calibracion_fotometro": calibracion,
             "seeing": {
                 "tercil": turbulence.tercile,
@@ -275,8 +304,16 @@ def _night(day: dt.datetime, site: Site, root=None, *,
                      if with_catalogue else []),
         "catalogo_evaluado": len(universo) if with_catalogue else 0,
         # Lo que un astrofotografo te diria al oido, con los numeros dentro.
+        # Al semaforo va lo TIPICO y no un extremo: sus textos dicen "el fondo de
+        # cielo se queda en X", y eso solo es cierto de un valor representativo.
+        # Con el mejor instante recomendaria galaxias por veinte minutos de
+        # cielo bueno; con el peor, las condenaria por veinte minutos de cielo
+        # malo. (Verificado: sobre la noche del 30-08 los semaforos salen los
+        # mismos con la mediana que con el minimo de antes, y distintos con el
+        # maximo -- o sea que esto arregla el numero que se cita sin cambiar el
+        # consejo.)
         "consejos": evaluate_advice(_condiciones(
-            night_report, turbulence, transparency, darkest, times, site)),
+            night_report, turbulence, transparency, typical, times, site)),
     }
 
 
@@ -447,7 +484,7 @@ def _hitos(alt: list, az: list) -> dict:
     return {"i_max": i_max, "i_min": i_min, "i_meridiano": meridiano}
 
 
-def _condiciones(night_report, turbulence, transparency, darkest, times, site):
+def _condiciones(night_report, turbulence, transparency, fondo_tipico, times, site):
     """Traduce la noche al vocabulario de la base de consejos."""
     lunas = moon_positions(times, site)
     ahora = None
@@ -478,7 +515,7 @@ def _condiciones(night_report, turbulence, transparency, darkest, times, site):
         # Una Luna llena que no sale no molesta a nadie, y el semaforo lo tiene
         # que saber: la fase sola manda a rojo noches que estan limpias.
         moon_up=bool(altura_maxima is not None and altura_maxima > 0),
-        sky_mag=darkest,
+        sky_mag=fondo_tipico,
         seeing_tercile=turbulence.tercile,
         seeing_range=turbulence.range_arcsec,
         aod=transparency.aod_site,
