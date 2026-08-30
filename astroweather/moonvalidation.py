@@ -77,7 +77,14 @@ def collect(since: str = "2019-01-01", root=None) -> dict:
                + INTERVAL (floor(minute(t_utc) / 10) * 10) MINUTE AS t,
                median(sky_mag_raw) AS mag
         FROM measurements
-        WHERE sky_mag_raw IS NOT NULL AND t_utc >= '{since}'
+        -- SOLO EL FOTOMETRO. La allsky escribe en esta misma columna una
+        -- magnitud INSTRUMENTAL, monotona en el ADU y con punto cero
+        -- ARBITRARIO (`fetch_allsky` lo dice en su comentario): valores de
+        -- -16 donde el cielo son 21. Sin este filtro entran en la mediana y
+        -- salen residuos de -34 mag contra el modelo. `skybackground` ya
+        -- filtraba asi; aqui no, y es el mismo concepto.
+        WHERE instrument_type = 'TESS' AND sky_mag_raw IS NOT NULL
+          AND t_utc >= '{since}'
         GROUP BY t ORDER BY t
     """).fetchall()
     if not rows:

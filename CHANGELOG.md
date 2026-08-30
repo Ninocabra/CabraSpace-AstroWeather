@@ -12,6 +12,43 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 30-08-2026 — La allsky escribía magnitudes instrumentales en la columna del fotómetro
+
+Salió preguntándose por qué el panel no enseñaba «Cielo medido». La respuesta
+buena está más abajo (el scheduler duerme con el escritorio), pero por el camino
+apareció esto: **3.350 filas con `sky_mag_raw` entre −16,80 y −15,07**, todas
+desde el 29-08 y todas del instrumento `indi-allsky-cam1`. El rango físicamente
+posible es [14, 23] y `is_plausible_sky_mag` lo aplica… en el camino del TESS.
+
+No es un fallo de la allsky: `fetch_allsky` guarda `-2.5·log10(ADU)` **a
+propósito**, y su comentario lo dice — es una magnitud **instrumental**, monótona
+en el ADU y con **punto cero arbitrario**, porque convertirla sin cruzarla antes
+con el TESS sería inventarse el punto cero. El fallo es que la guarda en **la
+misma columna** que el fotómetro calibrado, y de las cuatro consultas que leen
+`median(sky_mag_raw)` solo **una** filtraba por instrumento:
+
+| Consumidor | Filtraba por instrumento |
+|---|---|
+| `skybackground.medir_suelo` | sí |
+| `verification` / `webexport._sensores` | sí |
+| `calibration.observed_clear_hours` | **no** |
+| `moonvalidation.collect` | **no** |
+| `queries` (vista `nights`) | **no** |
+
+**Ya estaba entrando.** Desde el 29-08 hay 103 cubos de 10 minutos con lectura de
+cielo y **85 de ellos son SOLO de la allsky** (los dos instrumentos no se solapan
+en el tiempo, así que la mediana del cubo es la suya entera). Tres de esos cubos
+pasan ya los filtros de noche cerrada y Luna baja de la verdad terreno de nubes,
+con **residuos de −34 mag** contra el modelo. Hoy no llegan al mínimo de cuatro
+muestras por hora, así que aún no han torcido el calibrador; con una noche
+completa sin fotómetro lo harían.
+
+**Corregido:** las tres consultas filtran `instrument_type = 'TESS'`, que es lo
+que las otras hacían ya. Test de regresión con las dos fuentes en el mismo cubo:
+sin el filtro, una hora de fotómetro limpio sale etiquetada como nublada.
+
+---
+
 ## 30-08-2026 — «Cielo más oscuro» publicaba el instante más brillante de la noche
 
 **Cómo salió:** Nino preguntó por qué el panel daba **17,14** para esta noche

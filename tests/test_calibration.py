@@ -64,3 +64,47 @@ def test_the_model_survives_a_round_trip(tmp_path):
     restored = Calibrator.load(path)
     assert restored.probability(30) == pytest.approx(model.probability(30))
     assert Calibrator.load(tmp_path / "missing.json") is None
+
+
+def test_la_verdad_del_cielo_solo_la_da_el_fotometro(tmp_path):
+    """La allsky escribe en la MISMA columna que el fotometro.
+
+    `fetch_allsky` guarda -2.5*log10(ADU) en `sky_mag_raw`: una magnitud
+    instrumental, monotona en el ADU y con punto cero ARBITRARIO, y su propio
+    comentario lo dice. Son -16 donde el cielo son 21. Hasta el 30-08-2026
+    `observed_clear_hours` hacia `median(sky_mag_raw)` sin mirar el instrumento,
+    asi que en cuanto el fotometro faltaba un rato -- que pasa cada noche, con
+    el scheduler en un escritorio que se duerme -- la mediana del cubo era la de
+    la allsky y salian residuos de -34 mag contra el modelo. `skybackground` ya
+    filtraba por instrumento; estas dos consultas no.
+    """
+    import datetime as dt
+
+    from astroweather.archive import write_canonical
+    from astroweather.calibration import observed_clear_hours
+
+    # Noche cerrada de invierno, con la Luna muy por debajo del horizonte.
+    base = dt.datetime(2026, 1, 15, 2, 0, tzinfo=dt.timezone.utc)
+    filas = []
+    for minuto in range(0, 60, 2):
+        cuando = base + dt.timedelta(minutes=minuto)
+        filas.append({"site_id": "nerpio", "t_utc": cuando, "sky_mag_raw": 21.6,
+                      "instrument_type": "TESS", "instrument_id": "stars289",
+                      "bandpass_id": "tess-w"})
+        filas.append({"site_id": "nerpio", "t_utc": cuando, "sky_mag_raw": -16.3,
+                      "instrument_type": "ALLSKY", "instrument_id": "indi-allsky-cam1",
+                      "bandpass_id": "asi462mc-sin-filtro"})
+    write_canonical(filas, dataset="measurements", site_id="nerpio", root=tmp_path)
+    # `connect()` monta tambien la vista de previsiones y falla si el dataset no
+    # existe: una fila cualquiera basta para que el archivo de prueba sea legible.
+    write_canonical([{"site_id": "nerpio", "model": "prev", "run_utc": base,
+                      "valid_utc": base, "lead_h": 0, "cloud_total": 0.0}],
+                    dataset="forecasts", site_id="nerpio", root=tmp_path)
+
+    verdad = observed_clear_hours(since="2026-01-01", root=tmp_path)
+    assert verdad, "la hora del fotometro tiene que llegar a la verdad terreno"
+    # 21.6 contra el modelo es un cielo limpio; -16.3 no es un cielo, es un ADU.
+    # Si la allsky entrara en la mediana, la hora saldria "no despejada".
+    assert all(verdad.values()), (
+        "una hora de fotometro limpio se ha etiquetado como nublada: la "
+        "magnitud instrumental de la allsky se ha colado en la mediana")

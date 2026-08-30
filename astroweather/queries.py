@@ -76,9 +76,15 @@ def connect(root: Path | None = None) -> duckdb.DuckDBPyConnection:
         SELECT
             CAST(CASE WHEN hour(t_utc) < 12 THEN t_utc - INTERVAL 1 DAY
                       ELSE t_utc END AS DATE) AS night,
-            count(*) FILTER (WHERE sky_mag_raw IS NOT NULL) AS sky_samples,
-            median(sky_mag_raw) AS sky_mag_median,
-            stddev(sky_mag_raw) AS sky_mag_std,
+            -- Igual que arriba: la magnitud del cielo es la del FOTOMETRO.
+            -- La allsky escribe en la misma columna una magnitud instrumental
+            -- con punto cero arbitrario, y mezcladas no significan nada.
+            count(*) FILTER (WHERE sky_mag_raw IS NOT NULL
+                             AND instrument_type = 'TESS') AS sky_samples,
+            median(sky_mag_raw) FILTER (WHERE instrument_type = 'TESS')
+                AS sky_mag_median,
+            stddev(sky_mag_raw) FILTER (WHERE instrument_type = 'TESS')
+                AS sky_mag_std,
             min(t_sky_ir) AS sky_ir_min,
             bool_or(roof_open) AS any_roof_open
         FROM measurements
