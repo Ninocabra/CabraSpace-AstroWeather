@@ -76,13 +76,14 @@ def _veredicto_abrir(probabilidad: float) -> dict:
     return {
         "abierto": bool(abierto),
         "umbral": UMBRAL_ABRIR,
+        # Con tildes: esto se lee en la pagina, no en el codigo. Y sin repetir
+        # lo que ya dice `probabilidad_definicion`, que viaja al lado en el
+        # mismo globo.
         "regla": (
-            f"Se dice Abierto cuando la probabilidad de que haya CONDICIONES "
-            f"para abrir llega al {UMBRAL_ABRIR:.0%}, y Cerrado por debajo. Es "
-            f"un corte sobre esa misma probabilidad -- la que va debajo -- y no "
-            f"una segunda opinion, asi que las dos cosas no pueden discrepar. "
-            f"Sigue sin predecir lo que haran las personas: el techo lo abren "
-            f"ellas y un techo cerrado no significa mal tiempo."),
+            f"Se dice Abierto cuando la probabilidad que va debajo llega al "
+            f"{UMBRAL_ABRIR:.0%}, y Cerrado por debajo de esa cifra. Es un "
+            f"corte sobre ESE mismo número, no una segunda opinión, así que "
+            f"la palabra y el porcentaje no pueden discrepar."),
     }
 
 
