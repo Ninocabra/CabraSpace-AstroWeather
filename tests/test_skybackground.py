@@ -143,3 +143,54 @@ def test_el_suelo_de_2019_no_es_el_de_2026():
     reciente = float(epoch_floor(dt.datetime(2026, 6, 1, tzinfo=dt.timezone.utc)))
     assert reciente > viejo, "el cielo se ha oscurecido; el suelo tiene que subir"
     assert 0.2 < reciente - viejo < 1.0, f"deriva implausible: {reciente - viejo:+.3f} mag"
+
+
+def test_la_medida_diaria_no_borra_la_deriva(tmp_path, monkeypatch):
+    """`fit_epoch_floor` corre cada dia; `fit_floor_series` solo a mano.
+
+    Escriben en el MISMO fichero, y hasta el 30-08-2026 el diario lo construia
+    desde cero: la primera pasada del colector en GitHub dejo el fichero con
+    `serie: 0 puntos` y se llevo por delante siete anios de deriva medida. Sin
+    ella, releer el archivo vuelve a hacerse con el cielo de hoy.
+    """
+    import datetime as dt
+    import json
+    import types
+
+    from astroweather import skybackground
+
+    ruta = tmp_path / skybackground.FLOOR_FICHERO
+    ruta.write_text(json.dumps({
+        "suelo": 22.006, "medido": True,
+        "serie": [{"centro": "2019-09-23T00:00:00+00:00", "suelo": 21.585, "n": 1477}],
+    }), encoding="utf-8")
+
+    # Una noche limpia repetida: lo que se prueba es el ESCRITO, no la medida.
+    horas = [dt.datetime(2026, 8, 1, tzinfo=dt.timezone.utc) + dt.timedelta(hours=i)
+             for i in range(skybackground.FLOOR_MIN_HORAS + 10)]
+    fuera = types.SimpleNamespace(altitude=-30.0)
+
+    class _Con:
+        def execute(self, _sql):
+            return types.SimpleNamespace(
+                fetchall=lambda: [(h.replace(tzinfo=None), 21.9) for h in horas])
+
+    leer = lambda: json.loads(ruta.read_text(encoding="utf-8"))
+    leer.cache_clear = lambda: None      # el original va con lru_cache
+    monkeypatch.setattr(skybackground, "_suelo_fichero", leer)
+    monkeypatch.setattr("astroweather.queries.connect", lambda root=None: _Con())
+    monkeypatch.setattr("astroweather.ephem.sun_positions",
+                        lambda t, s=None: [fuera] * len(t))
+    monkeypatch.setattr("astroweather.ephem.moon_positions",
+                        lambda t, s=None: [fuera] * len(t))
+    monkeypatch.setattr("astroweather.skymodel.predict", lambda t, s=None: [
+        types.SimpleNamespace(predicted_mag=21.9, is_night=True, is_trustworthy=True)
+        for _ in t])
+
+    resultado = skybackground.fit_epoch_floor(root=tmp_path)
+    assert resultado["medido"], resultado
+
+    guardado = json.loads(ruta.read_text(encoding="utf-8"))
+    assert guardado.get("serie"), "la medida diaria se ha comido la serie"
+    assert len(guardado["serie"]) == 1
+    assert guardado["serie"][0]["suelo"] == 21.585

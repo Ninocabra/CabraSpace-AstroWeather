@@ -317,7 +317,15 @@ def fit_epoch_floor(dias: int = FLOOR_VENTANA_DIAS, root=None) -> dict:
     sesgo = sum(diferencias) / len(diferencias) if diferencias else 0.0
     suelo_usado = epoch_floor()
     n = len(limpias)
-    resultado = {
+    # SE CONSERVA LO QUE YA HABIA, y no es un detalle: este trabajo corre cada
+    # dia y `fit_floor_series` -- que mide la DERIVA y solo se lanza a mano --
+    # escribe su serie en este mismo fichero. Construyendo el diccionario desde
+    # cero, la pasada diaria borraba los 22 puntos de siete anios de archivo, y
+    # con ellos la unica forma de releer el pasado con el cielo que habia
+    # entonces. Paso de verdad: la primera pasada del colector en GitHub dejo
+    # el fichero con `serie: 0 puntos`.
+    resultado = dict(_suelo_fichero())
+    resultado.update({
         "medido": True,
         # El suelo que anula el sesgo. Restarlo es exacto porque el
         # desplazamiento es 1:1, no una aproximacion.
@@ -330,7 +338,7 @@ def fit_epoch_floor(dias: int = FLOOR_VENTANA_DIAS, root=None) -> dict:
         "p10": round(limpias[n // 10], 3), "p90": round(limpias[9 * n // 10], 3),
         "constante_anterior": NATURAL_FLOOR_MAG,
         "ajustado_el": utcnow().isoformat(),
-    }
+    })
     ruta = (root or DATA_ROOT) / FLOOR_FICHERO
     ruta.parent.mkdir(parents=True, exist_ok=True)
     ruta.write_text(json.dumps(resultado, indent=1), encoding="utf-8")
