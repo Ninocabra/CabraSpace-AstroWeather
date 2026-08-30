@@ -104,3 +104,18 @@ def test_an_expired_key_is_an_error_not_a_warning(monkeypatch, caplog):
     with caplog.at_level("ERROR"):
         scheduler._job_credentials()
     assert any("CADUCADA" in record.message for record in caplog.records)
+
+
+def test_la_hora_utc_de_un_trabajo_es_utc_de_verdad():
+    """Un CronTrigger sin zona usa la de la MAQUINA, no la del scheduler.
+
+    Se descubrio el 30-08-2026 mirando por que el `publicar` de "cada 6 h en el
+    minuto 35 UTC" disparaba a las 18:35 locales: el scheduler se construye con
+    timezone="UTC" pero los triggers se creaban aparte y APScheduler les pone la
+    zona local. Con un campo que se llama `desde_hora_utc`, que la hora dependa
+    de donde este el equipo es garantizar que un dia signifique otra cosa.
+    """
+    built = scheduler.build(only={"verificacion"})
+    job = built.get_job("verificacion")
+    assert str(job.trigger.timezone) == "UTC", (
+        f"el trabajo dispara en {job.trigger.timezone}, no en UTC")

@@ -324,7 +324,14 @@ def build(only: set[str] | None = None):
         if only and name not in only:
             continue
         if trabajo.desde_hora_utc is not None:
-            disparo = CronTrigger(hour=trabajo.desde_hora_utc, minute=20)
+            # La zona, EXPLICITA. Un CronTrigger creado sin ella no usa la del
+            # scheduler -- aunque se le haya puesto UTC -- sino la de la
+            # maquina: por eso el `publicar` de "*/6 UTC" del codigo anterior
+            # disparaba a las 18:35 LOCALES. Con un campo que se llama
+            # `desde_hora_utc`, dejarlo al azar de la zona del equipo es
+            # garantizar que un dia signifique otra cosa.
+            disparo = CronTrigger(hour=trabajo.desde_hora_utc, minute=20,
+                                  timezone="UTC")
         else:
             disparo = IntervalTrigger(seconds=int(trabajo.periodo.total_seconds()))
         scheduler.add_job(
