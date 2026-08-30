@@ -131,9 +131,33 @@ class Target:
 
     def positions(self, times: list[dt.datetime], site: Site = NERPIO):
         when = Time([t.astimezone(dt.timezone.utc) for t in times])
+        frame = AltAz(obstime=when, location=location(site))
         coordinates = SkyCoord(ra=self.ra_deg * u.deg, dec=self.dec_deg * u.deg)
-        altaz = coordinates.transform_to(AltAz(obstime=when, location=location(site)))
-        separations = coordinates.separation(get_body("moon", when)).deg
+        altaz = coordinates.transform_to(frame)
+        # LA SEPARACION SE MIDE EN EL MISMO MARCO QUE LA ALTURA, y hasta el
+        # 30-08-2026 no era asi: era `coordinates.separation(get_body("moon"))`,
+        # o sea un objeto en ICRS -- que es BARICENTRICO -- contra la Luna en
+        # GCRS, que es geocentrico. Entre esos dos marcos hay una TRASLACION de
+        # una unidad astronomica, no un giro, y astropy lo avisaba en cada
+        # llamada ("angular separation can depend on the direction of the
+        # transformation"); el aviso se leia como ruido de astropy y era el
+        # numero saliendo mal. La Luna acababa colocada donde se la ve desde el
+        # BARICENTRO del sistema solar en vez de desde aqui.
+        #
+        # No es un decimal: para NGC 7635 la noche del 30-08-2026 daba 70,7
+        # grados donde la Luna estaba a 55,7. Y con la ley de dispersion medida
+        # aqui -- 10^(-theta/48,55) -- quince grados son un factor DOS en el
+        # brillo lunar sobre el objeto, que entra en su rendimiento y en su
+        # veredicto. Verificado contra las tres formas honestas de calcularlo
+        # (los dos en AltAz, los dos en GCRS, y a mano sobre la AR/Dec aparente
+        # de la Luna): las tres dan 55,74.
+        #
+        # No toca la ley lunar: esa se ajusto con el fotometro cenital, donde
+        # theta es la distancia cenital de la Luna (90 - altura) y no pasa por
+        # aqui. Y ahora la separacion del motor y la que dibuja la cupula en el
+        # navegador son la misma cuenta, que era la otra mitad del problema.
+        moon = get_body("moon", when, location=location(site)).transform_to(frame)
+        separations = altaz.separation(moon).deg
         return (np.asarray(altaz.alt.deg, dtype=float),
                 np.asarray(altaz.az.deg, dtype=float),
                 np.asarray(separations, dtype=float))

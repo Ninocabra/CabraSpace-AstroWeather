@@ -58,6 +58,34 @@ def _hour(hour) -> dict:
     }
 
 
+# El corte del veredicto binario. Al 50 % por la razon de siempre: es el umbral
+# que minimiza los fallos cuando los dos errores cuestan lo mismo, y ninguna
+# otra cifra se podria defender sin una matriz de costes que nadie ha medido.
+UMBRAL_ABRIR = 0.5
+
+
+def _veredicto_abrir(probabilidad: float) -> dict:
+    """Abierto o cerrado, con la regla dentro.
+
+    La regla viaja con el veredicto porque la palabra sola es mas rotunda que
+    el numero del que sale: quien lee "ABIERTO" tiene derecho a saber que eso
+    significa "al menos la mitad de las veces", y que sigue siendo una
+    prevision de CONDICIONES, no de lo que haran las personas del techo.
+    """
+    abierto = probabilidad >= UMBRAL_ABRIR
+    return {
+        "abierto": bool(abierto),
+        "umbral": UMBRAL_ABRIR,
+        "regla": (
+            f"Se dice Abierto cuando la probabilidad de que haya CONDICIONES "
+            f"para abrir llega al {UMBRAL_ABRIR:.0%}, y Cerrado por debajo. Es "
+            f"un corte sobre esa misma probabilidad -- la que va debajo -- y no "
+            f"una segunda opinion, asi que las dos cosas no pueden discrepar. "
+            f"Sigue sin predecir lo que haran las personas: el techo lo abren "
+            f"ellas y un techo cerrado no significa mal tiempo."),
+    }
+
+
 def _night(day: dt.datetime, site: Site, root=None, *,
            with_catalogue: bool = True) -> dict | None:
     night_report = report(day, site, root)
@@ -120,6 +148,14 @@ def _night(day: dt.datetime, site: Site, root=None, *,
         "luna_iluminacion": round(night_report.moon_illumination, 3),
         # La respuesta a la pregunta 1, que es la que manda.
         "probabilidad_de_abrir": round(night_report.opening_probability, 3),
+        # Y la misma respuesta MOJADA. Un 47 % no le dice a nadie si conviene
+        # subir al observatorio: obliga a poner el umbral en la cabeza de quien
+        # lee, y cada uno lo pone donde quiere. Asi que el motor lo pone, y lo
+        # pone donde toca -- al 50 %, que es el corte que minimiza los fallos
+        # cuando equivocarse por arriba cuesta lo mismo que por abajo.
+        # NO es una segunda opinion: es un corte sobre el numero de arriba, asi
+        # que no pueden discrepar nunca.
+        "veredicto_abrir": _veredicto_abrir(night_report.opening_probability),
         # OJO a la diferencia, que confunde y con razon: esto es la suma de la
         # probabilidad utilizable sobre TODA la ventana de producto (del ocaso
         # menos una hora al orto mas una), asi que incluye el crepusculo. Por
@@ -203,22 +239,39 @@ def _night(day: dt.datetime, site: Site, root=None, *,
         # carriles detallan.
         "objetos": ([_objeto(t) for t in ordenados[:CON_TRAZA]]
                     if with_catalogue else []),
-        # Y el ranking de la noche para el desplegable, sin trazas: nombre,
-        # clase y horas es todo lo que hace falta para elegir.
-        "ranking": ([{"nombre": t.target.name, "tipo": t.target.kind,
-                      "clase": t.target.difficulty,
-                      # Con coordenadas: asi el buscador puede coger cualquiera
-                      # del ranking y situarlo en la cupula aunque no lleve
-                      # traza, con la misma geometria que los objetos de fuera.
-                      "ra": t.target.ra_deg, "dec": t.target.dec_deg,
-                      "alias": list(t.target.aliases)[:4],
-                      "horas_si_despeja": round(t.q_conditional, 1),
-                      "horas_esperadas": round(t.q_expected, 1),
-                      "altura_maxima": round(t.max_altitude, 0),
-                      "separacion_luna": round(t.min_moon_separation, 0),
-                      "veredicto": t.verdict}
-                     for t in ordenados[:EN_RANKING] if t.q_conditional > 0]
-                    if with_catalogue else []),
+        # EL CATALOGO ENTERO DE LA NOCHE, y "entero" quiere decir incluyendo lo
+        # que puntua cero. Un objeto con cero horas no es un objeto sin
+        # respuesta: es un objeto con una respuesta mala Y SU MOTIVO, que es
+        # justo lo que alguien quiere leer cuando lo busca. Publicando solo los
+        # que pasaban de cero, el buscador de la web no encontraba M31 con Luna
+        # llena -- el motor SI lo habia puntuado ("el cielo no baja de 20.0
+        # mag/arcsec2: esta clase no cuaja") -- lo mandaba a SIMBAD y lo pintaba
+        # como objeto externo diciendo "el motor NO lo ha puntuado". Mentia.
+        # Sin trazas: nombre, coordenadas, horas y veredicto es todo lo que hace
+        # falta para buscarlo, situarlo en la cupula y decir como le va.
+        "catalogo": ([{"nombre": t.target.name, "tipo": t.target.kind,
+                       "clase": t.target.difficulty,
+                       # Con coordenadas: asi el buscador puede coger cualquiera
+                       # y situarlo en la cupula aunque no lleve traza, con la
+                       # misma geometria que los objetos de fuera.
+                       "ra": t.target.ra_deg, "dec": t.target.dec_deg,
+                       # Seis y no cuatro: el orden de `catalog._alias` pone
+                       # primero la designacion cruda y las formas Messier, asi
+                       # que cortando a cuatro se quedaban fuera "NGC 224" y
+                       # "NGC224" justo en los objetos que la gente busca por
+                       # su numero.
+                       "alias": list(t.target.aliases)[:6],
+                       "horas_si_despeja": round(t.q_conditional, 1),
+                       "horas_esperadas": round(t.q_expected, 1),
+                       "altura_maxima": round(t.max_altitude, 0),
+                       "separacion_luna": round(t.min_moon_separation, 0),
+                       "veredicto": t.verdict,
+                       # El porque viaja con cada uno por la misma regla que
+                       # gobierna el resto del fichero: un numero sin su motivo
+                       # no se publica, y el motivo de un cero es el mas util.
+                       "porque": t.reason}
+                      for t in ordenados]
+                     if with_catalogue else []),
         "catalogo_evaluado": len(universo) if with_catalogue else 0,
         # Lo que un astrofotografo te diria al oido, con los numeros dentro.
         "consejos": evaluate_advice(_condiciones(
@@ -230,11 +283,12 @@ LIMITA_CODIGO = {"cielo": "c", "luna": "l", "fondo": "f", "altura": "a",
                  "ninguno": "n"}
 
 
-# Cuantos objetos se publican con su traza completa -- los que la cupula puede
-# dibujar y los carriles detallar -- y cuantos entran en el ranking del
-# desplegable, que solo necesita nombre y horas.
+# Cuantos objetos se publican con su traza completa: los que la cupula puede
+# dibujar hora a hora y los carriles detallar. El resto de lo evaluado va en
+# `catalogo` sin traza -- la altura se recalcula en el navegador con el mismo
+# tiempo sidereo, que es geometria -- y por eso ya no hay tope: el buscador
+# tiene que poder encontrar cualquier cosa que el motor haya mirado esta noche.
 CON_TRAZA = 40
-EN_RANKING = 150
 
 
 def _suben_esta_noche(times, site) -> list:

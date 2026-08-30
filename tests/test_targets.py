@@ -4,7 +4,7 @@ import datetime as dt
 
 import pytest
 
-from astroweather.ephem import night_for
+from astroweather.ephem import moon_positions, night_for
 from astroweather.seeing import integrate
 from astroweather.targets import (
     CATALOGUE, MOON_FILTER_FACTOR, SKY_GATE, Target, evaluate_night, hourly_yield,
@@ -171,3 +171,34 @@ def test_the_night_is_never_longer_than_itself():
     for times in (night.adaptive_hours(10, 30), night.hours(60), night.hours(5)):
         vano = (times[-1] - times[0]).total_seconds() / 3600
         assert sum(_sample_weights(times)) == pytest.approx(vano, abs=1e-9)
+
+
+def test_separacion_a_la_luna_en_el_mismo_marco_que_la_altura():
+    """La separacion tiene que salir de las MISMAS alturas y azimuts que se
+    publican, no de otro marco de referencia.
+
+    Hasta el 30-08-2026 salia de comparar el objeto en ICRS -- baricentrico --
+    con la Luna en GCRS -- geocentrico -- y entre esos dos marcos hay una
+    traslacion de una unidad astronomica: la Luna quedaba colocada donde se la
+    ve desde el baricentro del sistema solar. El error llegaba a 38 grados, y
+    con la ley de dispersion medida aqui (10^(-theta/48,55)) quince grados ya
+    son un factor dos en el brillo lunar sobre el objeto.
+
+    Se comprueba contra la geometria esferica pura sobre alt/az, que es
+    exactamente lo que hace la cupula del navegador: si las dos cuentas no dan
+    lo mismo, el panel y el motor discrepan sobre la misma noche.
+    """
+    import math
+
+    when = [FULL_MOON.replace(hour=h) for h in (21, 23)] +            [FULL_MOON.replace(hour=2) + dt.timedelta(days=1)]
+    luna = moon_positions(when)
+    for objetivo in CATALOGUE[:12]:
+        alt, az, sep = objetivo.positions(when)
+        for i, m in enumerate(luna):
+            a1, z1, a2, z2 = map(math.radians, (alt[i], az[i], m.altitude, m.azimuth))
+            esperado = math.degrees(math.acos(max(-1.0, min(1.0,
+                math.sin(a1) * math.sin(a2)
+                + math.cos(a1) * math.cos(a2) * math.cos(z1 - z2)))))
+            assert sep[i] == pytest.approx(esperado, abs=0.05), (
+                f"{objetivo.name} a las {when[i]:%H:%M}: el motor dice "
+                f"{sep[i]:.1f} grados y la geometria {esperado:.1f}")

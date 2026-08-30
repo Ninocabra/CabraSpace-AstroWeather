@@ -12,6 +12,65 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 30-08-2026 — La separación a la Luna se medía desde el baricentro del sistema solar
+
+**Cómo salió:** haciendo que el buscador de la web encontrara M31. Al comprobar
+que el número del motor y el que dibuja la cúpula del navegador fueran el mismo,
+no lo eran: para NGC 7635 esa noche el motor decía **70,7°** donde la Luna estaba
+a **55,7°**.
+
+**Qué pasaba.** `Target.positions` calculaba
+`coordinates.separation(get_body("moon", when))`: el objeto en **ICRS**, que es
+*baricéntrico*, contra la Luna en **GCRS**, que es *geocéntrico*. Entre esos dos
+marcos hay una **traslación de una unidad astronómica**, no un giro, así que la
+Luna acababa colocada donde se la ve desde el baricentro del sistema solar.
+Astropy lo avisaba en CADA llamada —«angular separation can depend on the
+direction of the transformation»— y el aviso llevaba semanas leyéndose como ruido
+de la librería: era el número saliendo mal, escrito en la salida de los tests.
+
+**Cuánto importaba.** Sobre los 983 objetos puntuados de la noche del 30-08: error
+**mediano de 23°** y **máximo de 38°** (NGC 1893). Con la ley de dispersión medida
+aquí —10^(−θ/48,55°)— quince grados son un **factor dos** en el brillo lunar sobre
+el objeto, que entra en su rendimiento hora a hora. Cambian las horas de **100
+objetos** (hasta −3,3 h), **seis veredictos** (M57 y M17 mejoran, NGC 1333 e
+IC 143 empeoran) y el primero de la lista de la noche.
+
+**Qué NO tocaba:** la ley lunar en sí. Se ajustó con el fotómetro **cenital**,
+donde θ es la distancia cenital de la Luna (90 − altura) y no pasa por esta
+función; el término del cenit en `targets.py` también la usaba ya así. Sólo estaba
+mal la separación **del objetivo**, que es la que hace direccional al modelo.
+
+**Corregido:** la separación se mide en el MISMO marco que la altura que se
+publica (`altaz.separation(moon.transform_to(frame))`), verificado contra las tres
+formas honestas de calcularlo —los dos en AltAz, los dos en GCRS, y a mano sobre
+la AR/Dec aparente de la Luna—: las tres dan 55,74. Y ahora el motor y la cúpula
+del navegador coinciden dentro de **0,46°** sobre los 40 objetos × 59 marcos, que
+antes discrepaban hasta 38°. Test de regresión en
+`tests/test_targets.py::test_separacion_a_la_luna_en_el_mismo_marco_que_la_altura`.
+
+**Y el fallo de método que lo dejó vivir tanto:** ningún test comparaba la
+separación contra nada. Los 276 que había pasaban con el número mal.
+
+## 30-08-2026 — Se publica el catálogo entero de la noche, no sólo lo que se recomienda
+
+El motor puntuaba ~1.000 objetos y publicaba los ~150 que sacaban horas. Un objeto
+se caía del buscador de la web **exactamente cuando la respuesta era interesante**:
+M31 con Luna llena no aparecía, la web lo mandaba a SIMBAD y lo pintaba como
+objeto externo con el rótulo «el motor NO lo ha puntuado». Lo había puntuado:
+cero, y con el motivo escrito («el cielo no baja de 20.0 mag/arcsec² esta noche:
+esta clase no cuaja»).
+
+`noche.json` cambia `ranking` (top 150 con horas > 0) por **`catalogo`** (todo lo
+evaluado, ordenado, con `porque`). El fichero pasa de 34 a 60 kB comprimidos, que
+es lo que cuesta que el buscador cubra lo que el motor mira. La lista de
+recomendados del desplegable la filtra ya la página.
+
+También nuevo: **`veredicto_abrir`** por noche —Abierto/Cerrado con su umbral y su
+regla dentro— para que la palabra que enseña la página salga del motor y no de un
+corte escrito en el navegador.
+
+---
+
 ## 28-08-2026 — La ley de dispersión lunar del sitio, y el contrato de v8 que resultó falso
 
 **Qué se buscaba:** la "respuesta angular del fotómetro", porque el 28-08 por la
