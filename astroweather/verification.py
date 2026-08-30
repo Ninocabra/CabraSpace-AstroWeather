@@ -162,6 +162,57 @@ def wind_scores(root=None) -> list[dict]:
             for r in rows]
 
 
+def gust_scores(root=None) -> list[dict]:
+    """La racha prevista contra el PICO medido. La unica verdad que se puede tener.
+
+    No hay racha medida en ninguna fuente: la pagina del sitio publica viento
+    MEDIO cada minuto y nada mas, y por eso la puerta de racha llevaba desde el
+    principio sin calibrar y alimentando una decision de seguridad.
+
+    Lo que si se puede medir es el PICO de los promedios: el maximo de las
+    lecturas de viento medio dentro de una hora. No es una racha -- una racha
+    es un pico de 3 segundos y esto son promedios de un minuto submuestreados,
+    asi que es una COTA INFERIOR -- pero es una medida, es monotona con la racha
+    de verdad, y con ella se puede afirmar al menos que la racha prevista no se
+    queda por debajo de un promedio observado, que es un fallo que se ve.
+
+    Se declara lo que es en el nombre y aqui: cota inferior, no verdad terreno.
+    """
+    try:
+        rows = connect(root).execute("""
+            WITH medido AS (
+                SELECT site_id, date_trunc('hour', t_utc) AS hora,
+                       max(wind) AS pico, count(*) AS muestras
+                FROM measurements
+                WHERE wind IS NOT NULL AND source = 'astrocamp_meteo'
+                GROUP BY 1, 2
+            ),
+            previsto AS (
+                SELECT site_id, valid_utc AS hora, model,
+                       median(gust10m) AS racha
+                FROM forecasts WHERE gust10m IS NOT NULL AND member IS NULL
+                GROUP BY 1, 2, 3
+            )
+            SELECT p.model, count(*) AS n,
+                   avg(p.racha - m.pico) AS sesgo,
+                   avg(m.pico) AS pico_medio,
+                   avg(p.racha) AS racha_media,
+                   -- Lo que de verdad se quiere saber: cuantas veces la racha
+                   -- prevista se queda POR DEBAJO de un promedio ya observado.
+                   -- Eso no es incertidumbre, es estar mal.
+                   avg(CASE WHEN p.racha < m.pico THEN 1.0 ELSE 0.0 END) AS por_debajo
+            FROM previsto p JOIN medido m USING (site_id, hora)
+            WHERE m.muestras >= 2
+            GROUP BY p.model ORDER BY n DESC
+        """).fetchall()
+    except Exception:
+        return []
+    return [{"model": r[0], "n": r[1], "bias": r[2], "observed_peak": r[3],
+             "forecast_gust": r[4], "below_observed": r[5],
+             "trustworthy": r[1] >= MIN_WIND_PAIRS}
+            for r in rows]
+
+
 def wind_correction(root=None, model: str | None = None) -> dict:
     """El factor por el que multiplicar la racha prevista, si se puede.
 

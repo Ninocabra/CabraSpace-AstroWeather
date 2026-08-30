@@ -35,12 +35,14 @@ def test_airglow_follows_solar_activity_slowly():
 
 def test_the_budget_says_where_every_magnitude_came_from():
     entry = budget([NIGHT])[0]
-    # Contra el suelo EN USO, no contra la constante: desde el 29-08-2026 el
-    # suelo se remide cada dia contra el fotometro, porque el cielo de aqui
-    # se ha oscurecido 0,56 mag desde 2019 y una constante no describe
-    # ningun anio. La constante sigue siendo el respaldo cuando no hay
-    # archivo, y por eso este test vale en las dos situaciones.
-    assert entry.natural_floor == epoch_floor()
+    # Contra el suelo DE SU PROPIO INSTANTE, que desde el 30-08-2026 no es el
+    # de hoy: el suelo se remide cada dia contra el fotometro y ademas se
+    # guarda su DERIVA, porque el cielo de aqui se ha oscurecido medio punto de
+    # magnitud desde 2019 y aplicarle a una noche de 2019 el suelo de 2026 mete
+    # 0,44 mag justo donde se deriva la verdad terreno de nubes. Sin serie
+    # medida `epoch_floor(t)` devuelve el numero unico, asi que esto vale en
+    # las dos situaciones.
+    assert entry.natural_floor == pytest.approx(float(epoch_floor(NIGHT)), abs=1e-9)
     assert entry.zodiacal <= 0            # brightening, so it lowers the number
     assert "suelo natural" in entry.breakdown
     assert 20.5 < entry.total_mag < 22.2
@@ -119,3 +121,25 @@ def test_the_zenith_helpers_still_agree_with_the_general_one():
 
     general = natural_background([NIGHT], [90.0], [0.0])[0]
     assert general == pytest.approx(budget([NIGHT])[0].total_mag, abs=1e-9)
+
+
+def test_el_suelo_de_2019_no_es_el_de_2026():
+    """La deriva medida tiene que llegar al modelo, no quedarse en el fichero.
+
+    Es la diferencia entre releer el archivo bien y releerlo con el cielo de
+    hoy: sobre 15.514 horas estables, el residuo del modelo iba de -0,374 en
+    2019 a +0,064 en 2026 con un suelo unico, y de -0,002 a +0,057 con la
+    serie. Si esta afirmacion deja de cumplirse es que la serie se ha perdido y
+    la verdad terreno vuelve a llevar dentro una rampa de siete anios.
+    """
+    import datetime as dt
+
+    from astroweather.skybackground import _serie_suelo
+
+    if not _serie_suelo():
+        pytest.skip("sin serie medida en esta maquina")
+
+    viejo = float(epoch_floor(dt.datetime(2019, 9, 1, tzinfo=dt.timezone.utc)))
+    reciente = float(epoch_floor(dt.datetime(2026, 6, 1, tzinfo=dt.timezone.utc)))
+    assert reciente > viejo, "el cielo se ha oscurecido; el suelo tiene que subir"
+    assert 0.2 < reciente - viejo < 1.0, f"deriva implausible: {reciente - viejo:+.3f} mag"

@@ -99,6 +99,46 @@ from .skymodel import predict
 CLEAR_SCATTER_THRESHOLD = 0.10
 MIN_SAMPLES_PER_HOUR = 4
 
+# LA VERDAD MEDIA LA LUNA, y esto es lo que quedaba de ese fallo (30-08-2026).
+#
+# El umbral de arriba se aplicaba igual con Luna que sin ella, y el residuo NO
+# tiene el mismo ruido en los dos casos: la ley de dispersion lunar cae como
+# 10^(-theta/48,55), asi que cualquier error pequenio en ella se convierte en
+# una rampa DENTRO de la hora. Medido sobre horas con 0-10 % de nubes previstas
+# -- o sea casi con seguridad limpias, y con una fuente independiente de
+# nuestra etiqueta -- la dispersion mediana del residuo es:
+#
+#     Luna bajo -6 grados   0,0180
+#     Luna arriba           0,0339      -> factor 1,89
+#
+# Con un umbral fijo, eso rechazaba una de cada cuatro horas limpias con Luna:
+# la sensibilidad caia del 96,4 % sin Luna al 75,6 % con ella, y la etiqueta
+# correlaba con la altura lunar a r = -0,39. La verdad terreno de NUBES estaba
+# midiendo la Luna.
+#
+# EL FACTOR SALE DE LA MEDIDA, no de cuadrar el resultado, y esa distincion
+# importa porque el resultado se puede cuadrar solo: ensanchando el umbral la
+# tasa de despejado sube siempre. Lo que dice que 1,89 es el numero honesto es
+# que a ese valor los dos regimenes pasan a EQUIVOCARSE IGUAL -- con 90-100 %
+# de nubes previstas se etiqueta despejado el 53,1 % de las veces sin Luna y el
+# ~50 % con ella, cuando con el umbral fijo era 53,1 % contra 21,0 %. Ese 53 %
+# alto en ambos casos no es nuestro fallo: es que una prevision de 90-100 % de
+# nubes acierta poco en Nerpio, y por eso sirve para comparar regimenes entre
+# si pero no como medida de acierto absoluto.
+#
+# Lo que NO arregla: con Luna la sensibilidad se queda en 85,7 % contra 96,4 %.
+# Queda un resto de 10 puntos que ya no es umbral, es que el modelo lunar tiene
+# mas error del que tiene el modelo sin Luna. Se declara en vez de taparse
+# ensanchando mas.
+MOON_UP_ALTITUDE = -6.0
+MOON_NOISE_FACTOR = 1.89
+
+
+def scatter_threshold(moon_altitude: float) -> float:
+    """El umbral de dispersion que le toca a esa hora segun donde este la Luna."""
+    return (CLEAR_SCATTER_THRESHOLD * MOON_NOISE_FACTOR
+            if moon_altitude > MOON_UP_ALTITUDE else CLEAR_SCATTER_THRESHOLD)
+
 # Scatter alone is NOT enough, and this was a real hole in the truth chain
 # (external audit, 2026-08-27). A flat, homogeneous stratus deck holds the
 # photometer at a CONSTANT reading for a whole hour, so its scatter is tiny and
@@ -147,8 +187,31 @@ MIN_SAMPLES_PER_HOUR = 4
 # queda entre 67 y 77 %), pero al ritmo actual de +0,08 mag/anio el nivel mediano
 # alcanza la tolerancia hacia **2031**, y mucho antes empieza a sesgar. Cuando se
 # resuelva 2.2 bis, esto se re-deriva con un termino temporal en vez de una media.
-CLEAR_LEVEL_CENTRE = -0.016
-CLEAR_LEVEL_TOLERANCE = 0.687
+# RE-DERIVADOS EL 30-08-2026 contra el modelo con el SUELO DE EPOCA.
+#
+# La deuda que dejaba el bloque de arriba ("cuando se resuelva 2.2 bis, esto se
+# re-deriva con un termino temporal") vencia aqui. El suelo dejo de ser una
+# constante de siete anios el 29-08, pero quedo siendo UN numero: el de hoy,
+# aplicado tambien a 2019, cuando el cielo era medio punto de magnitud mas
+# claro. Sobre 15.514 horas estables el residuo salia asi:
+#
+#     anio    2019    2020    2021    2022    2023    2024    2025    2026
+#     centro -0,374  -0,374  -0,405  -0,312  -0,244  -0,182  -0,071  +0,064
+#
+# Una rampa de 0,437 mag que no es del modelo: es el cielo cambiando debajo. Y
+# se comia el 64 % de la tolerancia sin que nadie lo notara, porque la
+# tolerancia era ancha.
+#
+# Con `epoch_floor(when)` -- el suelo interpolado de la serie medida, 22 puntos
+# de 2019 a 2026 -- el rango entre anios cae a 0,077 mag y el centro global de
+# -0,239 a +0,000. El modelo pasa a ser insesgado en TODAS las epocas, no en la
+# media de todas.
+#
+# Sobre 11.790 horas estables de noches de AJUSTE: centro robusto +0,0007,
+# sigma robusta 0,1704 (era 0,2290: la deriva la inflaba una cuarta parte),
+# corte a tres sigmas.
+CLEAR_LEVEL_CENTRE = 0.001
+CLEAR_LEVEL_TOLERANCE = 0.511
 
 # La Luna dentro del campo del fotometro no es brillo de cielo: el instrumento
 # la esta mirando. Son 144 muestras de 131.096 -- solo ocurre cerca de una
@@ -230,6 +293,7 @@ def observed_clear_hours(since: str = "2024-02-01", root=None) -> dict[dt.dateti
 
     predictions = predict([t for t, _ in rows])
     by_hour: dict[dt.datetime, list[float]] = defaultdict(list)
+    moon_by_hour: dict[dt.datetime, float] = {}
     for (time, measured), clear_sky in zip(rows, predictions):
         if clear_sky.sun_altitude >= -18.0:       # deep night only
             continue
@@ -238,9 +302,14 @@ def observed_clear_hours(since: str = "2024-02-01", root=None) -> dict[dt.dateti
         key = time.astimezone(dt.timezone.utc).replace(
             minute=0, second=0, microsecond=0, tzinfo=None)
         by_hour[key].append(measured - clear_sky.predicted_mag)
+        # La Luna MAS ALTA de la hora: es la que marca cuanto ruido puede meter
+        # su ley en el residuo, y quedarse con la media dejaria pasar por
+        # tranquila una hora en la que la Luna sale.
+        moon_by_hour[key] = max(moon_by_hour.get(key, -90.0),
+                                clear_sky.moon_altitude)
 
     return {
-        hour: (float(np.std(values)) < CLEAR_SCATTER_THRESHOLD
+        hour: (float(np.std(values)) < scatter_threshold(moon_by_hour[hour])
                and abs(float(np.mean(values)) - CLEAR_LEVEL_CENTRE)
                < CLEAR_LEVEL_TOLERANCE)
         for hour, values in by_hour.items()

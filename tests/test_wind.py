@@ -7,6 +7,10 @@ una puerta de seguridad ajustada con veintinueve horas de agosto es ruido con
 autoridad, y el error caeria del lado de abrir cuando no se debe.
 """
 
+import datetime as dt
+
+import pytest
+
 from astroweather import verification
 
 
@@ -59,3 +63,55 @@ def test_the_uncalibrated_gate_says_so_in_the_published_json(monkeypatch):
     avisos = webexport.build(nights=1)["confianza"]["avisos"]
 
     assert any("viento" in a.lower() and "optimista" in a.lower() for a in avisos)
+
+
+def test_la_correccion_medida_llega_a_la_puerta(monkeypatch):
+    """Se medía desde el 29-08-2026 y la puerta seguia con la racha CRUDA.
+
+    El modelo prevé el 55 % del viento medio real en este sitio -- terreno de
+    montania contra una celda de 25 km -- y eso se publicaba como aviso al pie
+    del panel mientras la puerta de seguridad decidia con el numero corto. Un
+    aviso no cierra un techo.
+    """
+    from astroweather import tonight
+
+    vistos = []
+    real = tonight.evaluate
+
+    def espia(*, t_utc, hours_ahead, gust, **resto):
+        vistos.append(gust)
+        return real(t_utc=t_utc, hours_ahead=hours_ahead, gust=gust, **resto)
+
+    monkeypatch.setattr(tonight, "evaluate", espia)
+    monkeypatch.setattr(tonight, "wind_correction",
+                        lambda root=None: {"factor": 2.0, "applied": True})
+
+    fila = (dt.datetime(2026, 9, 1, 22, tzinfo=dt.timezone.utc), 10.0, 3.0, 6.0,
+            0.0, 0.0, 0.0, 6)
+    monkeypatch.setattr(tonight, "_forecast_rows", lambda *a, **k: [fila])
+    tonight.report(dt.datetime(2026, 9, 1, 12, tzinfo=dt.timezone.utc))
+
+    assert vistos, "la puerta no llego a evaluarse"
+    assert vistos[0] == pytest.approx(12.0), (
+        f"la racha llego a la puerta como {vistos[0]} en vez de corregida")
+
+
+def test_sin_pares_suficientes_no_se_corrige_nada(monkeypatch):
+    """Una correccion sacada de 48 horas de agosto no sabe del viento de enero.
+
+    Mientras `wind_correction` no la de por fiable, el factor es 1,0 y la
+    puerta ve exactamente lo que preve el modelo: peor, pero declarado.
+    """
+    from astroweather import tonight
+
+    vistos = []
+    monkeypatch.setattr(tonight, "evaluate",
+                        lambda *, t_utc, hours_ahead, gust, **r:
+                        (vistos.append(gust) or tonight.SafetyVerdict(t_utc, [])))
+    monkeypatch.setattr(tonight, "wind_correction",
+                        lambda root=None: {"factor": 1.0, "applied": False})
+    fila = (dt.datetime(2026, 9, 1, 22, tzinfo=dt.timezone.utc), 10.0, 3.0, 6.0,
+            0.0, 0.0, 0.0, 6)
+    monkeypatch.setattr(tonight, "_forecast_rows", lambda *a, **k: [fila])
+    tonight.report(dt.datetime(2026, 9, 1, 12, tzinfo=dt.timezone.utc))
+    assert vistos[0] == pytest.approx(6.0)

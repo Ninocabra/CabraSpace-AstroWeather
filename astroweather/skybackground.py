@@ -53,7 +53,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
 import numpy as np
@@ -99,26 +99,165 @@ FLOOR_FICHERO = "sky_floor.json"
 
 
 @lru_cache(maxsize=1)
-def epoch_floor() -> float:
-    """El suelo natural de la EPOCA, o la constante si no se ha medido aun.
-
-    Nunca lanza y nunca tarda: lee un fichero. Si no esta, devuelve la
-    constante de siete anios y el producto sigue funcionando -- peor, pero
-    funcionando -- que es lo que tiene que hacer un numero tan central.
-    """
+def _suelo_fichero() -> dict:
+    """Lo que hay escrito del suelo. `{}` si no hay nada legible."""
     try:
         from .archive import DATA_ROOT
         ruta = DATA_ROOT / FLOOR_FICHERO
         if not ruta.exists():
-            return NATURAL_FLOOR_MAG
+            return {}
         import json
-        datos = json.loads(ruta.read_text(encoding="utf-8"))
-        suelo = float(datos["suelo"])
-        # Un suelo fuera de lo fisicamente razonable es un fichero corrupto, no
-        # un descubrimiento.
-        return suelo if 20.0 <= suelo <= 22.5 else NATURAL_FLOOR_MAG
+        return json.loads(ruta.read_text(encoding="utf-8"))
     except Exception:
-        return NATURAL_FLOOR_MAG
+        return {}
+
+
+def _plausible(valor) -> float | None:
+    """Un suelo fuera de lo fisicamente razonable es un fichero corrupto."""
+    try:
+        suelo = float(valor)
+    except (TypeError, ValueError):
+        return None
+    return suelo if 20.0 <= suelo <= 22.5 else None
+
+
+@lru_cache(maxsize=1)
+def _suelo_actual() -> float:
+    return _plausible(_suelo_fichero().get("suelo")) or NATURAL_FLOOR_MAG
+
+
+@lru_cache(maxsize=1)
+def _serie_suelo() -> tuple[tuple[float, float], ...]:
+    """La deriva medida, como (instante en segundos UTC, suelo)."""
+    puntos = []
+    for punto in _suelo_fichero().get("serie") or ():
+        suelo = _plausible(punto.get("suelo"))
+        if suelo is None:
+            continue
+        try:
+            cuando = datetime.fromisoformat(punto["centro"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if cuando.tzinfo is None:
+            cuando = cuando.replace(tzinfo=timezone.utc)
+        puntos.append((cuando.timestamp(), suelo))
+    return tuple(sorted(puntos))
+
+
+def epoch_floor(when=None):
+    """El suelo natural del sitio. Sin argumento, el de AHORA.
+
+    EL SUELO NO ES UNA CONSTANTE Y TAMPOCO ES UN NUMERO: es una deriva. El
+    29-08-2026 se jubilo la constante de siete anios porque promediaba una rampa
+    de +0,565 mag (2019 21,300 -> 2026 21,865), y quedo un unico valor medido
+    sobre los ultimos 400 dias. Para predecir esta noche eso es exacto. Para
+    releer el archivo NO: aplicarle a una noche de 2019 el suelo de 2026 mete
+    0,44 mag de error, y ahi es donde se deriva la verdad terreno de nubes.
+    Medido sobre 15.514 horas estables, el residuo del modelo iba de -0,374 en
+    2019 a +0,064 en 2026 -- una rampa monotona que no es del modelo, es el
+    cielo cambiando debajo.
+
+    Con `when` (un instante o un array de instantes) se interpola la serie
+    medida y se acota a sus extremos: fuera del archivo no se extrapola una
+    tendencia, se usa el punto conocido mas cercano. Extrapolar una deriva es
+    exactamente como se invento la constante que acabamos de jubilar.
+    """
+    if when is None:
+        return _suelo_actual()
+
+    serie = _serie_suelo()
+    escalar = not hasattr(when, "__len__") or isinstance(when, (str, bytes))
+    instantes = [when] if escalar else list(when)
+    if not serie:
+        # Sin serie medida, el comportamiento de siempre: un numero para todo.
+        actual = _suelo_actual()
+        return actual if escalar else np.full(len(instantes), actual)
+
+    xs = np.array([p[0] for p in serie], dtype=float)
+    ys = np.array([p[1] for p in serie], dtype=float)
+    marcas = np.array([t.timestamp() if hasattr(t, "timestamp") else float(t)
+                       for t in instantes], dtype=float)
+    valores = np.interp(marcas, xs, ys)     # np.interp ya acota en los extremos
+    return float(valores[0]) if escalar else valores
+
+
+def fit_floor_series(root=None, paso_dias: int = 120,
+                     ventana_dias: int = 400) -> dict:
+    """La deriva del suelo a lo largo de TODO el archivo, y la deja escrita.
+
+    Es la MISMA definicion de `fit_epoch_floor` -- el suelo que anula el sesgo
+    del modelo en horas sin Luna y noche cerrada -- aplicada a una ventana que
+    se desliza en vez de a la ultima. Se reutiliza la formula a proposito: dos
+    maneras de medir el mismo numero es como se llega a que discrepen.
+
+    Una pasada de `predict` para todo el archivo y despues se reparte por
+    ventanas, en vez de una pasada por ventana: son las mismas efemerides.
+    """
+    import json
+
+    from .archive import DATA_ROOT, utcnow
+    from .ephem import moon_positions, sun_positions
+    from .queries import connect
+    from .skymodel import predict
+
+    filas = connect(root).execute("""
+        SELECT date_trunc('hour', t_utc) AS h, median(sky_mag_raw) AS m
+        FROM measurements
+        WHERE instrument_type = 'TESS' AND sky_mag_raw IS NOT NULL
+        GROUP BY 1 HAVING count(*) >= 20 ORDER BY 1
+    """).fetchall()
+    if not filas:
+        return {"medido": False, "porque": "sin lecturas del fotometro"}
+
+    tiempos = [f[0].replace(tzinfo=timezone.utc) for f in filas]
+    medidos = [float(f[1]) for f in filas]
+    soles = sun_positions(tiempos, NERPIO)
+    lunas = moon_positions(tiempos, NERPIO)
+    limpios = [(t, m) for t, m, sol, luna in zip(tiempos, medidos, soles, lunas)
+               if sol.altitude < -18.0 and luna.altitude <= -6.0 and 18.0 < m < 22.6]
+    if len(limpios) < FLOOR_MIN_HORAS:
+        return {"medido": False, "n": len(limpios), "porque": "muy pocas horas limpias"}
+
+    predicciones = predict([t for t, _ in limpios], NERPIO)
+    residuos = [(t, p.predicted_mag - m)
+                for (t, m), p in zip(limpios, predicciones)
+                if p.is_night and p.is_trustworthy]
+
+    inicio, final = residuos[0][0], residuos[-1][0]
+    media_ventana = timedelta(days=ventana_dias / 2)
+    serie, centro = [], inicio + media_ventana
+    while centro - media_ventana <= final:
+        dentro = [d for t, d in residuos
+                  if abs((t - centro).total_seconds()) <= media_ventana.total_seconds()]
+        if len(dentro) >= FLOOR_MIN_HORAS:
+            # Misma cuenta que `fit_epoch_floor`: el desplazamiento del modelo
+            # con el suelo es 1:1, asi que restar el sesgo es exacto. Y el
+            # suelo de partida es EL QUE USO EL MODELO en esa ventana, no el
+            # de hoy: asi la medida es iterativa y converge -- la primera
+            # pasada parte del numero unico, la siguiente ya parte de la serie
+            # y solo corrige lo que quede. Restar siempre el actual haria que
+            # cada pasada volviera a aplicar la misma correccion.
+            usado = float(epoch_floor(centro))
+            serie.append({
+                "centro": centro.isoformat(timespec="seconds"),
+                "suelo": round(usado - sum(dentro) / len(dentro), 3),
+                "sesgo": round(sum(dentro) / len(dentro), 3),
+                "n": len(dentro),
+            })
+        centro += timedelta(days=paso_dias)
+
+    resultado = dict(_suelo_fichero())
+    resultado["serie"] = serie
+    resultado["serie_ajustada_el"] = utcnow().isoformat()
+    resultado["serie_paso_dias"] = paso_dias
+    resultado["serie_ventana_dias"] = ventana_dias
+    ruta = (root or DATA_ROOT) / FLOOR_FICHERO
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(json.dumps(resultado, indent=1), encoding="utf-8")
+    _suelo_fichero.cache_clear()
+    _suelo_actual.cache_clear()
+    _serie_suelo.cache_clear()
+    return resultado
 
 
 def fit_epoch_floor(dias: int = FLOOR_VENTANA_DIAS, root=None) -> dict:
@@ -195,7 +334,9 @@ def fit_epoch_floor(dias: int = FLOOR_VENTANA_DIAS, root=None) -> dict:
     ruta = (root or DATA_ROOT) / FLOOR_FICHERO
     ruta.parent.mkdir(parents=True, exist_ok=True)
     ruta.write_text(json.dumps(resultado, indent=1), encoding="utf-8")
-    epoch_floor.cache_clear()
+    _suelo_fichero.cache_clear()
+    _suelo_actual.cache_clear()
+    _serie_suelo.cache_clear()
     return resultado
 
 
@@ -357,14 +498,16 @@ def natural_background(times: list[datetime], altitudes_deg, azimuths_deg,
     elongations = np.abs(((np.asarray(ecliptic.lon.deg, dtype=float)
                            - np.asarray(sun.lon.deg, dtype=float) + 180) % 360) - 180)
     galactic_latitudes = np.asarray(pointing.galactic.b.deg, dtype=float)
-    floor_flux = mag_to_nl(epoch_floor())
+    # El suelo DE CADA INSTANTE, no el de hoy para todo: releer el archivo con
+    # el suelo actual mete 0,44 mag en las noches de 2019.
+    floor_flux = [mag_to_nl(m) for m in np.asarray(epoch_floor(times), dtype=float)]
     airglow = airglow_excess(f107)
     values = []
     for index in range(len(latitudes)):
         zodiacal = zodiacal_excess(float(latitudes[index]),
                                    float(elongations[index]))
         galactic = galactic_excess(float(galactic_latitudes[index]))
-        values.append(nl_to_mag(floor_flux * (
+        values.append(nl_to_mag(floor_flux[index] * (
             1.0
             + (10 ** (0.4 * zodiacal) - 1.0)
             + (10 ** (0.4 * galactic) - 1.0)
@@ -382,9 +525,11 @@ def budget(times: list[datetime], site: Site = NERPIO, *,
     """
     latitudes, elongations = zenith_ecliptic(times, site)
     galactic_latitudes = zenith_galactic(times, site)
-    floor_flux = mag_to_nl(epoch_floor())
+    floor_flux_por_instante = [mag_to_nl(m)
+                               for m in np.asarray(epoch_floor(times), dtype=float)]
     results = []
     for index, when in enumerate(times):
+        floor_flux = floor_flux_por_instante[index]
         zodiacal = zodiacal_excess(float(latitudes[index]), float(elongations[index]))
         galactic = galactic_excess(float(galactic_latitudes[index]))
         airglow = airglow_excess(f107)
@@ -402,7 +547,7 @@ def budget(times: list[datetime], site: Site = NERPIO, *,
         total = nl_to_mag(natural_flux + pollution_flux)
         results.append(SkyBudget(
             t_utc=when,
-            natural_floor=epoch_floor(),
+            natural_floor=float(epoch_floor(when)),
             zodiacal=-zodiacal,
             galactic=-galactic,
             airglow=-airglow,

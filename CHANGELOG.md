@@ -12,6 +12,99 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 30-08-2026 — El suelo pasa a ser una serie, y la verdad de nubes deja de medir la Luna
+
+Tres deudas que venían con fecha puesta, cerradas juntas porque son la misma
+cadena: el suelo → el residuo del modelo → la etiqueta de despejado → el
+calibrador → la probabilidad que se publica.
+
+### El suelo era un número donde hacía falta una curva
+
+El 29-08 se jubiló `NATURAL_FLOOR_MAG = 21.71` por promediar una rampa de siete
+años. Lo que quedó fue **un** número: el de hoy, medido sobre 400 días… aplicado
+también a 2019. Sobre 15.514 horas estables, el residuo del modelo salía así:
+
+| año | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
+|---|---|---|---|---|---|---|---|---|
+| centro | −0,374 | −0,374 | −0,405 | −0,312 | −0,244 | −0,182 | −0,071 | +0,064 |
+
+Una rampa de **0,437 mag** que no es del modelo: es el cielo cambiando debajo, y
+se comía el 64 % de la tolerancia de la verdad terreno sin que se notara.
+
+`fit_floor_series` mide la deriva con **la misma definición** que `fit_epoch_floor`
+—el suelo que anula el sesgo en horas sin Luna— aplicada a una ventana que se
+desliza: 22 puntos de 2019-09 (21,585) a 2026-08 (22,056). `epoch_floor(when)`
+interpola y **acota en los extremos**: fuera del archivo no se extrapola una
+tendencia, que es exactamente como se inventó la constante que acabamos de
+jubilar. Sin argumento sigue devolviendo el de hoy, así que el producto no
+cambia de camino.
+
+Resultado: rango entre años **0,437 → 0,077 mag**, centro global **−0,239 → +0,000**,
+sigma 0,309 → 0,243. Constantes re-derivadas sobre 11.790 horas de ajuste:
+`CLEAR_LEVEL_CENTRE` −0,0164 → **+0,001**, `CLEAR_LEVEL_TOLERANCE` 0,687 → **0,511**
+(tres sigmas robustas; la sigma bajó de 0,2290 a 0,1704 porque la deriva la
+inflaba una cuarta parte).
+
+### La verdad de nubes medía la Luna, y era el umbral de dispersión
+
+`CLEAR_SCATTER_THRESHOLD = 0.10` se aplicaba igual con Luna que sin ella, y el
+residuo no tiene el mismo ruido en los dos casos: la ley lunar cae como
+10^(−θ/48,55), así que un error pequeño en ella se vuelve una rampa **dentro** de
+la hora. Medido sobre horas con 0-10 % de nubes previstas —fuente independiente
+de nuestra etiqueta— la dispersión mediana del residuo es 0,0180 sin Luna y
+0,0339 con ella: **factor 1,89**.
+
+Con umbral fijo eso rechazaba una de cada cuatro horas limpias con Luna. El
+desglose por régimen lo dejaba claro: el rechazo por **dispersión** pasaba de
+10,4 % a 46,8 % mientras el de nivel apenas se movía de 2,4 % a 13,1 %.
+
+| | sensibilidad sin/con Luna | falso claro sin/con Luna | r(etiqueta, altura lunar) |
+|---|---|---|---|
+| umbral fijo | 96,4 % / 75,6 % | 53,1 % / 21,0 % | −0,393 |
+| umbral ×1,89 | 96,4 % / 85,7 % | 53,1 % / ~50 % | **−0,275** |
+
+**El factor sale de la medida, no de cuadrar el resultado**, y la distinción
+importa porque el resultado se cuadra solo: ensanchando el umbral la tasa de
+despejado sube siempre. Lo que dice que 1,89 es honesto es que a ese valor los
+dos regímenes pasan a **equivocarse igual** — con umbral fijo la Luna no daba
+más especificidad, daba rechazo indiscriminado. (Ese 53 % de falso claro sin
+Luna no es nuestro: es que una previsión de 90-100 % de nubes acierta poco aquí,
+así que sirve para comparar regímenes y no como acierto absoluto.)
+
+**Lo que NO arregla:** con Luna la sensibilidad se queda en 85,7 % contra 96,4 %.
+Quedan diez puntos que ya no son umbral, es que el modelo lunar tiene más error
+que el modelo sin Luna. Se declara en vez de taparse ensanchando más.
+
+### El calibrador, refitado
+
+Brier **0,169 → 0,136**; climatología 0,192 → 0,149. El **BSS baja de +11,7 % a
++9,1 %**, y hay que decir por qué: la tasa base de despejado sube del 74,1 % al
+81,8 % —ya no se rechazan las horas limpias con Luna— así que la climatología es
+un rival más difícil. La previsión acierta más en absoluto y saca menos ventaja
+relativa. Efecto en el producto: P(abrir) de esta noche 0,879 → 0,920.
+
+### La puerta de viento: la corrección se medía y no se aplicaba
+
+`wind_correction()` mide desde el 29-08 que el modelo prevé el **55 %** del
+viento medio real (terreno de montaña contra una celda de 25 km) y eso viajaba
+al panel **como aviso** mientras `tonight.report` seguía pasándole a la puerta la
+racha **cruda**. Un aviso no cierra un techo: ahora el factor se aplica, y
+mientras no haya pares suficientes vale 1,0 y el aviso sigue en pie (hoy: 48
+pares de los 200 que exige `MIN_WIND_PAIRS`).
+
+Aplicar al racheado el factor del viento medio es un supuesto y se declara: no
+hay racha medida en ninguna fuente —la página del sitio publica media— pero las
+dos salen de la misma celda y el mismo esquema, y el supuesto falla del lado
+seguro (sube la racha, cierra antes).
+
+Y se crea la verdad que faltaba: `gust_scores()` compara la racha prevista con
+el **pico** de los promedios medidos en la hora. No es una racha —es una cota
+inferior, y el nombre y el docstring lo dicen— pero ya da un número accionable:
+en el **14,6 %** de las horas la racha prevista queda **por debajo de un promedio
+ya observado**, y eso no es incertidumbre, es estar mal.
+
+---
+
 ## 30-08-2026 — La allsky escribía magnitudes instrumentales en la columna del fotómetro
 
 Salió preguntándose por qué el panel no enseñaba «Cielo medido». La respuesta

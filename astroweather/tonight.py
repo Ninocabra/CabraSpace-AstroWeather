@@ -18,6 +18,7 @@ from dataclasses import dataclass
 
 from .calibration import Calibrator
 from .ephem import moon_illumination, moon_positions, night_for
+from .verification import wind_correction
 from .gates import SafetyVerdict, evaluate, opening_probability, probability_usable
 from .queries import connect
 from .site import NERPIO, Site
@@ -129,11 +130,31 @@ def report(day: dt.datetime | None = None, site: Site = NERPIO, root=None) -> Ni
     times = [r[0] for r in rows]
     moon = {p.t_utc: p for p in moon_positions(times, site)} if times else {}
 
+    # LA CORRECCION DE VIENTO, APLICADA. Se medía desde el 29-08-2026 y se
+    # publicaba como aviso al pie del panel, pero la puerta seguia comiendose la
+    # racha CRUDA: el modelo prevé el 55 % del viento medio real en este sitio
+    # -- terreno de montania contra una celda de 25 km -- asi que una puerta de
+    # seguridad estaba decidiendo con un numero corto y el aviso solo servia
+    # para que la culpa fuera del lector.
+    #
+    # Aplicar al racheado el factor medido sobre el viento MEDIO es un supuesto,
+    # y se declara: no hay verdad terreno de racha en ninguna fuente (la pagina
+    # del sitio publica media, no racha). Lo que lo sostiene es que las dos
+    # salen de la MISMA celda y el mismo esquema de capa limite, asi que el
+    # defecto de representatividad del terreno las afecta igual. Y falla del
+    # lado seguro: sube la racha, o sea cierra antes.
+    #
+    # No se aplica hasta que hay pares suficientes (`wind_correction` decide), y
+    # mientras tanto el factor es 1,0 y el aviso sigue en pie.
+    correccion = wind_correction(root)
+    factor = float(correccion.get("factor", 1.0) or 1.0)
+
     hours: list[HourForecast] = []
     for valid, cloud, wind, gust, precipitation, probability, cape, lead in rows:
         hours_ahead = max(0.0, (valid - now).total_seconds() / 3600)
         verdict = evaluate(
-            t_utc=valid, hours_ahead=hours_ahead, gust=gust,
+            t_utc=valid, hours_ahead=hours_ahead,
+            gust=(gust * factor if gust is not None else None),
             precipitation=precipitation, precipitation_probability=probability,
             cape=cape,
         )
