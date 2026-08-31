@@ -7,21 +7,15 @@
 # 28-08 no tiene NI UNA fila. La pagina de AstroCamp solo publica el "ahora":
 # una lectura no raspada es una lectura que nunca existio.
 #
-# CADA 30 MINUTOS, Y ESE NUMERO ESTA MEDIDO. En Actions no se paga el trabajo
-# -- raspar cloud.html son 0,1 s -- se paga ARRANCAR el runner, redondeado al
-# minuto. El repo del motor es privado, asi que los minutos cuentan contra los
-# 2.000 gratis al mes:
+# LO QUE SE PAGA ES ARRANCAR, NO TRABAJAR. Raspar cloud.html son 0,1 s, pero
+# GitHub redondea cada job al minuto: el coste lo fija cuantas veces arrancas,
+# no cuanto haces dentro. El repo del motor es privado, asi que los minutos
+# cuentan contra los 2.000 gratis al mes. La cuenta entera, con el consumo real
+# de agosto medido, esta abajo en el bloque de `schedule`.
 #
-#   48 pasadas/dia x ~1 min          = 43 min/dia (las normales)
-#   + 4 con prevision, web y publicar =  8 min/dia
-#   + 1 con el lote diario            =  3 min/dia
-#   -------------------------------------------------
-#                                       54 min/dia = ~1.650 min/mes
-#
-# Cada 5 minutos serian ~13.900 min/mes, unos 95 $/mes. Se cambia resolucion de
-# archivo por coste cero, y se declara: el panel no lo nota (coge los sensores
-# en vivo al exportar), pero el archivo de sensores pasa de 288 muestras al dia
-# a 48 y eso no se recupera.
+# Y EL RITMO NO LO PONE EL CRON DE GITHUB, que se midio y sirve una cita cada
+# dos horas: lo pone un reloj de fuera que llama a `workflow_dispatch`. Tambien
+# abajo, con las lineas exactas.
 #
 # QUE HACE FALTA PARA QUE ESTO ARRANQUE (secretos del repositorio):
 #
@@ -32,57 +26,100 @@
 #   ADS_URL         \ las dos de Copernicus ADS, tambien de `.env`.
 #   ADS_KEY         /
 #
-# Y en el escritorio, APAGAR la tarea programada cuando esto lleve un dia
-# funcionando. Los dos a la vez no rompen nada -- el deduplicador de
-# `queries.py` absorbe lo repetido -- pero duplican pasadas y commits.
+# Y FUERA DE GITHUB, el reloj: un job en cron-job.org que hace POST a
+# `/actions/workflows/colector.yml/dispatches` con un PAT fine-grained acotado
+# a ESTE repositorio y con un solo permiso, `Actions: read and write`. Ese
+# token NO es un secreto del repositorio y no esta en Settings -> Secrets: vive
+# en cron-job.org, que es lo unico que necesita tenerlo. Si alguien lo roba
+# puede lanzar el colector y leer logs de Actions; no puede leer el codigo, ni
+# escribir, ni tocar los workflows, ni por tanto sacar AEMET_API_KEY ni ADS_KEY.
+#
+# Y EN EL ESCRITORIO, OJO: lo que relanza el scheduler local NO es una tarea
+# programada. El 30-08 se cerro la sesion con "parado y comprobado que nada lo
+# relanza" y a la manana siguiente estaba corriendo otra vez: lo arranca
+# `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\CabraSpace-AstroWeather.vbs`,
+# de fecha 27-08. Los dos a la vez no rompen nada -- el deduplicador de
+# `queries.py` absorbe lo repetido -- pero duplican pasadas y commits, y sobre
+# todo TAPAN el fallo: mientras el PC este encendido parece que la recogida va
+# bien aunque Actions no sirva una sola cita.
 
 name: Colector
 
 on:
+  # EL RITMO YA NO VIVE AQUI, Y ESTO ES UNA MEDIDA, NO UNA OPINION.
+  #
+  # La noche del 30 al 31-08-2026 se conto: **28 citas programadas entre las
+  # 20:00Z y las 05:47Z, 4 servidas** (14 %). Ninguna fallo -- `is:failure` da
+  # cero en todo el repositorio -- simplemente NO se ejecutaron. Y las cuatro
+  # que llegaron no salen repartidas al azar: 20:10, 21:53, 00:20 y 02:19, o
+  # sea espaciadas 1h43, 2h27 y 1h59, y cada una puntual sobre su cita (+5 a
+  # +20 min). Eso no es perdida aleatoria, es estrangulamiento: GitHub sirve
+  # una cada dos horas PIDAS LO QUE PIDAS, asi que mover el cron de sitio no
+  # arregla nada. Ficha [[github-actions-schedule-no-es-un-cron]].
+  #
+  # Lo que se perdio esa noche: el escritorio dejo de muestrear a las 20:14Z y
+  # no volvio hasta las 05:52Z, y en esas 9 h 38 min los sensores de AstroCamp
+  # se rasparon TRES veces. `cloud.html` solo publica el "ahora", asi que eso
+  # no se recupera.
+  #
+  # LA SOLUCION: un reloj de fuera llama a `workflow_dispatch`, que es un
+  # evento de API y se encola en el acto (medido: la pasada del EPS lanzada a
+  # mano el 29-08 termino en 20 s). El `schedule` se queda de PERRO GUARDIAN.
+  #
+  # EL RITMO DE VERDAD, que vive en cron-job.org y se documenta AQUI para que
+  # este fichero siga siendo la unica fuente de verdad (verano, abr-sep, UTC):
+  #
+  #     */15  19-23   ventana de decision      20/dia
+  #     */15  0       ...que cruza medianoche   4/dia
+  #     0,30  1-4     madrugada                 8/dia
+  #                                            -------
+  #                                            32/dia
+  #
+  # El bloque de DIA del diseno anterior ("0 6-18/2", 7/dia) se retira: lo
+  # cubre ya el propio perro guardian y era lo menos valioso de los tres
+  # ritmos. El de INVIERNO (oct-mar, ventana 17-22 y madrugada 0-6) se montara
+  # en octubre, con un mes de consumo real encima de la mesa.
   schedule:
-    # TRES RITMOS, porque no todas las horas valen lo mismo. Denso en la
-    # ventana de decision -- la hora antes de la oscuridad astronomica y las
-    # primeras de la noche, que es cuando se consulta -- flojo de madrugada y
-    # minimo de dia.
+    # CUATRO AL DIA Y CADA SEIS HORAS, que no es un numero redondo: seis horas
+    # es EXACTAMENTE el periodo de `forecast`, `prediccion` y `publicar`. Si el
+    # reloj de fuera se muere en silencio, el producto sigue actualizandose a su
+    # hora y lo unico que se degrada es la resolucion de sensores. Un respaldo
+    # tiene que elegir QUE deja caer, y esto lo elige.
     #
-    # Y en DOS ESTACIONES, porque la oscuridad astronomica en Nerpio se mueve
-    # tres horas a lo largo del anio y un bloque fijo desperdiciaria media
-    # ventana (medido con `ephem.night_for`, dia 21 de cada mes, UTC):
-    #
-    #     oct-mar   oscuridad 18:25 - 19:50   amanece 04:41 - 05:49
-    #     abr-sep   oscuridad 20:26 - 21:32   amanece 02:50 - 03:54
-    #
-    # El cron de GitHub SI entiende de meses, asi que la estacion se resuelve
-    # sin ninguna maquinaria: dos juegos de lineas y ya.
-    #
-    # Nada de esto tiene que ser exacto, y esa es la gracia: el colector
-    # pregunta que esta VENCIDO y no que hora es, asi que una cita que GitHub
-    # se salte -- pasa, y el workflow del EPS lleva escrito su caso -- se
-    # recupera sola en la pasada siguiente.
+    # Y en el minuto 13, no en el 0: los primeros minutos de cada hora son los
+    # mas disputados de la cola compartida -- por eso el workflow del EPS se
+    # movio a las y 43 el 29-08 -- y con cuatro citas al dia no hay margen para
+    # regalar ninguna.
+    - cron: "13 1,7,13,19 * * *"
 
-    # --- INVIERNO (oct-mar) ---
-    - cron: "*/15 17-22 * 10,11,12,1,2,3 *"   # ventana de decision  24/dia
-    - cron: "0,30 23 * 10,11,12,1,2,3 *"      # cierre de la ventana  2/dia
-    - cron: "0,30 0-6 * 10,11,12,1,2,3 *"     # madrugada            14/dia
-    - cron: "0 8-16/2 * 10,11,12,1,2,3 *"     # dia                   5/dia
-
-    # --- VERANO (abr-sep) ---
-    - cron: "*/15 19-23 * 4,5,6,7,8,9 *"      # ventana de decision  20/dia
-    - cron: "*/15 0 * 4,5,6,7,8,9 *"          # ...que cruza medianoche 4/dia
-    - cron: "0,30 1-4 * 4,5,6,7,8,9 *"        # madrugada             8/dia
-    - cron: "0 6-18/2 * 4,5,6,7,8,9 *"        # dia                   7/dia
-
-    # Suman 45 pasadas al dia en invierno y 39 en verano. A un minuto facturado
-    # cada una, mas los cuatro que ademas reconstruyen la prevision (+26 s) y
-    # el que hace el lote diario, salen ~48 min/dia = **~1.450 min/mes**, con
-    # sitio de sobra bajo el objetivo de 1.700 para el resto de workflows del
-    # repositorio.
+    # LA CUENTA, con el consumo REAL de agosto delante (Settings -> Actions
+    # usage metrics: 18 min en todo el mes, 13 del colector en 5 ejecuciones,
+    # que cuadran al minuto con las duraciones observadas):
+    #
+    #   pasada normal .................. 45-47 s  -> 1 min facturado  MEDIDO
+    #   pasada que rehace la prevision .. 3m34s   -> 4 min facturado  MEDIDO
+    #   pasada del lote diario .......... sin medir -> 4 min estimado
+    #
+    # El comentario anterior suponia "+26 s" para la pasada con prevision. Son
+    # 3m34s: cuatro veces mas. Con 32 disparos externos + 4 del guardian:
+    #
+    #   31 normales x 1 min             = 31
+    #    4 con prevision x 4 min        = 16
+    #    1 lote diario x 4 min          =  4
+    #   ------------------------------------
+    #                                     51 min/dia = ~1.550 min/mes
+    #   + archivo del EPS                     60
+    #   ------------------------------------
+    #                                     ~1.610 de los 2.000 gratuitos
+    #
+    # El plan original decia ~1.450 con objetivo de 1.700; la medida lo deja en
+    # ~1.610. Sigue cabiendo, pero el margen es del 20 % y no del 27 %. La
+    # unica palanca que importa son esos 3m34s: bajarlos de 3 min ahorra
+    # 4 min/dia, bajarlos de 2 ahorra 8.
     #
     # OJO AL SUELO DE FACTURACION: GitHub redondea cada job al minuto, asi que
     # una pasada de 35 s y una de 59 s cuestan lo mismo, y una de 61 s cuesta
-    # el DOBLE. Si el runner acaba tardando mas de un minuto, esta cuenta se
-    # duplica: hay que mirar la duracion real de las primeras pasadas antes de
-    # dar el presupuesto por bueno.
+    # el DOBLE.
   workflow_dispatch:
     inputs:
       forzar:
