@@ -151,6 +151,16 @@ ETIQUETAS_EN = {
     "noche_corta": "Short night",
 }
 
+# El tercil del seeing es un valor INTERNO y esta en castellano. Se colaba tal
+# cual en la prosa inglesa -- "seeing desfavorable" -- porque "favorable" se
+# escribe casi igual en los dos idiomas y disimulaba a los otros dos.
+TERCILES_EN = {"favorable": "favourable", "normal": "average",
+               "desfavorable": "poor"}
+
+
+def _tercil_en(tercil) -> str:
+    return TERCILES_EN.get(tercil, "unknown")
+
 
 def _fila(clave, etiqueta, luz, resumen, detalle, *,
           en_resumen: str = "", en_detalle: str = "") -> dict:
@@ -504,7 +514,7 @@ def _infrarrojo(c: Conditions) -> dict:
                  en_resumen="no advantage tonight",
                  en_detalle=f"""IR wins when there is something to cut through —
                  Moon, dust, bad seeing — and tonight there is none: sky at
-                 {c.cielo()} and seeing {c.seeing_tercile or 'unknown'}. With the sky
+                 {c.cielo()} and seeing {_tercil_en(c.seeing_tercile)}. With the sky
                  like this, ordinary broadband collects far more signal per hour.""")
 
 
@@ -557,7 +567,7 @@ def _planetaria(c: Conditions) -> dict:
                  puede intentar, pero no es la noche de batir tu mejor imagen. La
                  Luna al {c.luna_pct} % no estorba a esta técnica.""",
                  en_resumen="run-of-the-mill seeing",
-                 en_detalle=f"""Seeing {c.seeing_tercile or 'unknown'} (band up to
+                 en_detalle=f"""Seeing {_tercil_en(c.seeing_tercile)} (band up to
                  {alto}"): worth a try, but not the night to beat your best image.
                  The Moon at {c.luna_pct} % does not get in the way of this
                  technique.""")
@@ -708,7 +718,7 @@ def _planetas(c: Conditions) -> dict:
                  de cielo no interviene.""",
                  en_resumen="there is a target",
                  en_detalle=f"""Up there you have {lista_en}. The seeing is
-                 {c.seeing_tercile or 'unknown'} (up to {alto_en}): worth a try, but
+                 {_tercil_en(c.seeing_tercile)} (up to {alto_en}): worth a try, but
                  not the night to beat your best image. The sky background plays no
                  part.""")
 
@@ -746,7 +756,7 @@ def _cumulos(c: Conditions) -> dict:
                  en_detalle=f"""They are the last thing a mediocre night takes away.
                  With the sky at {c.cielo()} even the faint halo stars come through.
                  What really decides them is the seeing, which tonight is
-                 {c.seeing_tercile or 'unknown'}.""")
+                 {_tercil_en(c.seeing_tercile)}.""")
 
 
 def _planetarias_obj(c: Conditions) -> dict:
@@ -775,7 +785,7 @@ def _planetarias_obj(c: Conditions) -> dict:
                  en_resumen="they tolerate the background",
                  en_detalle=f"""High surface brightness: with the sky at {c.cielo()}
                  they take moonlight better than any other family. What decides them
-                 is the seeing, and tonight it is {c.seeing_tercile or 'unknown'} (up
+                 is the seeing, and tonight it is {_tercil_en(c.seeing_tercile)} (up
                  to {alto_en}). Careful if your target lives on OIII, which is where
                  many of them keep their signal.""")
 

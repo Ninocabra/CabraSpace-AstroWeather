@@ -1,0 +1,291 @@
+TEXTOS INGLESES DEL MOTOR DE CONSEJOS
+======================================================================
+
+56 mensajes distintos. Los numeros son de una noche de ejemplo.
+
+
+--- Clusters (cumulos) ---
+
+  ES  siempre disponibles
+  EN  always available
+      They are the last thing a mediocre night takes away. With the sky at 17.5 even the faint halo stars come through. What really decides them is the seeing, which tonight is favourable.
+
+  ES  el cúmulo sí, el fondo no
+  EN  the cluster yes, the background no
+      These are stars, not surface: with the Moon at 60 % a bright globular comes out just the same, and that is why they are the best plan B on a bad night. What you lose are the faint halo stars and any nebulosity around them. Watch the focus, because here everything shows, and do not saturate the core.
+
+--- Dual-band (dual) ---
+
+  ES  los dos canales trabajan
+  EN  both channels are working
+      With no high Moon and no dust, both channels of the dual deliver at once, which is the only situation in which the filter does what it promises.
+
+  ES  medio filtro a ciegas
+  EN  half the filter is flying blind
+      An Hα+OIII dual with the Moon at 60 % gives you one good channel and one noisy one: Hα holds up and OIII does not. If your target lives on OIII — supernova remnants, large planetaries — the exposure will come out unbalanced and you will see it when you combine. On pure Hα emission you will not notice.
+
+  ES  el canal azul sufre
+  EN  the blue channel suffers
+      With dust the OIII channel loses and Hα does not: the same imbalance as with the Moon, from another cause.
+
+--- Emission nebulae (emision) ---
+
+  ES  según el filtro
+  EN  depends on the filter
+      Hα: fine, but do not waste it. OIII: its kind of night. The whole family depends on which channel your target lives on.
+
+  ES  sí, pero solo en Hα
+  EN  yes, but in Hα only
+      This is the family that rescues a moonlit night: at 60 % illumination and a sky of 17.5, Hα is green and OIII is red. If your target is pure emission — North America, Heart, Rosette — go ahead. If it lives on OIII, like the Veil or a large planetary, leave it for another night.
+
+--- Galaxies (galaxias) ---
+
+  ES  condiciones de sobra
+  EN  conditions to spare
+      Sky at 21.4 against the 20.0 the class asks for. Choose by altitude: above 30° air mass stops being the problem.
+
+  ES  pide 20.0 y hay 17.5
+  EN  needs 20.0 and there is 17.5
+      The sky sits at 17.5 mag/arcsec² and this family needs 20.0 for the signal to clear the background. With the Moon at 60 % no amount of integration makes up for it.
+
+  ES  justo en el límite
+  EN  right on the edge
+      The sky is at 17.5 against the 20.0 this class asks for: it works, but with no margin. Get the target above 30° — at that altitude you are already crossing two air masses and losing close to 20 % of the flux.
+
+--- Hα (ha) ---
+
+  ES  la calima resta, pero pasa
+  EN  dust costs you, but it gets through
+      Hα is the filter that best cuts through a milky night: aerosol scatters far more in blue. At AOD 0.300 you lose contrast, not the session.
+
+  ES  bien, pero no lo desperdicies
+  EN  fine, but do not waste it
+      Hα works, but with the Moon at 0 % you are not using its advantage: narrowband can be done on any moonlit night, and what you CANNOT do then is deep broadband. If the sky is dark, spend it on that.
+
+  ES  la noche es suya
+  EN  the night belongs to it
+      With the Moon at 60 % Hα is exactly what to shoot: the filter passes a factor 0.05 of moonlight, so the background that ruins RGB barely exists here. At 3 nm the suppression beats 7 nm by a good margin; if your filter is wide, take more subs and discard without regret.
+
+--- IFN, haloes & tidal tails (ifn) ---
+
+  ES  pide 21.3 y hay 17.5
+  EN  needs 21.3 and there is 17.5
+      The sky sits at 17.5 mag/arcsec² and this family needs 21.3 for the signal to clear the background. With the Moon at 60 % no amount of integration makes up for it. It is the most contrast-hungry target there is: new Moon, or nothing.
+
+  ES  justo en el límite
+  EN  right on the edge
+      The sky is at 17.5 against the 21.3 this class asks for: it works, but with no margin. Get the target above 30° — at that altitude you are already crossing two air masses and losing close to 20 % of the flux. It is the most contrast-hungry target there is: new Moon, or nothing.
+
+--- Infrared (ir) ---
+
+  ES  es lo que mejor atraviesa
+  EN  it cuts through better than anything
+      With dust (AOD 0.300, k=0.40) the near infrared is the band that loses least: scattering falls with wavelength, so where OIII drowns, IR gets through. If you have a camera with the blocking filter removed, this is its night. Plan to refocus: the IR focal point is not the visible one.
+
+  ES  salva algo del seeing
+  EN  it salvages some of the seeing
+      With poor seeing (up to 1.6") the IR resolves somewhat better, because seeing scales as lambda^(1/5). It is a real improvement but a small one: it does not turn a bad night into a good one, it makes it slightly less bad.
+
+  ES  sin ventaja esta noche
+  EN  no advantage tonight
+      IR wins when there is something to cut through — Moon, dust, bad seeing — and tonight there is none: sky at 17.5 and seeing favourable. With the sky like this, ordinary broadband collects far more signal per hour.
+
+  ES  la banda J es la que sufre
+  EN  the J band is the one that suffers
+      IR handles humidity better than the visible, but not uniformly: with high water vapour the J band loses a fair amount — in the literature, up to 21 % of transmission between 1 and 10 mm of precipitable water — while H and K move by less than 5 %. At 95 % surface relative humidity, favour H or K if your filter reaches, and do not compare J photometry across nights. WARNING: precipitable water is NOT forecast here yet; surface humidity is a hint, not the measurement.
+
+  ES  la Luna le molesta poco
+  EN  the Moon barely bothers it
+      The same argument that makes Hα robust, taken further: at 60 % Moon the IR background rises far less than the visible one, because Rayleigh goes as lambda^-4. And seeing improves as lambda^(1/5), so it also resolves a little better. It needs a target that EMITS there — dust, red giants, reflection — and a camera with no IR blocking filter.
+
+--- Luminance (luminancia) ---
+
+  ES  Luna y humedad se suman
+  EN  Moon and humidity compound
+      With the Moon at 60 % and 95 % humidity the halo is worse than the model says: hydrated aerosol scatters more (Mie), so the same Moon dirties more sky. Push the minimum separation to your target beyond the usual 40° and expect a strong background gradient across the frame.
+
+  ES  solo objetos brillantes
+  EN  bright targets only
+      With the Moon at 60 % colour still works on bright clusters and galaxies, but the faint parts stay buried in background noise. The sky reaches its minimum about 80° from the disc: pick targets far from it and never go below 40°.
+
+  ES  la calima te cambia el color
+  EN  dust shifts your colour
+      At k=0.40 the aerosol does not just attenuate, it tints: blue loses more than red. The colour balance you calibrate tonight will not hold for another night, so shoot the channels back to back or do not mix them with other sessions.
+
+  ES  adelante
+  EN  go ahead
+      Background at 17.5 mag/arcsec² against the 20.9 the technique asks for, and the Moon is not in charge (0 % illuminated, and below the horizon). This is the night to spend on whatever needs a dark background.
+
+  ES  la humedad hincha el aerosol
+  EN  humidity swells the aerosol
+      A clear sky is not the same as a transparent sky. At 95 % humidity the aerosol takes up water and GROWS, and real extinction climbs above the k=0.20 you see above, which comes from dry aerosol. The effect runs away near 92 %. Assume you lose a little more than the forecast says, especially in blue.
+
+  ES  la Luna al 60 % lo tapa
+  EN  the Moon at 60 % swamps it
+      Sky background sits at 17.5 mag/arcsec², below the 20.9 this technique needs. Stacking will not fix it: stacking lowers the noise, not the background. And if you go out anyway, stay more than 40° from the disc — closer than that the halo dominates the whole frame.
+
+  ES  la Luna al 95 % lo tapa
+  EN  the Moon at 95 % swamps it
+      Sky background sits at 17.5 mag/arcsec², below the 20.9 this technique needs. Stacking will not fix it: stacking lowers the noise, not the background. And if you go out anyway, stay more than 40° from the disc — closer than that the halo dominates the whole frame.
+
+--- Short night (noche_corta) ---
+
+  ES  3.0 h de oscuridad
+  EN  3.0 h of darkness
+      With so little time, splitting it between two targets leaves both half done. Pick one.
+
+--- Cloud (nubes) ---
+
+  ES  40 % utilizable
+  EN  40 % usable
+      Chain short exposures and keep every subframe: a session broken into twenty-minute pieces can be salvaged; a six-panel mosaic cannot.
+
+--- OIII (oiii) ---
+
+  ES  la calima se lo come
+  EN  dust eats it
+      Aerosol scatters far more in blue, so OIII is the first to fall when there is dust (AOD 0.300, k=0.40). Switch to Hα and save OIII for a clean night.
+
+  ES  la humedad le pega en su banda
+  EN  humidity hits it in its own band
+      At 95 % humidity hydrated aerosol scatters much more, and it does so mostly in blue, which is exactly where OIII lives. Near 92 % the extinction can even invert its spectral ordering. Not a lost night, but the contrast you get today will not mix with that of a dry night.
+
+  ES  no hereda el indulto del Hα
+  EN  it does not inherit Hα's pardon
+      This is the classic narrowband mistake. OIII sits in the blue part of the spectrum, where Rayleigh scattering goes as λ⁻⁴, so the Moon hits it far harder than Hα: at 60 % illumination the OIII background climbs a long way. If you can only pick one filter tonight, pick Hα.
+
+  ES  condiciones suyas
+  EN  its kind of night
+      With no Moon to scatter in blue and k=0.20, OIII gives everything it has. It is the hardest signal in narrowband: spend it on supernova remnants and planetary nebulae.
+
+--- Planetary & lunar (planetaria) ---
+
+  ES  seeing del montón
+  EN  run-of-the-mill seeing
+      Seeing average (band up to 1.6"): worth a try, but not the night to beat your best image. The Moon at 0 % does not get in the way of this technique.
+
+  ES  gástalo en resolución
+  EN  spend it on resolution
+      Favourable seeing (band up to 1.6"): this is the night for planetary imaging, small planetary nebulae and close pairs. The Moon being at 0 % does not matter — these are bright targets and here turbulence rules, not the background.
+
+  ES  el seeing no da
+  EN  the seeing is not there
+      Poor seeing (up to 1.6" at the pessimistic edge of the band). High resolution lives on seeing and tonight there is none: drop the focal length or change plan. The sky background, on the other hand, is irrelevant — the Moon is not the problem here. Where this number comes from: the jet-stream wind at 200 hPa, the upper-level predictor the literature uses. What it does NOT see is the ground layer, which matters most and which nobody measures here — hence terciles, and uncalibrated.
+
+  ES  el viento vibra el tubo
+  EN  the wind shakes the tube
+      At 32 km/h the vibration shows at long focal lengths even when the seeing cooperates. Short videos and heavy discarding.
+
+--- Planetary nebulae (planetarias) ---
+
+  ES  las pequeñas, no
+  EN  not the small ones
+      They are compact and of high surface brightness: the background bothers them little and the seeing a lot. With tonight's turbulence (up to 1.6"), the large ones yes and the small ones come out soft.
+
+  ES  toleran el fondo
+  EN  they tolerate the background
+      High surface brightness: with the sky at 17.5 they take moonlight better than any other family. What decides them is the seeing, and tonight it is favourable (up to 1.6"). Careful if your target lives on OIII, which is where many of them keep their signal.
+
+--- Planets & Moon (planetas) ---
+
+  ES  objetivo y seeing
+  EN  target and seeing
+      Up there you have Mars (45°), and the seeing is favourable (up to 1.6"). That is the combination you need: here turbulence rules and not the background, so this family can be green on the very night deep sky is a write-off.
+
+  ES  hay objetivo, falta seeing
+  EN  target yes, seeing no
+      Up there you have Mars (45°). What decides here is not the sky background — these are bright objects and it does not matter to them — but turbulence, and tonight it reaches 1.6". Drop the focal length, record short videos and discard heavily.
+
+  ES  hay objetivo
+  EN  there is a target
+      Up there you have Mars (45°). The seeing is average (up to 1.6"): worth a try, but not the night to beat your best image. The sky background plays no part.
+
+--- Reflection nebulae (reflexion) ---
+
+  ES  pide 20.9 y hay 17.5
+  EN  needs 20.9 and there is 17.5
+      The sky sits at 17.5 mag/arcsec² and this family needs 20.9 for the signal to clear the background. With the Moon at 60 % no amount of integration makes up for it. They are starlight reflected off dust: broadband is mandatory, which is why the Moon does all the damage here. No narrowband.
+
+  ES  justo en el límite
+  EN  right on the edge
+      The sky is at 17.5 against the 20.9 this class asks for: it works, but with no margin. Get the target above 30° — at that altitude you are already crossing two air masses and losing close to 20 % of the flux. They are starlight reflected off dust: broadband is mandatory, which is why the Moon does all the damage here. No narrowband.
+
+--- RGB / colour (rgb) ---
+
+  ES  Luna y humedad se suman
+  EN  Moon and humidity compound
+      With the Moon at 60 % and 95 % humidity the halo is worse than the model says: hydrated aerosol scatters more (Mie), so the same Moon dirties more sky. Push the minimum separation to your target beyond the usual 40° and expect a strong background gradient across the frame.
+
+  ES  solo objetos brillantes
+  EN  bright targets only
+      With the Moon at 60 % colour still works on bright clusters and galaxies, but the faint parts stay buried in background noise. The sky reaches its minimum about 80° from the disc: pick targets far from it and never go below 40°.
+
+  ES  la calima te cambia el color
+  EN  dust shifts your colour
+      At k=0.40 the aerosol does not just attenuate, it tints: blue loses more than red. The colour balance you calibrate tonight will not hold for another night, so shoot the channels back to back or do not mix them with other sessions.
+
+  ES  adelante
+  EN  go ahead
+      Background at 17.5 mag/arcsec² against the 20.0 the technique asks for, and the Moon is not in charge (0 % illuminated, and below the horizon). This is the night to spend on whatever needs a dark background.
+
+  ES  la humedad hincha el aerosol
+  EN  humidity swells the aerosol
+      A clear sky is not the same as a transparent sky. At 95 % humidity the aerosol takes up water and GROWS, and real extinction climbs above the k=0.20 you see above, which comes from dry aerosol. The effect runs away near 92 %. Assume you lose a little more than the forecast says, especially in blue.
+
+  ES  la Luna al 60 % lo tapa
+  EN  the Moon at 60 % swamps it
+      Sky background sits at 17.5 mag/arcsec², below the 20.0 this technique needs. Stacking will not fix it: stacking lowers the noise, not the background. And if you go out anyway, stay more than 40° from the disc — closer than that the halo dominates the whole frame.
+
+  ES  la Luna al 95 % lo tapa
+  EN  the Moon at 95 % swamps it
+      Sky background sits at 17.5 mag/arcsec², below the 20.0 this technique needs. Stacking will not fix it: stacking lowers the noise, not the background. And if you go out anyway, stay more than 40° from the disc — closer than that the halo dominates the whole frame.
+
+--- Dew (rocio) ---
+
+  ES  1.0° de margen
+  EN  1.0° of margin
+      The air is 1.0° from the dew point, and this margin is OPTIMISTIC: the front element radiates to the sky and sits colder than the air, so it condenses sooner. Heater on and a long dew shield; once it fogs, the subs keep coming and every one of them is worthless.
+
+--- SII (sii) ---
+
+  ES  aguanta como el Hα
+  EN  as Moon-proof as Hα
+      SII is as robust to moonlight as Hα, and for the same reason: it is in the red. At 60 % illumination it comes out without trouble. Plan to integrate longer than for Hα, because the line is intrinsically fainter.
+
+  ES  adelante
+  EN  go ahead
+      With no Moon, SII gains nothing special over any other night: if the palette you are after needs it, go ahead, but a dark sky pays off more in deep broadband.
+
+  ES  aguanta la calima
+  EN  it shrugs off dust
+      SII sits even further into the red than Hα, so dust affects it less than anything else. What it gains in robustness it lacks in signal: it is the faintest of the three lines and needs considerably more integration.
+
+--- Wind (viento) ---
+
+  ES  32 km/h
+  EN  32 km/h
+      At long focal lengths guiding suffers and a single gust ruins the whole sub: shorten the individual exposure and expect to discard more than usual. Warning: the forecast gust is not calibrated against any ground truth, and the model has measured short on mean wind.
+
+
+--- REFERENCIAS ---
+
+  ES  Separación a la Luna: El fondo toca su mínimo alrededor de 80-90° del disco; la práctica publicada pide 40° como mínimo en banda ancha cerca de la llena.
+  EN  Separation from the Moon: The background reaches its minimum around 80-90° from the disc; published practice asks for 40° as a minimum in broadband near full Moon.
+
+  ES  Filtros estrechos y luz lunar: 3 nm suprime la Luna bastante mejor que 7-12 nm. Hα y SII aguantan; el OIII no, porque cae en el azul donde Rayleigh va como λ⁻⁴.
+  EN  Narrowband filters and moonlight: 3 nm suppresses the Moon appreciably better than 7-12 nm. Hα and SII hold up; OIII does not, because it falls in the blue where Rayleigh goes as λ⁻⁴.
+
+  ES  Humedad y aerosol (crecimiento higroscópico): Con humedad alta el aerosol capta agua y crece: sube la extinción por encima de la que predice un AOD seco, y cerca del 92 % la ordenación espectral llega a invertirse. También hace que la misma Luna disperse más (Mie).
+  EN  Humidity and aerosol (hygroscopic growth): At high humidity the aerosol takes up water and grows: extinction climbs above what a dry AOD predicts, and near 92 % the spectral ordering can invert. It also makes the same Moon scatter more (Mie).
+
+  ES  Vapor de agua e infrarrojo: Entre 1 y 10 mm de agua precipitable, la banda J pierde hasta un 21 % de transmisión mientras H y K se mueven menos del 5 %.
+  EN  Water vapour and the infrared: Between 1 and 10 mm of precipitable water the J band loses up to 21 % of its transmission while H and K move by less than 5 %.
+
+  ES  Seeing y viento en altura: El viento a 200 hPa (el chorro, ~12 km) es el predictor de altura habitual y correla con el empeoramiento del seeing; pero la capa de suelo domina y no se mide aquí.
+  EN  Seeing and upper-level wind: The wind at 200 hPa (the jet, ~12 km) is the usual upper-level predictor and correlates with worsening seeing; but the ground layer dominates and is not measured here.
+
+  ES  Altura y masa de aire: A 30° se cruzan ~2 masas de aire y queda cerca del 81 % del flujo cenital; por debajo de 30-35° la dispersión atmosférica empieza a teñir los bordes de las estrellas.
+  EN  Altitude and air mass: At 30° you cross ~2 air masses and keep about 81 % of the zenith flux; below 30-35° atmospheric dispersion starts to colour the edges of stars.
+
+  ES  Rocío: Condensa cuando la óptica ALCANZA el punto de rocío; la práctica es mantener las superficies unos grados por encima. El margen que publicamos (aire − rocío) es optimista: el frontal radia al cielo.
+  EN  Dew: It condenses when the optics REACH the dew point; the practice is to keep the surfaces a few degrees above it. The margin we publish (air − dew) is optimistic: the front element radiates to the sky.

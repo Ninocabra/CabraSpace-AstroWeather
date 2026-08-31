@@ -79,3 +79,21 @@ def test_el_titular_ingles_nombra_lo_mismo_que_el_castellano(c):
     """
     salida = evaluate(c)
     assert ("Hoy no:" in salida["resumen"]) == ("Not today:" in salida["resumen_en"])
+
+
+# Palabras que solo existen en el lado castellano y que NO pueden aparecer en la
+# prosa inglesa. "desfavorable" se colo de verdad: el tercil del seeing es un
+# valor interno en castellano y "favorable" se escribe casi igual en los dos
+# idiomas, asi que disimulaba a sus dos hermanos.
+CASTELLANAS = ("desfavorable", "sin dato", "desconocido", "sin banda",
+               "la Luna", " el cielo", "noche")
+
+
+@pytest.mark.parametrize("c", CASOS[:96])
+def test_no_se_cuela_castellano_en_el_ingles(c):
+    salida = evaluate(c)
+    todo = salida["adquisicion"] + salida["objetos"] + salida["avisos"]
+    for fila in todo:
+        texto = (fila["resumen_en"] + " " + fila["detalle_en"]).lower()
+        for palabra in CASTELLANAS:
+            assert palabra.lower() not in texto, (fila["clave"], palabra)
