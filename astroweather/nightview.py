@@ -280,11 +280,21 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
     turbulence = integrate(jet_speed)
 
     points, payload = ([], [])
+    clouds_error = None
     if with_clouds:
         try:
             points, payload = fetch_cloud_grid(site)
-        except Exception:
+        except Exception as exc:                      # noqa: BLE001
+            # NO SE TRAGA EN SILENCIO. Hasta el 31-08-2026 este `except` dejaba
+            # una lista vacia y aguas abajo eso es INDISTINGUIBLE de "no hay
+            # nubes": la noche del 31 se publico con los 59 marcos a cero
+            # mientras la prevision horaria daba 100 % de cobertura al
+            # amanecer, y la cupula pinto un cielo limpio toda la noche. El
+            # fallo era transitorio -- la rejilla son 49 peticiones seguidas --
+            # pero lo que lo hizo invisible fue esta linea.
             points, payload = [], []
+            clouds_error = "%s: %s" % (type(exc).__name__, exc)
+            print("[nightview] rejilla de nubes NO disponible -- %s" % clouds_error)
     grid_times = ([dt.datetime.fromisoformat(t).replace(tzinfo=dt.timezone.utc)
                    for t in payload[0]["hourly"]["time"]] if payload else [])
 
@@ -334,8 +344,15 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
         })
 
     # --- the question the observer actually asks -------------------------
+    # SIN REJILLA NO HAY PROBABILIDAD. El calculo de abajo hace
+    # `max(..., default=0.0)` sobre las nubes de cada marco, asi que con la
+    # rejilla caida contaria la noche como DESPEJADA y publicaria una
+    # probabilidad de abrir alta construida sobre ceros inventados. Mejor no
+    # decir nada que decir eso.
     outlook = None
     try:
+        if not grid_times:
+            raise RuntimeError("sin rejilla de nubes: no se estima apertura")
         from .calibration import Calibrator
         from .roof import load_climatology, outlook as roof_outlook
         climatology, calibrator = load_climatology(), Calibrator.load()
@@ -366,6 +383,11 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
     mid = times[len(times) // 2]
     return {
         "roof": outlook,
+        # Que la ausencia VIAJE. Quien pinte esto tiene que poder distinguir
+        # "no hay nubes" de "no sabemos si las hay", que es justo lo que no se
+        # podia hacer hasta hoy.
+        "clouds_available": bool(grid_times),
+        "clouds_error": clouds_error,
         "advice": _advice(
             moon_illumination=moon_illumination(night.dusk_astronomical or night.night),
             moon_up=any(f["moon_alt"] > 0 and f["dark"] for f in frames),
