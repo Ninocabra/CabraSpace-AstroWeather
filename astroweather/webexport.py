@@ -609,6 +609,21 @@ DESDE_ARCHIVO = {
 }
 
 
+# Cuanto hacia atras se rescata una lectura cuando la fuente no responde.
+#
+# ERAN SEIS HORAS Y SE QUEDABAN CORTAS EN EL CASO QUE IMPORTA. El 31-08-2026 la
+# pagina de AstroCamp llevaba caida desde las 10:22 UTC; a las 18:02 el rescate
+# no alcanzaba, y el panel publico solo temperatura y humedad -- que venian de
+# AEMET, otra fuente que sigue viva y que no da viento ni presion ni nubes. O
+# sea que el sensor se quedaba en blanco justo cuando la caida se hacia larga,
+# que es justo cuando hace falta saber cual fue la ultima lectura.
+#
+# Siete dias, y no "sin limite", porque un dato de hace un mes ya no describe
+# nada aunque se etiquete. Lo que hace honesto ensenar una lectura vieja no es
+# el plazo: es que viaje CUANDO se midio y que la pagina lo grite.
+RESCATE_HORAS = 24 * 7
+
+
 def _ultimo_del_archivo(columnas: list[str], root=None) -> dict:
     """El valor mas reciente de cada columna, con su hora. Vacio si no hay."""
     if not columnas:
@@ -621,7 +636,7 @@ def _ultimo_del_archivo(columnas: list[str], root=None) -> dict:
             fila = conexion.execute(f"""
                 SELECT {columna}, t_utc FROM measurements
                 WHERE {columna} IS NOT NULL
-                  AND t_utc > now() - INTERVAL 6 HOUR
+                  AND t_utc > now() - INTERVAL {RESCATE_HORAS} HOUR
                 ORDER BY t_utc DESC LIMIT 1
             """).fetchone()
             if fila:
