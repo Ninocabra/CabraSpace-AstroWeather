@@ -709,8 +709,37 @@ def _sensores(site: Site, root=None) -> dict | None:
             continue
         panel[campo] = valor[0]
         completados[campo] = valor[1].isoformat(timespec="seconds")
-    if panel["temperatura"] is not None and panel["punto_rocio"] is not None             and panel["margen_rocio"] is None:
+    # EL MARGEN DE ROCIO ES UNA RESTA, Y UNA RESTA EXIGE LA MISMA HORA. Con
+    # AstroCamp caida el 31-08-2026 la temperatura se rescataba de AEMET (16:00
+    # UTC, viva) y el punto de rocio de AstroCamp (10:21, muerta): la resta daba
+    # 25,8 grados de margen mezclando dos instantes separados casi seis horas.
+    # Un numero perfectamente plausible y sin ningun significado, en un campo
+    # que avisa de condensacion.
+    #
+    # Se deriva solo si las dos partes son del MISMO momento. Si no, se calla:
+    # lo que falta aqui no es un dato, es su simultaneidad, y eso no se rescata.
+    def _cuando(campo):
+        return completados.get(campo) or panel.get("medido_utc")
+
+    if (panel["temperatura"] is not None and panel["punto_rocio"] is not None
+            and panel["margen_rocio"] is None
+            and _cuando("temperatura") == _cuando("punto_rocio")):
         panel["margen_rocio"] = round(panel["temperatura"] - panel["punto_rocio"], 1)
+    # LOS TECHOS TAMBIEN, pero lo que se rescata es el ESTADO y no la cuenta.
+    # El archivo guarda `roof_open` como un booleano -- abierto o cerrado -- y no
+    # los 18 de 18, asi que no se puede reconstruir "0/18" de ayer sin
+    # inventarselo. Se publica lo que hay: abierto o cerrado, y cuando.
+    #
+    # Y es la casilla que mas pesa de la pagina, asi que la etiqueta de la web
+    # importa mas aqui que en ningun otro sitio: un "abierto" de hace ocho horas
+    # sin decir que es de hace ocho horas se lee como "el observatorio esta
+    # funcionando esta noche".
+    if panel["techos_total"] is None:
+        historico = _ultimo_del_archivo(["roof_open"], root).get("roof_open")
+        if historico is not None:
+            panel["techos_estado_archivo"] = bool(historico[0])
+            completados["techos"] = historico[1].isoformat(timespec="seconds")
+
     # Que se completo y de cuando: sin esto el panel diria "18 grados" sin decir
     # que ese 18 es de hace veinte minutos.
     panel["del_archivo"] = completados
