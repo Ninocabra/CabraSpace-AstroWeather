@@ -15,6 +15,7 @@ reader is responsible for two things:
 
 from __future__ import annotations
 
+import datetime as dt
 from pathlib import Path
 
 import duckdb
@@ -160,6 +161,74 @@ def night_inputs(start, end, site_id: str = "nerpio",
     except Exception:
         pass
     return result
+
+
+def night_series(start, end, site_id: str = "nerpio",
+                 root: Path | None = None) -> dict:
+    """Lo MISMO que `night_inputs`, pero SIN colapsar a la mediana.
+
+    `night_inputs` resume la noche en dos numeros porque eso es lo que necesita
+    el modelo para puntuar objetos. Pero las dos cosas cambian dentro de la
+    misma noche y bastante: el propio comentario de arriba lo dice medido -- el
+    jet del 28-08-2026 iba de 24,0 m/s a las 21:00 a 13,4 a las 06:00, o sea
+    casi el doble -- y colapsarlo a la mediana era publicar "seeing favorable"
+    para una noche que empieza mala y acaba buena.
+
+    Devuelve un diccionario por hora EN PUNTO, que es la marca con la que viene
+    el proveedor y la que usa el resto del exportador para emparejar.
+
+    Sin archivo o sin filas devuelve vacio y quien llame se queda con lo de
+    antes: esto ANIADE resolucion, no la sustituye, asi que no puede ser un
+    camino que rompa nada si falta.
+    """
+    salida: dict = {}
+    try:
+        connection = connect(root)
+    except Exception:
+        return salida
+    def punto(marca):
+        marca = marca if marca.tzinfo else marca.replace(tzinfo=dt.timezone.utc)
+        marca = marca.replace(minute=0, second=0, microsecond=0)
+        return salida.setdefault(marca, {"aod_total": None, "aod_dust": None,
+                                         "jet_speed": None})
+
+    # DOS CONSULTAS Y NO UNA, por el mismo motivo que `night_inputs`: el
+    # aerosol y los niveles de presion NO viajan en la misma fila, asi que
+    # pedirlos juntos y quedarse con la ultima pasada por `valid_utc` devuelve
+    # la fila del uno con las columnas del otro en blanco. Cada uno con su
+    # filtro de no-nulo, y luego se juntan por hora.
+    try:
+        for valid, aod_total, aod_dust in connection.execute("""
+            SELECT valid_utc, aod_total, aod_dust FROM forecasts
+            WHERE site_id = ? AND valid_utc BETWEEN ? AND ?
+              AND aod_total IS NOT NULL
+            QUALIFY row_number() OVER (
+                PARTITION BY valid_utc ORDER BY run_utc DESC) = 1
+            ORDER BY valid_utc
+        """, [site_id, start, end]).fetchall():
+            fila = punto(valid)
+            fila["aod_total"] = float(aod_total)
+            fila["aod_dust"] = float(aod_dust) if aod_dust is not None else None
+    except Exception:
+        pass
+
+    try:
+        for valid, jet in connection.execute("""
+            SELECT valid_utc,
+                   greatest(coalesce(v200, 0), coalesce(v250, 0),
+                            coalesce(v300, 0)) AS jet
+            FROM forecasts
+            WHERE site_id = ? AND valid_utc BETWEEN ? AND ?
+              AND (v200 IS NOT NULL OR v250 IS NOT NULL OR v300 IS NOT NULL)
+            QUALIFY row_number() OVER (
+                PARTITION BY valid_utc ORDER BY run_utc DESC) = 1
+            ORDER BY valid_utc
+        """, [site_id, start, end]).fetchall():
+            if jet:
+                punto(valid)["jet_speed"] = float(jet)
+    except Exception:
+        pass
+    return salida
 
 
 def summary(root: Path | None = None) -> dict[str, int]:

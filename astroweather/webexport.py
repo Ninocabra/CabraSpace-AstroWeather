@@ -30,7 +30,7 @@ from .advice import Conditions, evaluate as evaluate_advice
 from .calibration import Calibrator
 from .ephem import moon_illumination, moon_positions, night_for
 from .extinction import evaluate as evaluate_transparency
-from .queries import DATA_ROOT, night_inputs
+from .queries import DATA_ROOT, night_inputs, night_series
 from .seeing import integrate
 from . import site_now
 from .site import NERPIO, Site
@@ -46,8 +46,21 @@ TOP_TARGETS = 3
 DEFAULT_PATH = DATA_ROOT / "web" / "noche.json"
 
 
-def _hour(hour) -> dict:
-    return {
+def _hour(hour, serie: dict | None = None, site: Site | None = None) -> dict:
+    """Una hora de la noche. Con seeing y transparencia SUYOS si se tienen.
+
+    Hasta el 31-08-2026 el seeing y la transparencia solo salian por noche:
+    un tercil y un AOD, la mediana de la ventana entera. Y las dos cosas se
+    mueven dentro de la misma noche -- medido esta noche sobre el archivo, el
+    AOD va de 0,12 a las 20:00 a 0,27 al amanecer, MAS DEL DOBLE, y la mediana
+    publicada (0,19) no describe ninguno de los dos extremos. Con un solo
+    numero, "noche transparente" tapaba una noche que se enturbia segun avanza.
+
+    Las claves nuevas son OPCIONALES a proposito: si no hay serie -- archivo
+    ausente, filas que faltan -- la hora sale como salia. Esto aniade
+    resolucion, no la sustituye.
+    """
+    salida = {
         "t_utc": hour.t_utc.isoformat(),
         "nubes_previstas": hour.cloud_total,
         "p_despejado": (round(hour.clear_probability, 3)
@@ -57,6 +70,24 @@ def _hour(hour) -> dict:
         "seguro_para_abrir": hour.safety.safe_to_open,
         "porque": hour.safety.summary,
     }
+    punto = (serie or {}).get(
+        hour.t_utc.replace(minute=0, second=0, microsecond=0))
+    if not punto or site is None:
+        return salida
+
+    jet = punto.get("jet_speed")
+    if jet:
+        turbulencia = integrate(jet)
+        salida["seeing_arcsec"] = round(turbulencia.seeing_arcsec, 2)
+        salida["seeing_tercil"] = turbulencia.tercile
+    aod_total = punto.get("aod_total")
+    if aod_total is not None:
+        transparencia = evaluate_transparency(
+            aod_total=aod_total, aod_dust=punto.get("aod_dust"),
+            elevation_m=site.site_elevation, delta_h_m=site.delta_h)
+        salida["aod"] = round(transparencia.aod_site, 3)
+        salida["k_total"] = round(transparencia.k_total, 3)
+    return salida
 
 
 # El corte del veredicto binario. Al 50 % por la razon de siempre: es el umbral
@@ -104,6 +135,12 @@ def _night(day: dt.datetime, site: Site, root=None, *,
     # rejilla, asi que no pueden discrepar.
     times = night.adaptive_hours(10, 30, site)
     forecast = night_inputs(times[0], times[-1], site.site_id, root)
+    # La MISMA fuente sin colapsar, para que cada hora publique su seeing y su
+    # transparencia. La ventana se toma de las horas del informe y no de la
+    # rejilla, porque el informe llega mas lejos por los dos lados.
+    horas_informe = [h.t_utc for h in night_report.hours] or list(times)
+    serie_horaria = night_series(min(horas_informe), max(horas_informe),
+                                 site.site_id, root)
     turbulence = integrate(forecast["jet_speed"])
     transparency = evaluate_transparency(
         aod_total=forecast["aod_total"], aod_dust=forecast["aod_dust"],
@@ -203,7 +240,7 @@ def _night(day: dt.datetime, site: Site, root=None, *,
         "mejor_ventana": ({"desde": window[0].isoformat(),
                            "hasta": window[1].isoformat(),
                            "p_media": round(window[2], 3)} if window else None),
-        "horas": [_hour(h) for h in night_report.hours],
+        "horas": [_hour(h, serie_horaria, site) for h in night_report.hours],
         # Y la pregunta 2.
         "cielo": {
             "mag_cenit_mas_oscuro": round(darkest, 2) if darkest else None,
