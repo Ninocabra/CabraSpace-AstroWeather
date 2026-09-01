@@ -120,10 +120,25 @@ def project_clouds(points, payload, index: int) -> list[dict]:
 
 def moon_glow_profile(phase_angle: float, moon_alt: float, k: float,
                       separations=(5, 15, 30, 50, 80, 120, 170)) -> list[dict]:
-    """How the Moon's glow falls off with angular distance, from K&S.
+    """How the Moon's glow falls off with angular distance.
 
     This is the part of the render that is pure physics: the dome is not
     painting a decorative halo, it is painting the scattering function.
+
+    WHICH scattering function DEPENDS ON THE SEPARATION, and saying "from K&S"
+    as a blanket label -- which this docstring did until 2026-09-01 -- gets it
+    wrong in BOTH directions. `moonscatter.scattering` crosses over at about 84
+    degrees: below that the site's own fitted exponential wins, above it the
+    published Mauna Kea function takes over as a floor, so that an exponential
+    measured out to 80 degrees is never extrapolated to 170. Of the separations
+    sampled here, five (5 to 80) are the SITE fit and two (120, 170) are the
+    imported floor.
+
+    The distinction earns its lines because a constant provenance label is
+    believed: it is how you end up claiming a local calibration you are not
+    using, or crediting a published law for a number you fitted yourself.
+    Learned from the CabraTransit session, which had the mirror-image bug and
+    found it the same day.
     """
     profile = []
     for separation in separations:
