@@ -128,15 +128,44 @@ def night_inputs(start, end, site_id: str = "nerpio",
     try:
         row = connection.execute("""
             SELECT median(aod_total), median(aod_dust), count(*) FROM (
-                SELECT aod_total, aod_dust FROM forecasts
+                -- EL VALOR MAS FRESCO DE CADA COLUMNA, no la fila mas fresca.
+                -- Tercera vez que este proyecto se come el mismo fallo (las otras
+                -- dos: la nube contra la racha en `tonight`, y la pasada de solo
+                -- nubes desplazando a la de superficie).
+                --
+                -- Al mismo `valid_utc` escriben DOS fuentes de aerosol distintas:
+                -- `cams_openmeteo` trae el AOD total cada hora y se refresca a
+                -- diario, y `cams_ads` trae el desglose por especies -- el POLVO --
+                -- cada tres horas y con el analisis de la vispera. Coger la fila
+                -- mas reciente se queda siempre con la de Open-Meteo, que es mas
+                -- nueva y NO lleva polvo. Medido el 01-09-2026 a las 21:00Z:
+                -- `cams_openmeteo` (run del 01-09) con aod_dust NULL le ganaba a
+                -- `cams_ads` (run del 31-08) con aod_dust 0,178.
+                --
+                -- Efecto: el polvo llegaba al archivo y no llegaba al modelo. Sin
+                -- especies, el aerosol se corrige por altura como si fuera capa
+                -- limite -- y el polvo sahariano viaja por encima del observatorio,
+                -- que es justo el caso para el que existe la correccion -- asi que
+                -- la k publicada se quedaba un 14 % baja y `dust_alert` no podia
+                -- saltar en una noche de calima.
+                --
+                -- `arg_max` ignora los NULL del argumento: cada columna se queda
+                -- con su valor mas reciente que EXISTE.
+                SELECT arg_max(aod_total, run_utc) AS aod_total,
+                       arg_max(aod_dust,  run_utc) AS aod_dust
+                FROM forecasts
                 WHERE site_id = ? AND valid_utc BETWEEN ? AND ?
-                  AND aod_total IS NOT NULL
-                QUALIFY row_number() OVER (
-                    PARTITION BY valid_utc ORDER BY run_utc DESC) = 1)
+                  AND (aod_total IS NOT NULL OR aod_dust IS NOT NULL)
+                GROUP BY valid_utc
+                HAVING arg_max(aod_total, run_utc) IS NOT NULL)
         """, [site_id, start, end]).fetchone()
         if row and row[2]:
             result["aod_total"] = float(row[0])
-            result["aod_dust"] = float(row[1]) if row[1] is not None else FALLBACK_AOD_DUST
+            # NO se inventa un desglose por especies. `float(row[1]) or 0.01`
+            # dejaba `species_resolved` en True con una constante dentro, que
+            # es afirmar que sabemos cuanto del aerosol es polvo cuando no lo
+            # sabemos. None lo dice y `extinction.evaluate` degrada declarando.
+            result["aod_dust"] = float(row[1]) if row[1] is not None else None
             result["aod_source"] = "cams"
     except Exception:
         pass
@@ -199,11 +228,36 @@ def night_series(start, end, site_id: str = "nerpio",
     # filtro de no-nulo, y luego se juntan por hora.
     try:
         for valid, aod_total, aod_dust in connection.execute("""
-            SELECT valid_utc, aod_total, aod_dust FROM forecasts
+            -- EL VALOR MAS FRESCO DE CADA COLUMNA, no la fila mas fresca.
+            -- Tercera vez que este proyecto se come el mismo fallo (las otras
+            -- dos: la nube contra la racha en `tonight`, y la pasada de solo
+            -- nubes desplazando a la de superficie).
+            --
+            -- Al mismo `valid_utc` escriben DOS fuentes de aerosol distintas:
+            -- `cams_openmeteo` trae el AOD total cada hora y se refresca a
+            -- diario, y `cams_ads` trae el desglose por especies -- el POLVO --
+            -- cada tres horas y con el analisis de la vispera. Coger la fila
+            -- mas reciente se queda siempre con la de Open-Meteo, que es mas
+            -- nueva y NO lleva polvo. Medido el 01-09-2026 a las 21:00Z:
+            -- `cams_openmeteo` (run del 01-09) con aod_dust NULL le ganaba a
+            -- `cams_ads` (run del 31-08) con aod_dust 0,178.
+            --
+            -- Efecto: el polvo llegaba al archivo y no llegaba al modelo. Sin
+            -- especies, el aerosol se corrige por altura como si fuera capa
+            -- limite -- y el polvo sahariano viaja por encima del observatorio,
+            -- que es justo el caso para el que existe la correccion -- asi que
+            -- la k publicada se quedaba un 14 % baja y `dust_alert` no podia
+            -- saltar en una noche de calima.
+            --
+            -- `arg_max` ignora los NULL del argumento: cada columna se queda
+            -- con su valor mas reciente que EXISTE.
+            SELECT valid_utc,
+                   arg_max(aod_total, run_utc) AS aod_total,
+                   arg_max(aod_dust,  run_utc) AS aod_dust
+            FROM forecasts
             WHERE site_id = ? AND valid_utc BETWEEN ? AND ?
-              AND aod_total IS NOT NULL
-            QUALIFY row_number() OVER (
-                PARTITION BY valid_utc ORDER BY run_utc DESC) = 1
+              AND (aod_total IS NOT NULL OR aod_dust IS NOT NULL)
+            GROUP BY valid_utc
             ORDER BY valid_utc
         """, [site_id, start, end]).fetchall():
             fila = punto(valid)
