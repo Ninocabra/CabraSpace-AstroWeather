@@ -185,3 +185,41 @@ DAILY_OBSERVATION_SCHEMA = pa.schema(
 )
 
 SCHEMAS["daily_observations"] = DAILY_OBSERVATION_SCHEMA
+
+
+# --- Lo que hace que una fila sea una fila -----------------------------------
+#
+# El esquema dice de que TIPO es cada columna y ahi se paraba: `write_canonical`
+# rechazaba un nombre de columna inventado y aceptaba encantado una fila entera
+# a nulos. Eso es la misma familia de fallo que llevamos dos semanas cazando,
+# pero en la frontera de escritura: una fila sin identidad no se puede volver a
+# encontrar, y una fila sin ningun valor es ausencia disfrazada de dato.
+#
+# Aqui no hay dependencia nueva a proposito. La frontera ya existia -- el bucle
+# que valida columnas desconocidas en `archive.write_canonical` -- y lo unico
+# que le faltaba era tener algo que exigir.
+
+# Las columnas que IDENTIFICAN la fila. Un nulo aqui no es un dato que falta:
+# es una fila que no se puede consultar nunca mas.
+CLAVES_OBLIGATORIAS = {
+    "forecasts": ("site_id", "model", "run_utc", "valid_utc"),
+    "measurements": ("site_id", "t_utc"),
+    "daily_observations": ("site_id", "date", "station_id"),
+}
+
+# `member` es NULL en las pasadas deterministas y `lead_h` puede faltar: son
+# claves del esquema pero no son obligatorias, y por eso no estan arriba.
+
+# Rangos FISICOS, no estadisticos. Solo columnas donde el limite es una
+# definicion y no una opinion: una cobertura nubosa es un porcentaje, un AOD y
+# una velocidad no son negativos. Fuera de aqui, el numero no es "raro": es
+# imposible, y significa que algo se ha convertido mal aguas arriba.
+RANGOS = {
+    "cloud_low": (0.0, 100.0), "cloud_mid": (0.0, 100.0),
+    "cloud_high": (0.0, 100.0), "cloud_total": (0.0, 100.0),
+    "rh2m": (0.0, 100.0), "prob_precip": (0.0, 100.0),
+    "aod_total": (0.0, 5.0), "aod_dust": (0.0, 5.0),
+    "wind10m": (0.0, 150.0), "gust10m": (0.0, 150.0),
+    "precipitation": (0.0, 500.0),
+    "t2m": (-90.0, 60.0), "td2m": (-90.0, 60.0),
+}

@@ -165,6 +165,14 @@ def main() -> int:
         escribir_estado(estado)
 
     only = set(args.only) if args.only else (set(args.forzar) if args.forzar else None)
+    if only:
+        # EL QUE EMPUJA VA SIEMPRE. Medido el 01-09-2026: un
+        # `--forzar aerosol` corrio el trabajo, escribio sus 161 filas -- con
+        # las 41 de especies que llevaban seis dias sin llegar -- y las tiro a
+        # la basura con el runner, porque `archivo` no estaba en `only` y es el
+        # unico que commitea. Una pasada que CALCULA y no PERSISTE es peor que
+        # no correr: gasta minutos y deja creer que el dato esta guardado.
+        only = only | {ULTIMO}
     resumen = pasada(only=only, en_seco=args.en_seco)
 
     logger.info("pasada %s | vencidos: %s", resumen["ahora"],

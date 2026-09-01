@@ -17,7 +17,7 @@ from typing import Any, Iterable
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from .schema import SCHEMAS
+from .schema import SCHEMAS, CLAVES_OBLIGATORIAS, RANGOS
 
 PIPELINE_VERSION = "0.2.0"   # 0.2.0: FWHM por ajuste gaussiano (0.1.0 usaba momentos, ~30% alto)
 
@@ -87,10 +87,42 @@ def write_canonical(
 
     schema = SCHEMAS[dataset]
     known = set(schema.names)
-    for row in rows:
+    obligatorias = CLAVES_OBLIGATORIAS.get(dataset, ())
+    valores = [n for n in schema.names
+               if n not in obligatorias and n != "pipeline_version"]
+    for indice, row in enumerate(rows):
         unknown = set(row) - known
         if unknown:
             raise ValueError(f"unknown columns for {dataset}: {sorted(unknown)}")
+
+        # LA FRONTERA DE ESCRITURA EXIGE, NO SOLO DESCRIBE. Hasta el
+        # 01-09-2026 aqui solo se rechazaba un nombre de columna inventado, y
+        # una fila entera a nulos entraba sin una queja. Es el mismo fallo que
+        # llevamos dos semanas persiguiendo aguas abajo -- la ausencia escrita
+        # como si fuera dato -- pero en el sitio donde ya no se puede
+        # distinguir: una vez en el Parquet, "no lo sabiamos" y "no lo habia"
+        # son la misma fila.
+        faltan = [c for c in obligatorias if row.get(c) is None]
+        if faltan:
+            raise ValueError(
+                f"{dataset}[{indice}]: sin {faltan}, la fila no se puede "
+                f"volver a encontrar; algo la ha construido a medias")
+
+        if valores and all(row.get(c) is None for c in valores):
+            raise ValueError(
+                f"{dataset}[{indice}]: fila sin un solo valor. Escribirla "
+                f"seria publicar 'no hay dato' con aspecto de medida")
+
+        for columna, (minimo, maximo) in RANGOS.items():
+            valor = row.get(columna)
+            if valor is not None and not minimo <= float(valor) <= maximo:
+                # Fuera de rango no es "raro", es imposible: casi siempre una
+                # conversion de unidades que no se hizo (m/s contra km/h) o una
+                # fraccion que alguien creia porcentaje.
+                raise ValueError(
+                    f"{dataset}[{indice}]: {columna}={valor} fuera de "
+                    f"[{minimo}, {maximo}]; revisa las unidades de origen")
+
         row.setdefault("pipeline_version", PIPELINE_VERSION)
 
     table = pa.Table.from_pylist(

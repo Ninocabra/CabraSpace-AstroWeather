@@ -156,3 +156,50 @@ def test_cada_trabajo_declara_su_periodo():
     for nombre, trabajo in JOBS.items():
         assert trabajo.periodo > dt.timedelta(0), nombre
         assert callable(trabajo.funcion), nombre
+
+
+def test_forzar_arrastra_siempre_al_que_empuja(monkeypatch, tmp_path):
+    """Una pasada que CALCULA y no PERSISTE es peor que no correr.
+
+    Medido el 01-09-2026: `--forzar aerosol` corrio el trabajo, escribio sus
+    161 filas -- con las 41 de especies de aerosol que llevaban seis dias sin
+    llegar al archivo -- y las tiro a la basura al morir el runner, porque
+    `archivo` es el unico trabajo que commitea y `--forzar` lo habia dejado
+    fuera de `only`. La pasada salio en verde y el dato no existe.
+    """
+    import astroweather.colector as colector
+
+    vistos = {}
+
+    def falso_pasada(*, ahora=None, root=None, only=None, en_seco=False):
+        vistos["only"] = only
+        return {"ahora": "2026-09-01T20:00:00+00:00", "vencidos": [],
+                "ejecutados": [], "fallidos": []}
+
+    monkeypatch.setattr(colector, "pasada", falso_pasada)
+    monkeypatch.setattr(colector, "leer_estado", lambda root=None: {})
+    monkeypatch.setattr(colector, "escribir_estado",
+                        lambda estado, root=None: tmp_path / "estado.json")
+    monkeypatch.setattr("sys.argv", ["colector", "--forzar", "aerosol"])
+
+    colector.main()
+    assert vistos["only"] == {"aerosol", colector.ULTIMO}
+
+
+def test_sin_forzar_no_se_limita_nada(monkeypatch, tmp_path):
+    """La pasada normal sigue mirando TODOS los trabajos, no solo el que empuja."""
+    import astroweather.colector as colector
+
+    vistos = {}
+
+    def falso_pasada(*, ahora=None, root=None, only=None, en_seco=False):
+        vistos["only"] = only
+        return {"ahora": "2026-09-01T20:00:00+00:00", "vencidos": [],
+                "ejecutados": [], "fallidos": []}
+
+    monkeypatch.setattr(colector, "pasada", falso_pasada)
+    monkeypatch.setattr(colector, "leer_estado", lambda root=None: {})
+    monkeypatch.setattr("sys.argv", ["colector"])
+
+    colector.main()
+    assert vistos["only"] is None

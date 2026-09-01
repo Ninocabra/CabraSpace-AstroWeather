@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import argparse
 import time
+import duckdb
+
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
@@ -193,7 +195,12 @@ def ultima_archivada(station: str = DEFAULT_STATION,
         fila = connect(root).execute(
             "SELECT max(t_utc) FROM measurements WHERE instrument_id = ?",
             [station]).fetchone()
-    except Exception:
+    except (duckdb.Error, OSError):
+        # La primera pasada de una maquina nueva no tiene archivo que consultar
+        # y eso NO es un fallo. Cualquier otra cosa -- un esquema que cambio,
+        # un bug aqui -- sube a `guarded` en vez de disfrazarse de "no hay
+        # medidas todavia", que es indistinguible y nos costo seis dias en el
+        # aerosol.
         return None
     if not fila or fila[0] is None:
         return None

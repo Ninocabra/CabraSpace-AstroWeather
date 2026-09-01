@@ -237,20 +237,26 @@ def run(site: Site = NERPIO, *, days: int = 5, with_dust: bool = False) -> int:
                   + f"; AOD del sitio en el analisis ({dust[0]['valid_utc']:%d-%m %HZ}) "
                   f"{analysis:.3f}")
             rows += dust
-        except ImportError as error:
-            # UNA DEPENDENCIA QUE FALTA NO ES UNA FUENTE CAIDA, y tratarlas
-            # igual es lo que costo seis dias de aerosol sin especies. La cola
-            # de CAMS se recupera sola; un modulo ausente no se instala solo, y
-            # cada pasada que lo trague vuelve a perder el polvo del dia.
-            # `::error::` lo saca a la cara del run en Actions aunque el job
-            # termine en verde, que es justo el caso que hay que romper.
-            print(f"::error::[fetch_aerosol] CAMS dust IMPOSIBLE en este entorno: "
-                  f"falta el modulo '{error.name}'. Declaralo en "
-                  f"requirements-colector.txt; no se va a arreglar solo.")
-        except Exception as error:      # queue down, licence revoked, etc.
-            # Esto SI es transitorio: se degrada, se avisa y se reintenta manana.
-            print(f"::warning::[fetch_aerosol] CAMS dust NO disponible: "
-                  f"{type(error).__name__}: {str(error)[:160]}")
+        except (requests.exceptions.RequestException, TimeoutError) as error:
+            # LO UNICO QUE SE TRAGA AQUI: la red y la cola de CAMS, que se
+            # recuperan solas y para las que reintentar manana es la respuesta
+            # correcta. Todo lo demas SUBE hasta `scheduler.guarded`, que ya
+            # sabe gritar: registra `ERROR aerosol FALLO ...`, deja el trabajo
+            # vencido y lo reintenta en la pasada siguiente.
+            #
+            # POR QUE NO UN `except Exception` AQUI. Este mismo bloque se
+            # tragaba un `ModuleNotFoundError: netCDF4` y lo publicaba como
+            # "fuente no disponible": seis dias de aerosol sin especies con el
+            # trabajo en verde todos los dias. Y el proximo de la familia ya se
+            # ve venir: si Open-Meteo cambia su JSON, un `KeyError` diria
+            # exactamente lo mismo y nos costaria meses en vez de dias.
+            #
+            # Que un fallo de parseo tumbe el trabajo no cuesta descargas de
+            # mas: cuando el problema es la descarga, no hay descarga que
+            # pagar, y cuando la descarga funciona el fallo es nuestro y hay
+            # que enterarse hoy.
+            print(f"::warning::[fetch_aerosol] CAMS dust NO disponible "
+                  f"(se reintenta): {type(error).__name__}: {str(error)[:160]}")
     return len(rows)
 
 
