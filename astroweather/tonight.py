@@ -82,24 +82,66 @@ class NightReport:
         return opening_probability([h.usable_probability for h in self.hours])
 
 
+def _safety_rows(connection, site: Site, start: dt.datetime, end: dt.datetime):
+    """Racha, CAPE y lluvia por hora, de CUALQUIER modelo que las publique.
+
+    POR QUE ESTO NO VA CON EL FILTRO DE MODELO DE LA NUBE. La nube se filtra al
+    modelo con el que se entreno el calibrador, y con razon: la curva es de una
+    malla concreta y aplicarla a otra es corregir numeros que no son suyos. Pero
+    esa razon vale para lo que pasa por una CURVA AJUSTADA, no para lo que pasa
+    por un umbral fisico. La puerta de viento pregunta si la racha supera 11,1
+    m/s; ese umbral no se midio contra ninguna malla, asi que la racha de otro
+    modelo responde a la pregunta igual de bien.
+
+    Y NO ES ACADEMICO. El 28-08-2026 la consulta se filtro a `ecmwf_ifs025`
+    porque el calibrador venia de ahi -- correcto -- pero `ecmwf_ifs025` NO
+    publica racha, ni CAPE, ni probabilidad de precipitacion: las publica
+    `ecmwf_ifs`. Desde ese dia las tres puertas de seguridad recibian None en
+    todas las horas y devolvian "ok" sin mirar nada. Medido la noche del
+    01-09-2026: 13 horas de 13 sin un solo dato de seguridad, mientras el
+    archivo tenia rachas de hasta 8,0 m/s PARA ESAS MISMAS HORAS.
+
+    `arg_max(col, run_utc)` ignora los NULL del argumento, asi que cada columna
+    se queda con su valor mas reciente que existe, sin que una pasada de solo
+    nubes -- que corre en cada recogida -- desplace a la de superficie completa,
+    que corre una vez al dia.
+    """
+    filas = connection.execute("""
+        SELECT valid_utc,
+               arg_max(wind10m,       run_utc),
+               arg_max(gust10m,       run_utc),
+               arg_max(precipitation, run_utc),
+               arg_max(prob_precip,   run_utc),
+               arg_max(cape,          run_utc),
+               arg_max(model,         run_utc) FILTER (WHERE gust10m IS NOT NULL)
+        FROM forecasts
+        WHERE site_id = ? AND valid_utc BETWEEN ? AND ?
+          AND member IS NULL AND model NOT LIKE '%prev%'
+        GROUP BY valid_utc
+    """, [site.site_id, start, end]).fetchall()
+    return {f[0]: f[1:] for f in filas}
+
+
 def _forecast_rows(site: Site, start: dt.datetime, end: dt.datetime, root=None,
                    model: str | None = None):
-    """Las horas de la noche, de UN modelo.
+    """Las horas de la noche: la NUBE de un modelo, la SEGURIDAD de quien la dé.
 
-    El filtro por modelo no es cosmetico. Sin el, la consulta se queda con la
-    pasada mas reciente de CUALQUIER proveedor, hora por hora: ICON corre cada
-    3 h y GFS cada 6, asi que pueden desplazar al ECMWF en unas horas y no en
-    otras y dejar una noche cosida con tres modelos distintos. Y encima la
-    curva de calibracion es de uno solo, asi que aplicarla al resto es corregir
-    numeros que no son suyos. El propio marcador avisa de que los proveedores
-    no entienden lo mismo por "cobertura nubosa".
+    El filtro por modelo no es cosmetico para la nube. Sin el, la consulta se
+    queda con la pasada mas reciente de CUALQUIER proveedor, hora por hora: ICON
+    corre cada 3 h y GFS cada 6, asi que pueden desplazar al ECMWF en unas horas
+    y no en otras y dejar una noche cosida con tres modelos distintos. Y encima
+    la curva de calibracion es de uno solo, asi que aplicarla al resto es
+    corregir numeros que no son suyos. El propio marcador avisa de que los
+    proveedores no entienden lo mismo por "cobertura nubosa".
+
+    Las variables de SEGURIDAD son otra cosa y van por su camino: ver
+    `_safety_rows`.
     """
     connection = connect(root)
     condicion = "AND model = ?" if model else "AND model NOT LIKE '%prev%'"
     parametros = [site.site_id, start, end] + ([model] if model else [])
-    return connection.execute(f"""
-        SELECT valid_utc, cloud_total, wind10m, gust10m, precipitation,
-               prob_precip, cape, lead_h
+    nubes = connection.execute(f"""
+        SELECT valid_utc, cloud_total, lead_h
         FROM forecasts
         WHERE site_id = ? AND valid_utc BETWEEN ? AND ?
           AND member IS NULL AND cloud_total IS NOT NULL
@@ -107,6 +149,20 @@ def _forecast_rows(site: Site, start: dt.datetime, end: dt.datetime, root=None,
         QUALIFY row_number() OVER (PARTITION BY valid_utc ORDER BY run_utc DESC) = 1
         ORDER BY valid_utc
     """, parametros).fetchall()
+    seguridad = _safety_rows(connection, site, start, end)
+    salida = []
+    for valid, cloud, lead in nubes:
+        viento, racha, precip, pprec, cape, _modelo = seguridad.get(
+            valid, (None, None, None, None, None, None))
+        salida.append((valid, cloud, viento, racha, precip, pprec, cape, lead))
+    return salida
+
+
+def safety_source(site: Site, start: dt.datetime, end: dt.datetime, root=None):
+    """De que modelo salio la racha, para poder declararlo. None si no hay."""
+    modelos = {f[5] for f in _safety_rows(connect(root), site, start, end).values()
+               if f[5]}
+    return sorted(modelos)
 
 
 def report(day: dt.datetime | None = None, site: Site = NERPIO, root=None) -> NightReport:

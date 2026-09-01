@@ -211,7 +211,7 @@ jobs:
         # disco; aqui es la cache, que es gratis y no ensucia el historial.
         # Si se pierde, se pierde como mucho el raw de un dia: los valores ya
         # estan en `measurements`, que si viaja en cada pasada.
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: data/raw
           key: colector-raw-${{ github.run_id }}
@@ -274,7 +274,7 @@ jobs:
         # `always()` porque el raw ya raspado es dato aunque otro trabajo haya
         # fallado despues: tirarlo por un fallo ajeno seria perderlo del todo.
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: data/raw
           key: colector-raw-${{ github.run_id }}

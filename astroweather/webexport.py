@@ -844,6 +844,29 @@ def build(site: Site = NERPIO, *, nights: int = 2, root=None) -> dict:
         avisos.append("No hay previsión de aerosol para esta noche: la "
                       "transparencia sale de un valor supuesto.")
 
+    # DE DONDE SALEN RACHA, CAPE Y LLUVIA, que desde el 01-09-2026 pueden venir
+    # de una malla distinta de la de la nube. Es correcto -- esas tres pasan por
+    # umbrales físicos y no por la curva calibrada, así que la malla no las
+    # invalida -- pero no puede ser silencioso: quien lea "NO abrir" tiene
+    # derecho a saber qué modelo lo dijo.
+    try:
+        from .tonight import safety_source
+        from .ephem import night_for
+        noche_actual = night_for(now, site)
+        fuentes = safety_source(site, noche_actual.window_start,
+                                noche_actual.window_end, root)
+    except Exception:
+        fuentes = []
+    if not fuentes:
+        avisos.append("No hay previsión de racha, CAPE ni precipitación para "
+                      "esta noche: las puertas de seguridad no han podido "
+                      "comprobar nada y el veredicto de abrir solo mira nubes.")
+    elif calibrator and fuentes != [calibrator.trained_on_model]:
+        avisos.append("La racha, el CAPE y la lluvia salen de %s, no de la "
+                      "malla con la que se calibró la nube (%s): son umbrales "
+                      "físicos y no la curva, así que la malla no los invalida."
+                      % (", ".join(fuentes), calibrator.trained_on_model))
+
     return {
         "generado_utc": now.isoformat(timespec="seconds"),
         "sitio": {
