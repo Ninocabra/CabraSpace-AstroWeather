@@ -69,16 +69,65 @@ on:
   # EL RITMO DE VERDAD, que vive en cron-job.org y se documenta AQUI para que
   # este fichero siga siendo la unica fuente de verdad (verano, abr-sep, UTC):
   #
-  #     */15  19-23   ventana de decision      20/dia
-  #     */15  0       ...que cruza medianoche   4/dia
-  #     0,30  1-4     madrugada                 8/dia
+  #     */5   19-20   VENTANA DE APERTURA      24/dia
+  #     */15  21-23   vigilancia                12/dia
+  #     */15  0-4     vigilancia                20/dia
   #                                            -------
-  #                                            32/dia
+  #                                            56/dia
+  #
+  # LA VENTANA DE APERTURA (01-09-2026). La pregunta del producto es si
+  # AstroCamp abre, y eso se decide en la media hora larga alrededor del ocaso
+  # astronomico. Hasta hoy el techo se leia cada 30 minutos: el ocaso del 01-09
+  # cayo a las 20:11Z y el archivo tiene lecturas a las 19:01, 19:31, 20:01 y
+  # 20:31. Si hubiera abierto a las 20:05 no lo habriamos sabido hasta las
+  # 20:31, con la noche ya empezada.
+  #
+  # Cinco minutos desde una hora ANTES del ocaso y durante dos horas, o hasta
+  # que abra. Despues, quince: un techo abierto se puede cerrar, y enterarse
+  # tarde de eso es el mismo fallo por el otro lado.
+  #
+  # EL RELOJ SOLO NO BASTA, y esto es lo que casi se nos escapa. `sensores`
+  # tenia periodo de 10 minutos para estar vencido en cualquier pasada de un
+  # reloj de 15. Con un reloj de 5, ese mismo 10 pasa de red de seguridad a
+  # TAPON: la mitad de las pasadas encuentran el trabajo no vencido, y se paga
+  # el doble de runners para seguir muestreando cada 10 minutos. Por eso
+  # `scheduler.ritmo_de_techos` baja el periodo a 3 minutos dentro de la
+  # ventana. Las dos mitades se mueven juntas o no se mueve nada.
+  #
+  # LAS HORAS SON DE VERANO Y HAY QUE MOVERLAS CON LA ESTACION. El ocaso
+  # astronomico en Nerpio va de las 21:30Z en junio a las 18:25Z en diciembre:
+  #
+  #     jun-jul   */5 20-22      sep-oct   */5 18-20
+  #     ago       */5 19-21      nov-feb   */5 17-19
+  #
+  # El colector NO depende de que esto este bien afinado: calcula el ocaso de
+  # cada noche por efemerides y acelera solo. Un reloj mal puesto pierde
+  # resolucion; no publica nada falso.
+  #
+  # LO QUE CUESTA, y hay que decidirlo ANTES de subir el reloj:
+  #
+  #     51 normales x 1 min   = 51
+  #      4 con prevision x 4  = 16
+  #      1 lote diario x 4    =  4
+  #     -------------------------
+  #                             71 min/dia = ~2.130/mes
+  #     + archivo del EPS         60
+  #     -------------------------
+  #                            ~2.190 de los 2.000 gratuitos
+  #
+  # Se sale por ~190 minutos, que a 0,008 $/min son ~1,50 $/mes. El problema NO
+  # es el dinero: el limite de gasto de Actions viene a CERO por defecto, y con
+  # cero los workflows se PARAN al agotar los minutos. La recogida se moriria a
+  # mitad de mes y en silencio, que es exactamente el fallo del que venimos.
+  #
+  # Dos salidas, y hay que elegir una:
+  #   1. Mover este workflow a un repo PUBLICO -- el de datos ya lo es -- y
+  #      hacer checkout del motor privado con el PAT. Los minutos de repo
+  #      publico son gratis y el techo desaparece para siempre.
+  #   2. Subir el limite de gasto en Settings -> Billing.
   #
   # El bloque de DIA del diseno anterior ("0 6-18/2", 7/dia) se retira: lo
-  # cubre ya el propio perro guardian y era lo menos valioso de los tres
-  # ritmos. El de INVIERNO (oct-mar, ventana 17-22 y madrugada 0-6) se montara
-  # en octubre, con un mes de consumo real encima de la mesa.
+  # cubre ya el propio perro guardian y era lo menos valioso de los tres ritmos.
   schedule:
     # CUATRO AL DIA Y CADA SEIS HORAS, que no es un numero redondo: seis horas
     # es EXACTAMENTE el periodo de `forecast`, `prediccion` y `publicar`. Si el

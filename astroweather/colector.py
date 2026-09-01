@@ -79,7 +79,7 @@ def escribir_estado(estado: dict[str, dt.datetime], root: Path | None = None) ->
 
 
 def vencidos(ahora: dt.datetime, estado: dict[str, dt.datetime],
-             only: set[str] | None = None) -> list[str]:
+             only: set[str] | None = None, root: Path | None = None) -> list[str]:
     """Que toca correr AHORA, en orden de dependencia.
 
     Un trabajo esta vencido si nunca ha corrido o si ha pasado su periodo. Los
@@ -92,7 +92,13 @@ def vencidos(ahora: dt.datetime, estado: dict[str, dt.datetime],
         if only and nombre not in only:
             continue
         ultimo = estado.get(nombre)
-        if ultimo is not None and ahora - ultimo < trabajo.periodo:
+        # El periodo puede depender del MOMENTO: los techos se miran cada tres
+        # minutos en la ventana de apertura y cada diez el resto de la noche.
+        # Sin esto, subir el reloj a cinco minutos no subiria el muestreo: el
+        # trabajo saldria no vencido en la mitad de las pasadas y pagariamos el
+        # doble de runners para la misma resolucion.
+        periodo = trabajo.ritmo(ahora, root) if trabajo.ritmo else trabajo.periodo
+        if ultimo is not None and ahora - ultimo < periodo:
             continue
         if trabajo.desde_hora_utc is not None:
             if ahora.hour < trabajo.desde_hora_utc:
@@ -110,7 +116,7 @@ def pasada(*, ahora: dt.datetime | None = None, root: Path | None = None,
     """Una pasada completa. Devuelve que se hizo, para el log del runner."""
     ahora = ahora or dt.datetime.now(dt.timezone.utc)
     estado = leer_estado(root)
-    pendientes = vencidos(ahora, estado, only)
+    pendientes = vencidos(ahora, estado, only, root)
 
     if en_seco:
         return {"ahora": ahora.isoformat(timespec="seconds"),

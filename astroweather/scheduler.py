@@ -244,10 +244,84 @@ class Trabajo(NamedTuple):
 
     funcion: Callable[[], object]
     periodo: timedelta
+    # ...o un periodo que depende del MOMENTO. `periodo` sigue siendo el caso
+    # normal y el que usa el scheduler local; `ritmo` manda cuando existe.
+    ritmo: Callable[[datetime], timedelta] | None = None
     # ...y nunca antes de esta hora UTC. Solo para lo que necesita que la noche
     # anterior este CERRADA: verificar o remedir el suelo sobre una noche a
     # medias no es que sea impreciso, es que es otra cosa.
     desde_hora_utc: int | None = None
+
+
+# --- El ritmo de los techos ------------------------------------------------
+#
+# LA PREGUNTA DEL PRODUCTO ES "¿ABRE ASTROCAMP?", y esa pregunta se responde en
+# una franja estrecha: la media hora larga alrededor del ocaso astronomico, que
+# es cuando el observatorio decide. Fuera de ahi el techo cambia poco; dentro,
+# cambia una vez y esa vez es TODA la informacion.
+#
+# Medido el 01-09-2026: el ocaso astronomico cayo a las 20:11Z y el archivo
+# tiene lecturas de techo a las 19:01, 19:31, 20:01 y 20:31. Cinco muestras de
+# media hora para cubrir el unico momento que importa: si hubiera abierto a las
+# 20:05 no lo habriamos sabido hasta las 20:31.
+#
+# POR QUE ESTO NO ES SOLO CAMBIAR EL CRON DE FUERA. `sensores` tiene periodo de
+# 10 minutos a proposito, para estar vencido en cualquier pasada de un reloj de
+# 15. Con un reloj de 5 minutos ese mismo 10 pasa de red de seguridad a TAPON:
+# la mitad de las pasadas encontrarian el trabajo no vencido y el muestreo real
+# seguiria siendo de 10 minutos con el doble de runners pagados. El ritmo tiene
+# que bajar con el reloj o el reloj no sirve de nada.
+VENTANA_TECHOS_ANTES = timedelta(hours=1)
+VENTANA_TECHOS_LARGO = timedelta(hours=2)
+# Por debajo de los 5 minutos del reloj, por el mismo motivo que 10 esta por
+# debajo de 15: el trabajo tiene que estar vencido SIEMPRE que el runner
+# arranque, y las pasadas no caen en punto.
+RITMO_TECHOS_APERTURA = timedelta(minutes=3)
+
+
+def techo_abierto(root=None) -> bool | None:
+    """El ultimo estado conocido del techo. None si no hay ninguno.
+
+    None no es "cerrado": significa que no lo sabemos, y aguas arriba se trata
+    como el caso que MAS resolucion necesita, no como el que menos.
+    """
+    try:
+        from .queries import connect
+        fila = connect(root).execute("""
+            SELECT roof_open FROM measurements
+            WHERE instrument_id = 'astrocamp_roofs' AND roof_open IS NOT NULL
+            ORDER BY t_utc DESC LIMIT 1
+        """).fetchone()
+    except Exception:                                   # noqa: BLE001
+        return None
+    return bool(fila[0]) if fila else None
+
+
+def ritmo_de_techos(ahora: datetime, root=None) -> timedelta:
+    """Cada cuanto mirar el techo, segun donde estemos de la noche.
+
+    Cinco minutos desde una hora ANTES del ocaso astronomico y durante dos
+    horas, mientras el techo siga cerrado. En cuanto abre -- o pasadas las dos
+    horas -- se vuelve al ritmo de vigilancia, que no se apaga: un techo abierto
+    se puede cerrar, y enterarse tarde de eso es el mismo fallo por el otro
+    lado.
+    """
+    if techo_abierto(root):
+        return JOBS_PERIODO_SENSORES
+    try:
+        from .ephem import night_for
+        ocaso = night_for(ahora, NERPIO).dusk_astronomical
+    except Exception:                                   # noqa: BLE001
+        return JOBS_PERIODO_SENSORES
+    inicio = ocaso - VENTANA_TECHOS_ANTES
+    if inicio <= ahora <= inicio + VENTANA_TECHOS_LARGO:
+        return RITMO_TECHOS_APERTURA
+    return JOBS_PERIODO_SENSORES
+
+
+# El periodo de fuera de la ventana. Sigue siendo mas corto que el reloj para
+# que ninguna pasada se quede sin raspar.
+JOBS_PERIODO_SENSORES = timedelta(minutes=10)
 
 
 # El ritmo de cada trabajo lo marca lo deprisa que OLVIDA su fuente, no lo a
@@ -259,7 +333,8 @@ JOBS: dict[str, Trabajo] = {
     # pagado, raspar en cada arranque sale gratis. Asi la resolucion del
     # archivo sigue a la cadencia de la noche -- cuarto de hora en la ventana
     # de decision -- en vez de ser plana.
-    "sensores": Trabajo(_job_sensors, timedelta(minutes=10)),
+    "sensores": Trabajo(_job_sensors, JOBS_PERIODO_SENSORES,
+                        ritmo=ritmo_de_techos),
     # Los miembros del EPS caducan aguas arriba en ~4 dias.
     "ensemble": Trabajo(_job_ensemble, timedelta(hours=12)),
     "forecast": Trabajo(_job_forecast, timedelta(hours=6)),
