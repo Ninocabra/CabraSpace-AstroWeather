@@ -160,7 +160,7 @@ def _night(day: dt.datetime, site: Site, root=None, *,
             usable.get(t.replace(minute=0, second=0, microsecond=0), 0.0)
             for t in times],
         turbulence=turbulence, aod_total=forecast["aod_total"],
-        aod_dust=forecast["aod_dust"], site=site)
+        aod_dust=forecast["aod_dust"], serie=serie_horaria, site=site)
 
     calibracion = _calibracion_fotometro()
     ordenados = sorted(targets, key=lambda t: (-t.q_expected, -t.q_conditional,

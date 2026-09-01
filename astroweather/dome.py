@@ -31,7 +31,7 @@ from .extinction import evaluate as evaluate_transparency
 from .moonsky import moon_brightness, nl_to_mag, mag_to_nl
 from .seeing import integrate
 from .site import NERPIO, Site
-from .queries import night_inputs
+from .queries import night_inputs, night_series
 from .skymodel import predict
 from .targets import CATALOGUE, evaluate_night
 
@@ -208,8 +208,9 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO,
         })
 
     targets = evaluate_night(CATALOGUE, times, usable_probability=[0.8] * len(times),
-                             turbulence=turbulence,
-                             aod_total=aod_total, aod_dust=aod_dust, site=site)
+                             turbulence=turbulence, aod_total=aod_total,
+                             aod_dust=aod_dust, site=site,
+                             serie=night_series(times[0], times[-1], site.site_id))
     tracks = []
     for result in targets[:6]:
         altitudes, azimuths, separations = result.target.positions(times, site)

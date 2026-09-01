@@ -39,6 +39,7 @@ import astropy.units as u
 
 from .ephem import location, moon_phase_angle, moon_positions, night_for
 from .extinction import evaluate as evaluate_transparency
+from .hourly import at_times
 from .moonsky import mag_to_nl, moon_brightness, nl_to_mag
 from .seeing import Turbulence
 from .site import NERPIO, Site
@@ -397,11 +398,44 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
                    *, usable_probability: list[float],
                    turbulence: Turbulence | None = None,
                    aod_total: float | None = None, aod_dust: float | None = None,
+                   serie: dict | None = None,
                    site: Site = NERPIO) -> list[TargetNight]:
     """Score every target over the night, using the whole physics stack."""
+    # The NIGHT's transparency: still the median, and still what the verdict
+    # sentence talks about, because "there is calima tonight" is a statement
+    # about the night and not about 03:40.
     transparency = evaluate_transparency(
         aod_total=aod_total, aod_dust=aod_dust,
         elevation_m=site.site_elevation, delta_h_m=site.delta_h)
+    # ...and the transparency of EACH HOUR, which is what the physics gets.
+    #
+    # WHY THIS IS NOT COSMETIC. Extinction enters three places that are all
+    # exponential in k: the Moon's two light paths, the target's own airmass
+    # loss, and the yield. Feeding all three the median of a quantity that
+    # moves inside the night is not "roughly right" -- by Jensen it is not even
+    # unbiased. CabraTransit measured k moving 0.068 -> 0.110 WITHIN one night,
+    # five times the difference they see BETWEEN nights, and the archive backs
+    # it: 28-08-2026 ran 0.060 -> 0.193 in AOD over Nerpio in a day.
+    #
+    # HOW MUCH IT IS WORTH, measured and not asserted. On a quiet night it is
+    # small: 01-09-2026 moved AOD 0.24 -> 0.27 across the window (k 0.323 ->
+    # 0.345) and the ranking did not change, with E[Q] shifting a median 0.5 %
+    # and at most 2.4 %. On a night that actually moves it is not: an AOD ramp
+    # 0.05 -> 0.35 -- SAME median as a flat 0.20, so the old code could not
+    # tell them apart -- moves 35 catalogue objects a median 3.1 % and up to
+    # 19 %, and in BOTH directions. That two-sided spread is the point: the
+    # median was not adding noise, it was deleting which hours are the good
+    # ones.
+    #
+    # `serie` is optional and its absence is not an error: with no series every
+    # hour gets the median back and the report comes out as it did before.
+    hourly = zip(at_times(serie or {}, "aod_total", times, fallback=aod_total),
+                 at_times(serie or {}, "aod_dust", times, fallback=aod_dust))
+    transparencies = [
+        evaluate_transparency(aod_total=total, aod_dust=dust,
+                              elevation_m=site.site_elevation,
+                              delta_h_m=site.delta_h)
+        for total, dust in hourly]
     # The floor must carry twilight, not just the natural background: the
     # product window opens an hour before sunset, and without the twilight term
     # those daylight hours look like pristine dark sky and score as usable.
@@ -438,6 +472,8 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
 
         trace: list[dict] = []
         for index, when in enumerate(times):
+            # THIS hour's k (see above), not the night's.
+            k_hour = transparencies[index].k_total
             altitude = float(altitudes[index])
             if altitude < MIN_ALTITUDE:
                 trace.append({"alt": round(altitude, 1),
@@ -461,14 +497,14 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
                 separation_deg=max(1.0, 90.0 - moon[when].altitude),
                 moon_altitude_deg=moon[when].altitude,
                 target_altitude_deg=90.0,
-                extinction_k=transparency.k_total,
+                extinction_k=k_hour,
             )
             target_moon = moon_brightness(
                 phase_angle_deg=phase,
                 separation_deg=float(separations[index]),
                 moon_altitude_deg=moon[when].altitude,
                 target_altitude_deg=altitude,
-                extinction_k=transparency.k_total,
+                extinction_k=k_hour,
             )
             # The filter cuts EVERYTHING outside its passband, not just the
             # Moon: twilight, airglow and zodiacal light are broadband too.
@@ -497,7 +533,7 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
                       else FWHM_REFERENCE * airmass ** 0.6)
             value = hourly_yield(airmass=airmass, sky_mag=sky_mag,
                                  seeing_arcsec=seeing,
-                                 k_total=transparency.k_total, alpha=target.alpha,
+                                 k_total=k_hour, alpha=target.alpha,
                                  difficulty=target.difficulty)
             conditional += value * weights[index]
             expected += value * weights[index] * usable_probability[index]
@@ -506,7 +542,7 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
             # Which of the three penalties is actually costing this hour.
             # The recommendation is worth little if it cannot say why.
             gate = SKY_GATE.get(target.difficulty, 20.0)
-            extinction_loss = 1 - 10 ** (-0.8 * transparency.k_total * (airmass - 1))
+            extinction_loss = 1 - 10 ** (-0.8 * k_hour * (airmass - 1))
             background_loss = 1 - min(1.0, 10 ** (0.4 * (sky_mag - epoch_floor())))
             moon_up = moon[when].altitude > 0
             if value <= 0.0:

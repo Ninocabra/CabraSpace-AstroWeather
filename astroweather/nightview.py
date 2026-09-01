@@ -34,7 +34,7 @@ from .ephem import moon_illumination, moon_phase_angle, moon_positions, night_fo
 from .extinction import evaluate as evaluate_transparency
 from .seeing import integrate
 from .site import NERPIO, Site
-from .queries import night_inputs
+from .queries import night_inputs, night_series
 from .skymodel import predict
 from .skyobjects import (milky_way_field, planet_positions, sidereal_degrees,
                          visible_stars)
@@ -249,8 +249,8 @@ def _site_weather(payload, index) -> dict:
 
 def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
           aod_total: float | None = None, aod_dust: float | None = None,
-          jet_speed: float | None = None, with_clouds: bool = True,
-          usable: float = 0.8) -> dict:
+          jet_speed: float | None = None, serie: dict | None = None,
+          with_clouds: bool = True, usable: float = 0.8) -> dict:
     """Everything both views need, in one JSON-ready dictionary.
 
     El aerosol y el jet salen de la PREVISION de esta noche, no de una
@@ -269,6 +269,10 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
     aod_total = forecast["aod_total"] if aod_total is None else aod_total
     aod_dust = forecast["aod_dust"] if aod_dust is None else aod_dust
     jet_speed = forecast["jet_speed"] if jet_speed is None else jet_speed
+    # Y la MISMA prevision sin colapsar a la mediana, que es de donde sale la
+    # extincion de cada hora. La mediana se queda para el veredicto de la noche.
+    serie = (night_series(times[0], times[-1], site.site_id)
+             if serie is None else serie)
 
     skies = predict(times, site)
     moons = moon_positions(times, site)
@@ -322,7 +326,7 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
     results = evaluate_night(CATALOGUE, times,
                              usable_probability=[usable] * len(times),
                              turbulence=turbulence, aod_total=aod_total,
-                             aod_dust=aod_dust, site=site)
+                             aod_dust=aod_dust, serie=serie, site=site)
     moon_altitudes = [f["moon_alt"] for f in frames]
     lanes = []
     for result in results:
