@@ -275,6 +275,19 @@ def _night(day: dt.datetime, site: Site, root=None, *,
                 "k_total": round(transparency.k_total, 3),
                 "veredicto": transparency.verdict,
                 "origen": forecast["aod_source"],
+                # LAS DOS JUNTAS O NINGUNA. `calima: false` a solas es
+                # indistinguible de "no tenemos el desglose", y esa confusion
+                # no es teorica: del 27-08 al 01-09-2026 el producto publico
+                # que no habia calima seis dias seguidos porque `netCDF4` no
+                # estaba declarado en el runner y las especies de CAMS no
+                # llegaban. La noche del 01-09 tenia polvo por encima del
+                # umbral en TODAS las horas.
+                #
+                # Con `especies` al lado, un `false` significa "lo hemos
+                # mirado" y su ausencia significa "no lo sabemos". Que es todo
+                # lo que hay que decir.
+                "calima": transparency.dust_alert,
+                "especies": transparency.species_resolved,
             },
         },
         # `evaluate_night` devuelve en orden de CATALOGO, no de calidad: cortar

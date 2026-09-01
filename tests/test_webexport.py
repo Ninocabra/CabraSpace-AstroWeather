@@ -29,7 +29,8 @@ def _noche(recomendaciones, origen_seeing="ecmwf", origen_aod="cams"):
             "seeing": {"tercil": "favorable", "rango_arcsec": [0.8, 1.3],
                        "jet_ms": 18.0, "origen": origen_seeing, "calibrado": False},
             "transparencia": {"aod": 0.053, "k_total": 0.2,
-                              "veredicto": "noche transparente", "origen": origen_aod},
+                              "veredicto": "noche transparente", "origen": origen_aod,
+                              "calima": False, "especies": True},
         },
         "recomendaciones": recomendaciones,
     }
@@ -127,3 +128,31 @@ def test_lo_mas_oscuro_es_lo_mas_oscuro_y_no_lo_contrario():
     assert cielo["mag_cenit_tipico"] == pytest.approx(
         statistics.median(de_noche), abs=0.01)
     assert cielo["mag_cenit_tipico"] <= cielo["mag_cenit_mas_oscuro"]
+
+
+def test_la_calima_nunca_viaja_sin_decir_si_la_hemos_medido():
+    """`calima: false` a solas es indistinguible de "no tenemos el dato".
+
+    Y no es teorico: del 27-08 al 01-09-2026 el producto publico seis dias
+    seguidos que no habia calima porque `netCDF4` no estaba declarado en el
+    runner y las especies de CAMS no llegaban al archivo. La noche del 01-09
+    tenia polvo por encima del umbral en TODAS sus horas.
+
+    La regla de este fichero -- nada se publica sin su incertidumbre -- aplicada
+    al par: si sale una, sale la otra.
+    """
+    from astroweather.site import NERPIO
+
+    publicado = webexport._night(
+        dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc), NERPIO)
+    if publicado is None:
+        pytest.skip("sin datos de esa noche en el archivo local")
+
+    transp = publicado["cielo"]["transparencia"]
+    assert ("calima" in transp) == ("especies" in transp), (
+        "una sin la otra deja al lector sin saber si el false es una medida o "
+        "un hueco")
+    assert isinstance(transp["especies"], bool)
+    if transp["calima"]:
+        assert transp["especies"] is True, (
+            "no se puede avisar de calima sin tener el desglose que la define")
