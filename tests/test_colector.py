@@ -203,3 +203,34 @@ def test_sin_forzar_no_se_limita_nada(monkeypatch, tmp_path):
 
     colector.main()
     assert vistos["only"] is None
+
+
+def test_forzar_deja_al_que_empuja_VENCIDO_y_no_solo_permitido(monkeypatch, tmp_path):
+    """Colarlo en `only` no basta: `only` respeta el periodo.
+
+    Medido en el run #53 del 01-09-2026. `archivo` corre cada 10 minutos y una
+    pasada normal acababa de empujar hacia cuatro, asi que no estaba vencido y
+    el filtro abierto no sirvio de nada: el aerosol escribio sus 161 filas y el
+    log dijo `hechos: aerosol` a secas. El primer test que escribi para esto
+    comprobaba el filtro y pasaba en verde mientras el fallo seguia vivo.
+    """
+    import datetime as dt
+
+    import astroweather.colector as colector
+
+    guardado = {}
+    ahora = dt.datetime(2026, 9, 1, 20, 7, tzinfo=dt.timezone.utc)
+    reciente = {"aerosol": ahora, colector.ULTIMO: ahora}
+
+    monkeypatch.setattr(colector, "leer_estado", lambda root=None: dict(reciente))
+    monkeypatch.setattr(colector, "escribir_estado",
+                        lambda estado, root=None: guardado.update(estado) or tmp_path)
+    monkeypatch.setattr(colector, "pasada",
+                        lambda **kw: {"ahora": "x", "vencidos": [],
+                                      "ejecutados": [], "fallidos": []})
+    monkeypatch.setattr("sys.argv", ["colector", "--forzar", "aerosol"])
+
+    colector.main()
+    assert "aerosol" not in guardado, "el trabajo forzado tiene que quedar vencido"
+    assert colector.ULTIMO not in guardado, (
+        "y el que empuja tambien, o la pasada calcula y no persiste")

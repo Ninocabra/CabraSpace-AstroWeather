@@ -162,6 +162,14 @@ def main() -> int:
             if nombre not in JOBS:
                 raise SystemExit(f"trabajo desconocido: {nombre}")
             estado.pop(nombre, None)
+        # Y EL QUE EMPUJA TAMBIEN SE FUERZA, no solo se deja pasar el filtro.
+        # Primer intento del 01-09-2026: bastaba con meter `archivo` en `only`.
+        # No basta -- `only` respeta el periodo -- y `archivo` corre cada 10
+        # min, asi que si una pasada normal acababa de empujar hace cuatro, no
+        # estaba vencido y se quedaba fuera igual. Medido en el run #53: el
+        # aerosol escribio sus 161 filas y el log dijo `hechos: aerosol` a
+        # secas. Otra pasada que calcula y no persiste.
+        estado.pop(ULTIMO, None)
         escribir_estado(estado)
 
     only = set(args.only) if args.only else (set(args.forzar) if args.forzar else None)
@@ -172,6 +180,9 @@ def main() -> int:
         # la basura con el runner, porque `archivo` no estaba en `only` y es el
         # unico que commitea. Una pasada que CALCULA y no PERSISTE es peor que
         # no correr: gasta minutos y deja creer que el dato esta guardado.
+        #
+        # Esto le abre el filtro; que ademas este VENCIDO lo hace el
+        # `estado.pop(ULTIMO)` de arriba. Hacen falta las dos cosas.
         only = only | {ULTIMO}
     resumen = pasada(only=only, en_seco=args.en_seco)
 
