@@ -237,9 +237,20 @@ def run(site: Site = NERPIO, *, days: int = 5, with_dust: bool = False) -> int:
                   + f"; AOD del sitio en el analisis ({dust[0]['valid_utc']:%d-%m %HZ}) "
                   f"{analysis:.3f}")
             rows += dust
+        except ImportError as error:
+            # UNA DEPENDENCIA QUE FALTA NO ES UNA FUENTE CAIDA, y tratarlas
+            # igual es lo que costo seis dias de aerosol sin especies. La cola
+            # de CAMS se recupera sola; un modulo ausente no se instala solo, y
+            # cada pasada que lo trague vuelve a perder el polvo del dia.
+            # `::error::` lo saca a la cara del run en Actions aunque el job
+            # termine en verde, que es justo el caso que hay que romper.
+            print(f"::error::[fetch_aerosol] CAMS dust IMPOSIBLE en este entorno: "
+                  f"falta el modulo '{error.name}'. Declaralo en "
+                  f"requirements-colector.txt; no se va a arreglar solo.")
         except Exception as error:      # queue down, licence revoked, etc.
-            print(f"[fetch_aerosol] CAMS dust NO disponible: {type(error).__name__}: "
-                  f"{str(error)[:160]}")
+            # Esto SI es transitorio: se degrada, se avisa y se reintenta manana.
+            print(f"::warning::[fetch_aerosol] CAMS dust NO disponible: "
+                  f"{type(error).__name__}: {str(error)[:160]}")
     return len(rows)
 
 

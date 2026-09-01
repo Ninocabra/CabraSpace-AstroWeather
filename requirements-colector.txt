@@ -15,6 +15,12 @@
 astropy~=8.0
 cdsapi~=0.7.7
 duckdb~=1.5.5
+# Lo que lee el NetCDF de CAMS dentro del zip (`fetch_aerosol.dust_rows`).
+# Estuvo sin declarar del 27-08 al 01-09-2026 y costo SEIS DIAS sin
+# especies de aerosol: el escritorio lo tenia instalado, el runner no, y
+# el `except` del worker convertia el ModuleNotFoundError en una linea de
+# log que nadie leia mientras el trabajo se marcaba OK todos los dias.
+netCDF4~=1.7.4
 numpy~=2.4.4
 pyarrow~=25.0
 requests~=2.34
