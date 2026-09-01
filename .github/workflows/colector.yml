@@ -66,8 +66,30 @@ on:
   # evento de API y se encola en el acto (medido: la pasada del EPS lanzada a
   # mano el 29-08 termino en 20 s). El `schedule` se queda de PERRO GUARDIAN.
   #
-  # EL RITMO DE VERDAD, que vive en cron-job.org y se documenta AQUI para que
-  # este fichero siga siendo la unica fuente de verdad (verano, abr-sep, UTC):
+  # EL RITMO DE VERDAD vive en cron-job.org y se documenta AQUI para que este
+  # fichero siga siendo la unica fuente de verdad. Y por eso mismo hay que
+  # separar lo que ESTA PUESTO de lo que esta PROPUESTO:
+  #
+  # ---- LO QUE HAY CONFIGURADO HOY (01-09-2026), medido, no supuesto --------
+  #
+  #     0,30  *       cada media hora           ~48/dia
+  #
+  # No es lo que decia este fichero hasta hoy (afirmaba `*/15 19-23` y dos
+  # bloques mas). Se comprobo mirando las ejecuciones reales: 14:00, 14:30,
+  # 16:00, 16:30, 18:00, 18:30, 20:00, 20:30, 21:00, 21:30... y las lecturas de
+  # techo del archivo, que caen en :01 y :31. Media hora, no un cuarto.
+  #
+  # Que un fichero que se declara fuente de verdad llevara semanas describiendo
+  # un reloj que no era el configurado es su propio aviso: esto solo vale si se
+  # contrasta contra las ejecuciones de vez en cuando.
+  #
+  # ---- LO PROPUESTO, **NO IMPLEMENTADO** (verano, abr-sep, UTC) ------------
+  #
+  # Decidido el 01-09-2026 dejarlo EN ESPERA hasta resolver lo del limite de
+  # gasto (ver la cuenta mas abajo). El codigo del colector ya lo soporta
+  # -- `scheduler.ritmo_de_techos` -- y es inerte mientras el reloj no cambie:
+  # con pasadas de 30 minutos el trabajo esta vencido igual con periodo 3 que
+  # con 10. NO hay que tocar codigo para activarlo, solo cron-job.org.
   #
   #     */5   19-20   VENTANA DE APERTURA      24/dia
   #     */15  21-23   vigilancia                12/dia
