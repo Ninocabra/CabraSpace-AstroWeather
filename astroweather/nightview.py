@@ -423,11 +423,15 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
                    "range": [round(turbulence.range_arcsec[0], 1),
                              round(turbulence.range_arcsec[1], 1)],
                    "jet": round(turbulence.jet_speed, 0),
-                   # Said plainly because the lanes would otherwise imply it:
-                   # one jet speed per night means no intra-night variation is
-                   # modelled, so there are no seeing events to draw.
-                   "note": "estimacion experimental sin calibrar; un solo valor "
-                           "por noche, no se modela variacion intranoche"},
+                   # ESTA NOTA DECIA "un solo valor por noche, no se modela
+                   # variacion intranoche" y desde el 03-09-2026 es FALSA: el
+                   # modelo puntua con el jet de CADA HORA. Lo que se publica
+                   # aqui sigue siendo el resumen de la noche -- el tercil es
+                   # una frase sobre la noche, como el de la calima -- asi que
+                   # la nota tiene que decir las dos cosas y no una.
+                   "note": "estimacion experimental sin calibrar; el tercil y "
+                           "la banda resumen la noche, el modelo puntua con el "
+                           "jet de cada hora"},
         "galaxy": milky_way_field(),
         "stars": visible_stars(site),
         "planets": planet_positions(mid, site),

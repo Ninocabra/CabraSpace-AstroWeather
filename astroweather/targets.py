@@ -41,7 +41,7 @@ from .ephem import location, moon_phase_angle, moon_positions, night_for
 from .extinction import evaluate as evaluate_transparency
 from .hourly import at_times
 from .moonsky import mag_to_nl, moon_brightness, nl_to_mag
-from .seeing import Turbulence
+from .seeing import Turbulence, integrate
 from .site import NERPIO, Site
 from .skybackground import epoch_floor, natural_background
 from .skymodel import predict
@@ -394,6 +394,45 @@ def _sample_weights(times: list[dt.datetime]) -> list[float]:
             for index in range(len(times))]
 
 
+def _turbulencia_por_hora(serie: dict | None, times: list[dt.datetime],
+                          turbulence: Turbulence | None
+                          ) -> list[Turbulence | None]:
+    """Una `Turbulence` por instante de la rejilla, del jet de esa hora.
+
+    Sin serie -- o sin muestras de jet en ella -- cada hora recibe LA MISMA
+    turbulencia que se le paso, el objeto tal cual y no uno recalculado: asi el
+    camino sin archivo es identico bit a bit al de antes, y no solo parecido.
+
+    `boundary_amplitude` se hereda de la turbulencia de la noche en vez de
+    volver al valor por defecto. Quien la haya ajustado -- una calibracion
+    local del sitio, el dia que la haya -- no puede perderla por pasar a
+    resolucion horaria.
+
+    Las cuatro mil muestras de `integrate` por hora suenan a caro y no lo son:
+    60 llamadas son 11 ms, contra los segundos que cuesta puntuar mil objetivos.
+    Medido, no supuesto.
+    """
+    if turbulence is None:
+        return [None] * len(times)
+    jets = at_times(serie or {}, "jet_speed", times,
+                    fallback=turbulence.jet_speed)
+    cache: dict[float, Turbulence] = {}
+    salida = []
+    for jet in jets:
+        if jet is None or jet == turbulence.jet_speed:
+            salida.append(turbulence)
+            continue
+        # Redondear a la decima antes de cachear: la rejilla adaptativa pide
+        # hasta 60 instantes de una serie horaria interpolada, o sea casi todo
+        # valores distintos, y el perfil no distingue 12,34 de 12,3 m/s.
+        clave = round(jet, 1)
+        if clave not in cache:
+            cache[clave] = integrate(
+                clave, boundary_amplitude=turbulence.boundary_amplitude)
+        salida.append(cache[clave])
+    return salida
+
+
 def evaluate_night(targets: list[Target], times: list[dt.datetime],
                    *, usable_probability: list[float],
                    turbulence: Turbulence | None = None,
@@ -436,6 +475,32 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
                               elevation_m=site.site_elevation,
                               delta_h_m=site.delta_h)
         for total, dust in hourly]
+    # ...y la TURBULENCIA de cada hora, por el mismo motivo y con la misma
+    # cautela.
+    #
+    # EL JET SE MUEVE MAS QUE EL AEROSOL. Medido sobre el archivo, las ocho
+    # ultimas noches de Nerpio (27-08 a 03-09-2026): el viento del chorro va de
+    # su minimo a su maximo por un factor de 1,12 a 2,29 DENTRO de la misma
+    # noche, y cuatro de las ocho pasan de 1,5. La mediana no describe ninguno
+    # de los dos extremos.
+    #
+    # PERO EL EFECTO EN EL SEEING ES MUCHO MENOR QUE ESE FACTOR, y decirlo
+    # importa mas que el cambio: en el perfil Hufnagel-Valley el termino del
+    # chorro es cuadratico en la velocidad pero vive a 10 km, y la capa limite
+    # -- amplitud constante aqui -- es la que manda en el r0 del sitio. El
+    # 01-09-2026, con el jet moviendose 9,9 -> 22,1 m/s (factor 2,2), el seeing
+    # va de 0,93" a 1,03": un 11 %. Quien espere que doblar el jet doble el
+    # seeing esta leyendo mal el modelo.
+    #
+    # Y solo lo notan los objetos COMPACTOS: `hourly_yield` mete el seeing por
+    # `(FWHM_ref/FWHM)^(2 alpha)`, asi que con alpha = 0 -- nebulosas extensas,
+    # campo ancho -- la nitidez es 1 y esta serie no cambia nada. Es un efecto
+    # sobre planetarias, globulares y dobles, no sobre el catalogo entero.
+    #
+    # Igual que con la k: la turbulencia de la NOCHE sigue siendo la mediana,
+    # porque "seeing normal esta noche" es una frase sobre la noche. Sin serie,
+    # cada hora recupera esa mediana y el informe sale exactamente como salia.
+    turbulencias = _turbulencia_por_hora(serie, times, turbulence)
     # The floor must carry twilight, not just the natural background: the
     # product window opens an hour before sunset, and without the twilight term
     # those daylight hours look like pristine dark sky and score as usable.
@@ -529,8 +594,10 @@ def evaluate_night(targets: list[Target], times: list[dt.datetime],
             # from the pessimistic edge of the published band, never from the
             # point value. Using the loose number contradicted our own rule of
             # publishing terciles, and swung compact targets by a factor 3.7.
-            seeing = ((turbulence.range_arcsec[1] * airmass ** 0.6) if turbulence
-                      else FWHM_REFERENCE * airmass ** 0.6)
+            # ...y de la turbulencia de ESTA hora, no la de la noche.
+            turbulencia_hora = turbulencias[index]
+            seeing = ((turbulencia_hora.range_arcsec[1] * airmass ** 0.6)
+                      if turbulencia_hora else FWHM_REFERENCE * airmass ** 0.6)
             value = hourly_yield(airmass=airmass, sky_mag=sky_mag,
                                  seeing_arcsec=seeing,
                                  k_total=k_hour, alpha=target.alpha,
