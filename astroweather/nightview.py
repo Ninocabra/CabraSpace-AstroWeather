@@ -415,7 +415,25 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
         "transparency": {"k": round(transparency.k_total, 3),
                          "aod_source": forecast["aod_source"],
                          "aod_site": round(transparency.aod_site, 3),
+                         # LAS DOS JUNTAS O NINGUNA, como en el JSON de la
+                         # web desde el 01-09-2026. `dust_alert: false` a
+                         # solas es indistinguible de "no tenemos el desglose
+                         # por especies", y esa confusion costo seis dias: del
+                         # 27-08 al 01-09 la cupula pinto cielo limpio porque
+                         # `netCDF4` no estaba declarado en el runner y las
+                         # especies de CAMS no llegaban, con polvo real por
+                         # encima del umbral TODAS las horas de la noche del 01.
+                         #
+                         # Y aqui la falta de especies no solo calla el aviso:
+                         # CAMBIA EL PIXEL. `extinction.evaluate` corrige el
+                         # aerosol por la altura del sitio, y sin desglose
+                         # rebaja TAMBIEN el polvo -- que viaja por encima del
+                         # observatorio y no se rebaja -- asi que `aod_site`,
+                         # que es de donde la cupula saca su rojo, sale corto.
+                         # Medido el 01-09: un 14 % en la k. El render se ve
+                         # mas limpio de lo que esta y nada lo dice.
                          "dust_alert": transparency.dust_alert,
+                         "species_resolved": transparency.species_resolved,
                          "verdict": transparency.verdict,
                          "color_note": transparency.color_note},
         "seeing": {"source": forecast["jet_source"],

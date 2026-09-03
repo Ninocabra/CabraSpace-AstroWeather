@@ -236,7 +236,13 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO,
                  "glow": moon_glow_profile(phase, 45.0, transparency.k_total)},
         "transparency": {"k": round(transparency.k_total, 3),
                          "aod_site": round(transparency.aod_site, 3),
+                         # LAS DOS JUNTAS O NINGUNA: un `dust_alert`
+                         # a solas no distingue "no hay calima" de "no
+                         # lo hemos mirado". El porque entero, con lo
+                         # que le hace al pixel, en `nightview.build`,
+                         # que es el payload que se publica.
                          "dust_alert": transparency.dust_alert,
+                         "species_resolved": transparency.species_resolved,
                          "verdict": transparency.verdict,
                          "color_note": transparency.color_note},
         "seeing": {"tercile": turbulence.tercile,
