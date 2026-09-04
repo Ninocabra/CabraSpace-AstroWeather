@@ -105,6 +105,13 @@ def _job_suelo():
     return fit_epoch_floor()
 
 
+def _job_techo_curva():
+    from .roofcalibration import summary, train
+    model = train()
+    model.save()
+    return summary(model)
+
+
 def _job_tess_live():
     from .workers import fetch_tess
     return fetch_tess.run_live()
@@ -371,6 +378,11 @@ JOBS: dict[str, Trabajo] = {
     # relleno del TESS: el numero que usa el recomendador tiene que ser el de
     # hoy, no el de hace siete anios.
     "suelo": Trabajo(_job_suelo, timedelta(hours=24), desde_hora_utc=8),
+    # La curva P(techo abierto | nube prevista), reajustada cada dia con la
+    # noche anterior ya cerrada: cada noche de techo es una mas hacia las 60
+    # que hacen falta para que el ajuste sea horario del todo
+    # (roofcalibration.NIGHTS_FOR_HOURLY_REFIT).
+    "techo_curva": Trabajo(_job_techo_curva, timedelta(hours=24), desde_hora_utc=8),
     # Barato, diario, y es lo unico que hay entre una clave que caduca en
     # silencio y una fuente que deja de responder sin que nadie se entere.
     "credenciales": Trabajo(_job_credentials, timedelta(hours=24)),

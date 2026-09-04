@@ -79,3 +79,50 @@ def test_opening_probability_falls_back_to_climatology_without_data():
 def test_a_night_of_good_hours_is_worth_opening_for():
     assert opening_probability([0.8] * 8) > 0.7
     assert opening_probability([0.1, 0.1]) < 0.2
+
+
+# --- la ventana de dos horas (2026-09-04) ------------------------------------
+# Antes la noche valia lo que su MEJOR hora en cuanto sumaba 4 h esperadas, y
+# con una curva que nunca bajaba de 0,49 eso era siempre: 74 veredictos
+# publicados, cero "Cerrado". Ahora vale la hora mas floja de la mejor ventana
+# de dos horas seguidas.
+
+from astroweather.gates import opening_window  # noqa: E402
+
+
+def test_una_sola_hora_buena_no_abre_una_noche():
+    """La noche real del 04-09-2026: 100 % de nubes de 21 a 23 UTC y una hora
+    limpia a las 03. Con la regla vieja salia 0,92; ahora manda la pareja."""
+    hours = [0.69, 0.77, 0.56, 0.49, 0.49, 0.62, 0.70, 0.81, 0.89, 0.92, 0.88, 0.74, 0.60]
+    assert opening_probability(hours) == pytest.approx(0.89)   # min(0.89, 0.92)
+    lonely = [0.1] * 8 + [0.95] + [0.1] * 4
+    assert opening_probability(lonely) == pytest.approx(0.1)
+    assert opening_window(lonely)[2] == pytest.approx(0.1)
+
+
+def test_la_ventana_dice_donde_se_apoya_el_veredicto():
+    hours = [0.2, 0.3, 0.7, 0.8, 0.4, 0.9, 0.35]
+    first, last, floor = opening_window(hours)
+    assert (first, last) == (2, 3)
+    assert floor == pytest.approx(0.7)
+
+
+def test_la_ventana_se_mide_en_horas_y_no_en_casillas():
+    """Con rejilla de media hora, dos horas son cuatro casillas."""
+    hours = [0.1, 0.9, 0.9, 0.1, 0.6, 0.6, 0.6, 0.6, 0.1]
+    assert opening_probability(hours, step_hours=1.0) == pytest.approx(0.9)
+    assert opening_probability(hours, step_hours=0.5) == pytest.approx(0.6)
+
+
+def test_una_noche_mas_corta_que_la_ventana_vale_su_hora_mas_floja():
+    assert opening_probability([0.7]) == pytest.approx(0.7)
+    assert opening_window([]) is None
+
+
+def test_control_positivo_la_regla_vieja_si_abria_esa_noche():
+    """La regla anterior, reconstruida: si este test no discriminara, el de
+    arriba tampoco. Misma noche, 0,92."""
+    hours = [0.69, 0.77, 0.56, 0.49, 0.49, 0.62, 0.70, 0.81, 0.89, 0.92, 0.88, 0.74, 0.60]
+    old_rule = max(hours) if sum(hours) >= 4.0 else min(1.0, sum(hours) / 4.0) * max(hours)
+    assert old_rule == pytest.approx(0.92)
+    assert opening_probability(hours) < old_rule

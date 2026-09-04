@@ -75,7 +75,7 @@ SKIPPED = {
 # `estado_colector.json` entro el mismo dia y es lo que hace posible que la
 # recogida viva en un runner que se destruye: sin el, cada pasada creeria que
 # no ha corrido nunca nada.
-LOOSE = ("cloud_calibration.json", "open_hours_nerpio.json",
+LOOSE = ("cloud_calibration.json", "roof_calibration.json", "open_hours_nerpio.json",
          "roof_climatology.json", "sky_floor.json", "estado_colector.json")
 
 

@@ -12,6 +12,67 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 05-09-2026 — El veredicto se calibra contra el techo real, y nombra su ventana
+
+**El síntoma (04-09, 21 UTC):** la web decía «Abierto 92 %» con 100 % de nubes
+previstas de 21 a 23 UTC. No era un fallo de datos: el JSON decía exactamente
+eso. Eran dos mecanismos encadenados, y ninguno podía salir en rojo.
+
+1. **La curva del fotómetro no bajaba del 58 % ni con el cielo cubierto.** Su
+   verdad terreno es el residuo contra el modelo de cielo, que mide la Luna
+   además de las nubes. Contra el techo real de Nerpio —horas abiertas por mes
+   de AstroCamp, 31 meses de 2024-02 a 2026-08— sale **26 puntos optimista**.
+2. **La noche valía lo que su mejor hora** en cuanto sumaba 4 h esperadas, y con
+   una curva que nunca baja de 0,49 eso era siempre. **74 veredictos publicados,
+   cero «Cerrado».**
+
+**Lo medido antes de tocar nada.** La fracción abierta mensual sigue a la
+fracción de horas nocturnas con nube prevista < 30 %: r = 0,89, sesgo 0,00
+(control con meses barajados: r = 0,00). A escala de minutos, los 18 techos
+abren y cierran como uno solo (0/18 o 18/18), nunca están abiertos con la
+bandera del CloudWatcher en nublado (1 muestra de 180), y abren 30-60 min
+después de que pase a verde. En 9 noches no hay un solo cierre por tiempo a
+media noche: todos los cierres son 30-45 min después del orto. Esa misma noche
+del 04-09 el techo abrió a las 22:01 UTC, 36 min después de que la bandera
+pasara a verde y con 100 % previsto: en Nerpio el 100 % del ECMWF acierta el
+42 % de las horas.
+
+**`roofcalibration.py` (nuevo).** `P(techo abierto | nube prevista)` como
+logística con cada parámetro de la escala que lo determina: el **cruce** (30 %)
+de los meses —31 medias mensuales no distinguen la pendiente: el ajuste libre
+se va a un escalón— y la **pendiente** (−3,3, intervalo 10-90 % por bootstrap de
+noches [−7,5; −0,3]) de las 53 horas de techo con previsión. MAE mensual 0,123
+contra 0,181 de la climatología constante; 0,119 en los 8 meses de 2026 sin
+verlos. `load_calibrator()` prefiere esta curva y cae a la del fotómetro si no
+existe; la nota del informe y `confianza.verdad_terreno` dicen cuál manda.
+
+**`gates.opening_window` (nuevo) y `opening_probability` (cambiado).** La noche
+vale la hora más floja de la mejor ventana de dos horas seguidas —mínimo, no
+producto: las horas vecinas comparten el error de previsión— y la ventana viaja
+en `veredicto_abrir.ventana`. La web la pinta bajo la palabra. Con la nueva
+regla y la nueva curva, la noche del 04-09 sale **Abierto 62 %, ventana 02-04
+UTC** (cierto: abrieron), y la del 05-09 **Cerrado 35 %**: el primer Cerrado
+del producto.
+
+**LA NOTA DE LAS 60 NOCHES, dentro del producto.** `NIGHTS_FOR_HOURLY_REFIT =
+60`. `fit()` cuenta noches y cambia solo a ajuste horario de los dos
+parámetros; el JSON publica `noches` y `noches_objetivo` y un aviso con cuántas
+faltan (hoy 54); el aviso cambia a «comprobar que el cruce horario siga cerca
+del 30 % mensual» el día que se cumpla. `tests/test_roofcalibration.py` cubre
+el cambio de método, y `test_control_positivo_la_curva_del_fotometro_sale_optimista`
+es el control positivo: la curva vieja sobre meses de techo tiene que salir
+optimista, o el test no mide. El trabajo `techo_curva` del colector reajusta
+cada día tras las 08 UTC y `roof_calibration.json` viaja como fichero suelto.
+
+**Lo que NO cambia y hay que reconciliar:** la cúpula (`nightview`) sigue
+estimando su «probabilidad de techo» con la curva del fotómetro por el factor
+humano de `roof.py`; ahora puede discrepar del JSON. Y dos avisos de
+instrumentos: la allsky cae a 0 estrellas todas las noches desde las 03 UTC
+(no es nube) y la temperatura de cielo «despejado» del CloudWatcher bajó de −14
+a −8 °C con la calima: la bandera no es un umbral fijo.
+
+---
+
 ## 30-08-2026 — El suelo pasa a ser una serie, y la verdad de nubes deja de medir la Luna
 
 Tres deudas que venían con fecha puesta, cerradas juntas porque son la misma

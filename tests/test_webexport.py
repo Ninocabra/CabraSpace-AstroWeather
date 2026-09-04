@@ -156,3 +156,66 @@ def test_la_calima_nunca_viaja_sin_decir_si_la_hemos_medido():
     if transp["calima"]:
         assert transp["especies"] is True, (
             "no se puede avisar de calima sin tener el desglose que la define")
+
+
+# --- la curva del techo y la ventana del veredicto (2026-09-04) ---------------
+
+from astroweather.roofcalibration import RoofCalibrator  # noqa: E402
+
+
+def _curva_techo(nights):
+    return RoofCalibrator(intercept=1.0, cloud_weight=-3.3, trained_on=nights * 9,
+                          brier=0.02, brier_climatology=0.04, base_rate=0.55,
+                          fitted_at="2026-09-05T00:00:00+00:00", crossing=0.30,
+                          slope_low=-7.5, slope_high=-0.3, months=31, nights=nights,
+                          monthly_mae=0.123, monthly_mae_climatology=0.181,
+                          method=("horario" if nights >= 60
+                                  else "cruce mensual + pendiente horaria"))
+
+
+def test_el_veredicto_lleva_su_ventana_y_la_regla_la_nombra():
+    inicio = dt.datetime(2026, 9, 5, 2, tzinfo=dt.timezone.utc)
+    fin = inicio + dt.timedelta(hours=1)
+    veredicto = webexport._veredicto_abrir(0.66, (inicio, fin, 0.66))
+    assert veredicto["abierto"] is True
+    assert veredicto["ventana"] == {"desde": "2026-09-05T02:00+00:00",
+                                    "hasta": "2026-09-05T03:00+00:00"}
+    assert "dos horas" in veredicto["regla"]
+    assert webexport._veredicto_abrir(0.30, None)["abierto"] is False
+    assert webexport._veredicto_abrir(0.30, None)["ventana"] is None
+
+
+def test_la_confianza_dice_contra_que_se_calibro(monkeypatch):
+    monkeypatch.setattr(webexport, "_night", lambda *a, **k: _noche([]))
+    monkeypatch.setattr(webexport, "load_calibrator", lambda *a, **k: _curva_techo(6))
+    confianza = webexport.build(nights=1)["confianza"]
+    assert confianza["verdad_terreno"] == "techo"
+    curva = confianza["curva_techo"]
+    assert curva["cruce_nube"] == 0.3
+    assert curva["noches"] == 6 and curva["noches_objetivo"] == 60
+    assert curva["pendiente_p10_p90"] == [-7.5, -0.3]
+
+
+def test_la_nota_de_las_60_noches_viaja_en_el_json(monkeypatch):
+    """Faltan N noches, y el dia que no falten el aviso cambia a 'comprobar'."""
+    monkeypatch.setattr(webexport, "_night", lambda *a, **k: _noche([]))
+    monkeypatch.setattr(webexport, "load_calibrator", lambda *a, **k: _curva_techo(6))
+    avisos = " ".join(webexport.build(nights=1)["confianza"]["avisos"])
+    assert "faltan 54 noches" in avisos
+    monkeypatch.setattr(webexport, "load_calibrator", lambda *a, **k: _curva_techo(60))
+    avisos = " ".join(webexport.build(nights=1)["confianza"]["avisos"])
+    assert "ya se ajusta por horas" in avisos
+    assert "faltan" not in avisos
+
+
+def test_con_la_curva_del_fotometro_se_avisa_de_que_no_es_el_techo(monkeypatch):
+    from astroweather.calibration import Calibrator
+    fotometro = Calibrator(intercept=2.4, cloud_weight=-2.1, lead_weight=0.0,
+                           trained_on=100, brier=0.1, brier_climatology=0.2,
+                           base_rate=0.8, fitted_at="x")
+    monkeypatch.setattr(webexport, "_night", lambda *a, **k: _noche([]))
+    monkeypatch.setattr(webexport, "load_calibrator", lambda *a, **k: fotometro)
+    payload = webexport.build(nights=1)
+    assert payload["confianza"]["verdad_terreno"] == "fotometro"
+    assert payload["confianza"]["curva_techo"] is None
+    assert "no contra el techo real" in " ".join(payload["confianza"]["avisos"])

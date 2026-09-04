@@ -16,10 +16,11 @@ from __future__ import annotations
 import datetime as dt
 from dataclasses import dataclass
 
-from .calibration import Calibrator
+from .roofcalibration import load_calibrator
 from .ephem import moon_illumination, moon_positions, night_for
 from .verification import wind_correction
-from .gates import SafetyVerdict, evaluate, opening_probability, probability_usable
+from .gates import (SafetyVerdict, evaluate, opening_probability, opening_window,
+                    probability_usable)
 from .queries import connect
 from .site import NERPIO, Site
 
@@ -78,8 +79,30 @@ class NightReport:
         return (best[0], best[1], best[3]) if best else None
 
     @property
+    def step_hours(self) -> float:
+        """Spacing of the hourly grid, so the window is measured in hours and
+        not in slots whatever the forecast cadence."""
+        if len(self.hours) < 2:
+            return 1.0
+        delta = (self.hours[1].t_utc - self.hours[0].t_utc).total_seconds() / 3600
+        return delta if delta > 0 else 1.0
+
+    @property
+    def verdict_window(self) -> tuple[dt.datetime, dt.datetime, float] | None:
+        """The two hours the verdict rests on, so "Abierto" names its window."""
+        found = opening_window([h.usable_probability for h in self.hours],
+                               step_hours=self.step_hours)
+        if found is None:
+            return None
+        first, last, floor = found
+        # El final es el FINAL de la ultima casilla: "02:00-04:00" son dos horas.
+        return (self.hours[first].t_utc,
+                self.hours[last].t_utc + dt.timedelta(hours=self.step_hours), floor)
+
+    @property
     def opening_probability(self) -> float:
-        return opening_probability([h.usable_probability for h in self.hours])
+        return opening_probability([h.usable_probability for h in self.hours],
+                                   step_hours=self.step_hours)
 
 
 def _safety_rows(connection, site: Site, start: dt.datetime, end: dt.datetime):
@@ -169,7 +192,7 @@ def report(day: dt.datetime | None = None, site: Site = NERPIO, root=None) -> Ni
     """Build the operational report for the night beginning on `day`."""
     day = day or dt.datetime.now(dt.timezone.utc)
     night = night_for(day, site)
-    calibrator = Calibrator.load()
+    calibrator = load_calibrator()
     now = dt.datetime.now(dt.timezone.utc)
 
     # Primero el modelo con el que se calibro. Hasta el 2026-08-28 esto no se
@@ -226,10 +249,18 @@ def report(day: dt.datetime | None = None, site: Site = NERPIO, root=None) -> Ni
             calibrated=calibrator is not None,
         ))
 
-    note = (f"probabilidad calibrada con {calibrator.trained_on} pares "
-            f"(BSS sobre climatología: "
-            f"{(1 - calibrator.brier / calibrator.brier_climatology) * 100:+.1f} %)"
-            if calibrator else "SIN CALIBRAR: probabilidad no disponible")
+    if calibrator is None:
+        note = "SIN CALIBRAR: probabilidad no disponible"
+    elif getattr(calibrator, "truth", "fotometro") == "techo":
+        # La verdad terreno es el TECHO REAL, y el BSS es mensual: la curva se
+        # puntua por lo que el observatorio abrio cada mes, no por el fotometro.
+        note = (f"probabilidad calibrada contra el techo real: {calibrator.months} "
+                f"meses y {calibrator.nights} noches (BSS mensual sobre climatología: "
+                f"{(1 - calibrator.brier / calibrator.brier_climatology) * 100:+.1f} %)")
+    else:
+        note = (f"probabilidad calibrada con {calibrator.trained_on} pares "
+                f"(BSS sobre climatología: "
+                f"{(1 - calibrator.brier / calibrator.brier_climatology) * 100:+.1f} %)")
     if mismatch:
         # Se dice, no se esconde: una probabilidad calibrada sobre otro modelo
         # sigue siendo mejor que ninguna, pero deja de ser lo que promete.
@@ -284,11 +315,18 @@ def render(night_report: NightReport) -> str:
     # ley de dispersion lunar del sitio. Antes de arreglarla estas dos cifras
     # eran 40 % y 75 %, y la de arriba estaba mal por la verdad, no por el
     # forecast: una noche despejada con Luna se archivaba como nublada.
-    lines += ["", f"  {night_report.calibration_note}",
-              "  cubierto total previsto -> 42 % de horas despejadas; cielo limpio",
-              "  previsto -> 90 %, sobre una tasa base del 74 %. Sigue avisando",
-              "  mejor de las noches malas, pero ya promete las buenas.",
-              "  seeing y calidad por dimension: pendientes de las rodajas 4-6."]
+    lines += ["", f"  {night_report.calibration_note}"]
+    if "techo real" in night_report.calibration_note:
+        window = night_report.verdict_window
+        lines += ["  la probabilidad de la noche es la hora mas floja de la mejor",
+                  "  ventana de dos horas seguidas"
+                  + (f": {window[0]:%H:%M}-{window[1]:%H:%M} UTC" if window else "")
+                  + "."]
+    else:
+        lines += ["  cubierto total previsto -> 42 % de horas despejadas; cielo limpio",
+                  "  previsto -> 90 %, sobre una tasa base del 74 %. Sigue avisando",
+                  "  mejor de las noches malas, pero ya promete las buenas."]
+    lines += ["  seeing y calidad por dimension: pendientes de las rodajas 4-6."]
     return "\n".join(lines)
 
 

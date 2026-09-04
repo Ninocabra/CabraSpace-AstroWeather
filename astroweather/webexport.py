@@ -27,7 +27,7 @@ import statistics
 from pathlib import Path
 
 from .advice import Conditions, evaluate as evaluate_advice
-from .calibration import Calibrator
+from .roofcalibration import load_calibrator
 from .ephem import moon_illumination, moon_positions, night_for
 from .extinction import evaluate as evaluate_transparency
 from .queries import DATA_ROOT, night_inputs, night_series
@@ -96,18 +96,24 @@ def _hour(hour, serie: dict | None = None, site: Site | None = None) -> dict:
 UMBRAL_ABRIR = 0.5
 
 
-def _veredicto_abrir(probabilidad: float) -> dict:
-    """Abierto o cerrado, con la regla dentro.
+def _veredicto_abrir(probabilidad: float, ventana=None) -> dict:
+    """Abierto o cerrado, con la regla dentro y la ventana en la que se apoya.
 
     La regla viaja con el veredicto porque la palabra sola es mas rotunda que
     el numero del que sale: quien lee "ABIERTO" tiene derecho a saber que eso
-    significa "al menos la mitad de las veces", y que sigue siendo una
-    prevision de CONDICIONES, no de lo que haran las personas del techo.
+    significa "al menos la mitad de las veces". Y la VENTANA viaja por lo que
+    paso el 2026-09-04: se publico "Abierto 92 %" con 100 % de nubes previstas
+    de 21 a 23 UTC, porque el numero era el de la hora de las 03. La palabra
+    vendia la noche entera y la linea de nubes decia lo contrario. Ahora el
+    numero es el de las dos horas seguidas mas seguras, y se dice cuales.
     """
     abierto = probabilidad >= UMBRAL_ABRIR
     return {
         "abierto": bool(abierto),
         "umbral": UMBRAL_ABRIR,
+        "ventana": ({"desde": ventana[0].isoformat(timespec="minutes"),
+                     "hasta": ventana[1].isoformat(timespec="minutes")}
+                    if ventana else None),
         # Con tildes: esto se lee en la pagina, no en el codigo. Y sin repetir
         # lo que ya dice `probabilidad_definicion`, que viaja al lado en el
         # mismo globo.
@@ -115,8 +121,34 @@ def _veredicto_abrir(probabilidad: float) -> dict:
             f"Se dice Abierto cuando la probabilidad que va debajo llega al "
             f"{UMBRAL_ABRIR:.0%}, y Cerrado por debajo de esa cifra. Es un "
             f"corte sobre ESE mismo número, no una segunda opinión, así que "
-            f"la palabra y el porcentaje no pueden discrepar."),
+            f"la palabra y el porcentaje no pueden discrepar. El número es el "
+            f"de la hora más floja de la mejor ventana de dos horas seguidas, "
+            f"y la ventana va al lado: Abierto quiere decir Abierto AHÍ."),
     }
+
+
+def _definicion_probabilidad() -> str:
+    """Que significa EXACTAMENTE el numero, y depende de contra que se calibro.
+
+    Con la curva del techo (roofcalibration.py) la probabilidad por hora ES la
+    de que el observatorio este abierto, con sus decisiones dentro; con la del
+    fotometro es la de cielo despejado, y decir "no de que abran" era cierto.
+    Un mismo texto para las dos seria falso en una.
+    """
+    comun = (" Por hora se multiplica por 0,85 por cada riesgo en vigilancia, y es "
+             "cero si una puerta de seguridad la bloquea. Para la noche se toma la "
+             "hora más floja de la mejor ventana de DOS horas seguidas: una sola "
+             "hora buena a las 03 no abre una noche.")
+    if getattr(load_calibrator(), "truth", "fotometro") == "techo":
+        return ("Probabilidad de que el techo de Nerpio esté ABIERTO a esa hora "
+                "dada la nube prevista, calibrada contra lo que el observatorio "
+                "hizo de verdad: 31 meses de horas abiertas y las noches de techo "
+                "medidas minuto a minuto. Lleva dentro sus decisiones (abren 30-60 "
+                "min después de que su detector de nubes pase a despejado)."
+                + comun)
+    return ("Probabilidad de que haya CONDICIONES para abrir, no de que abran: "
+            "el techo lo abren personas y un techo cerrado no significa mal "
+            "tiempo. Por hora es la probabilidad de cielo despejado." + comun)
 
 
 def _night(day: dt.datetime, site: Site, root=None, *,
@@ -216,7 +248,8 @@ def _night(day: dt.datetime, site: Site, root=None, *,
         # cuando equivocarse por arriba cuesta lo mismo que por abajo.
         # NO es una segunda opinion: es un corte sobre el numero de arriba, asi
         # que no pueden discrepar nunca.
-        "veredicto_abrir": _veredicto_abrir(night_report.opening_probability),
+        "veredicto_abrir": _veredicto_abrir(night_report.opening_probability,
+                                            night_report.verdict_window),
         # OJO a la diferencia, que confunde y con razon: esto es la suma de la
         # probabilidad utilizable sobre TODA la ventana de producto (del ocaso
         # menos una hora al orto mas una), asi que incluye el crepusculo. Por
@@ -229,14 +262,7 @@ def _night(day: dt.datetime, site: Site, root=None, *,
         # Que significa EXACTAMENTE la probabilidad de arriba, dentro del JSON:
         # sin esto, "probabilidad de que la noche sea utilizable" se lee como
         # "probabilidad de que abran el techo", y no es eso.
-        "probabilidad_definicion": (
-            "Probabilidad de que haya CONDICIONES para abrir, no de que abran: "
-            "el techo lo abren personas y un techo cerrado no significa mal "
-            "tiempo. Por hora es la probabilidad de cielo despejado multiplicada "
-            "por 0,85 por cada riesgo en vigilancia, y cero si una puerta de "
-            "seguridad la bloquea. Para la noche se toma la MEJOR hora, siempre "
-            "que se esperen al menos 4 h utilizables en total; si no, se penaliza "
-            "en proporcion."),
+        "probabilidad_definicion": _definicion_probabilidad(),
         "mejor_ventana": ({"desde": window[0].isoformat(),
                            "hasta": window[1].isoformat(),
                            "p_media": round(window[2], 3)} if window else None),
@@ -814,8 +840,56 @@ def _cupula(site: Site) -> dict | None:
             if clave not in CUPULA_FUERA}
 
 
+def _curva_techo_publicada(calibrator) -> dict | None:
+    """Los parametros de la curva del techo y de donde salio cada uno, para
+    que el JSON no publique un cruce y una pendiente sin su procedencia."""
+    if calibrator is None or getattr(calibrator, "truth", "fotometro") != "techo":
+        return None
+    return {
+        "metodo": calibrator.method,
+        "cruce_nube": round(calibrator.crossing, 2),
+        "pendiente": round(calibrator.cloud_weight, 2),
+        "pendiente_p10_p90": [round(calibrator.slope_low, 2),
+                              round(calibrator.slope_high, 2)],
+        "meses": calibrator.months,
+        "noches": calibrator.nights,
+        "noches_objetivo": calibrator.nights_target,
+        "mae_mensual": round(calibrator.monthly_mae, 3),
+        "mae_mensual_climatologia": round(calibrator.monthly_mae_climatology, 3),
+        "mae_fuera_de_muestra": (round(calibrator.held_out_mae, 3)
+                                 if calibrator.held_out_mae is not None else None),
+    }
+
+
+def _avisos_curva_techo(calibrator) -> list[str]:
+    """Lo que hay que saber de la curva del techo, con la nota de las 60 noches
+    DENTRO del producto: el dia que se cumpla lo dira el propio JSON."""
+    if getattr(calibrator, "truth", "fotometro") != "techo":
+        return ["La probabilidad se calibró contra el fotómetro, no contra el "
+                "techo real: sobre 31 meses de techo salía 26 puntos optimista."]
+    avisos = []
+    if calibrator.nights_missing:
+        avisos.append(
+            f"La curva del techo tiene el cruce ({calibrator.crossing:.0%} de nube) "
+            f"de {calibrator.months} meses y la pendiente de solo "
+            f"{calibrator.nights} noches (intervalo {calibrator.slope_low:.1f} a "
+            f"{calibrator.slope_high:.1f}): faltan {calibrator.nights_missing} noches "
+            f"para reajustarla entera por horas. Ese día hay que COMPROBAR que el "
+            f"cruce horario siga cerca del mensual.")
+    else:
+        avisos.append(
+            f"La curva del techo ya se ajusta por horas ({calibrator.nights} "
+            f"noches): comprobar que su cruce ({calibrator.crossing:.0%}) siga "
+            f"cerca del 30 % mensual y que el MAE mensual "
+            f"({calibrator.monthly_mae:.3f}) no empeore.")
+    if not calibrator.beats_climatology:
+        avisos.append("La curva del techo NO mejora a la climatología mensual: "
+                      "trátala como un supuesto.")
+    return avisos
+
+
 def build(site: Site = NERPIO, *, nights: int = 2, root=None) -> dict:
-    calibrator = Calibrator.load()
+    calibrator = load_calibrator()
     now = dt.datetime.now(dt.timezone.utc)
 
     salidas = []
@@ -830,6 +904,7 @@ def build(site: Site = NERPIO, *, nights: int = 2, root=None) -> dict:
         avisos.append("La probabilidad NO está calibrada: es la salida cruda "
                       "del modelo, que aquí es peor que la climatología.")
     else:
+        avisos.extend(_avisos_curva_techo(calibrator))
         # El aviso del desajuste de modelo viaja tal cual: si la curva se esta
         # aplicando a otro proveedor, quien lea el JSON tiene que enterarse.
         for linea in report(now, site, root).calibration_note.splitlines():
@@ -900,6 +975,11 @@ def build(site: Site = NERPIO, *, nights: int = 2, root=None) -> dict:
         "cupula": _cupula(site),
         "confianza": {
             "calibrado": calibrator is not None,
+            # Contra QUE se calibro: "techo" es el estado real de los techos de
+            # Nerpio; "fotometro" es el residuo contra el modelo de cielo (que
+            # mide la Luna ademas de las nubes, y salia 26 puntos optimista).
+            "verdad_terreno": getattr(calibrator, "truth", "fotometro") if calibrator else None,
+            "curva_techo": _curva_techo_publicada(calibrator),
             "pares_de_entrenamiento": calibrator.trained_on if calibrator else 0,
             "bss_sobre_climatologia": (
                 round(1 - calibrator.brier / calibrator.brier_climatology, 3)

@@ -144,22 +144,45 @@ def probability_usable(clear_probability: float, verdict: SafetyVerdict) -> floa
     return float(clear_probability * (0.85 ** watches))
 
 
-def opening_probability(usable_hours: list[float], climatology: float | None = None,
-                        minimum_hours: float = 2.0) -> float:
-    """Chance the night offers conditions worth opening for.
+def opening_window(usable_hours: list[float], minimum_hours: float = 2.0,
+                   step_hours: float = 1.0) -> tuple[int, int, float] | None:
+    """The best window of at least `minimum_hours`: (first, last, floor).
 
-    Named for what it predicts: CONDITIONS, not human behaviour. The roof is
-    opened by people, so a closed roof does not mean bad weather and the model
-    would be learning staffing patterns (SPEC v8 section 1.4).
+    The floor is the WEAKER hour of the window, on purpose. Adjacent hours
+    share the same forecast error -- a front that arrives late is late for both
+    -- so multiplying their probabilities would count the same doubt twice, and
+    taking the best hour alone was the failure this replaces: 74 published
+    verdicts, zero "Cerrado", because any night with one clear hour at 03 UTC
+    scored as that hour (measured 2026-09-04 against the roof record).
+    """
+    if not usable_hours:
+        return None
+    slots = max(1, int(round(minimum_hours / step_hours)))
+    if len(usable_hours) < slots:
+        return (0, len(usable_hours) - 1, float(min(usable_hours)))
+    best = None
+    for first in range(len(usable_hours) - slots + 1):
+        floor = float(min(usable_hours[first:first + slots]))
+        if best is None or floor > best[2]:
+            best = (first, first + slots - 1, floor)
+    return best
+
+
+def opening_probability(usable_hours: list[float], climatology: float | None = None,
+                        minimum_hours: float = 2.0, step_hours: float = 1.0) -> float:
+    """Chance the night offers at least `minimum_hours` in a row worth opening.
+
+    It is the floor of the best window (see `opening_window`), so a night is
+    only "Abierto" when SOME two consecutive hours both clear the bar. With the
+    roof-trained curve (roofcalibration.py) the per-hour number is already the
+    chance the observatory opens at that hour given the forecast cloud, so the
+    verdict reads as the roof would: a two-hour window is what they open for.
 
     Climatology enters as a prior on nights we know nothing about, never as a
     multiplier on an already calibrated probability -- that would count the
     same base rate twice.
     """
-    if not usable_hours:
+    window = opening_window(usable_hours, minimum_hours, step_hours)
+    if window is None:
         return climatology if climatology is not None else 0.0
-    # Expected number of usable hours, then the odds of clearing the bar.
-    expected = sum(usable_hours)
-    if expected >= minimum_hours * 2:
-        return float(max(usable_hours))
-    return float(min(1.0, expected / (minimum_hours * 2)) * max(usable_hours))
+    return window[2]

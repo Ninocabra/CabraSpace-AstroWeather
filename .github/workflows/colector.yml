@@ -302,9 +302,9 @@ jobs:
           done
           # Estado del producto: viaja como fichero suelto y vuelve al archivo
           # al final de la pasada (`archivepush.LOOSE`).
-          for suelto in cloud_calibration.json open_hours_nerpio.json \
-                        roof_climatology.json sky_floor.json \
-                        estado_colector.json; do
+          for suelto in cloud_calibration.json roof_calibration.json \
+                        open_hours_nerpio.json roof_climatology.json \
+                        sky_floor.json estado_colector.json; do
             # `if`, no `[ -f ] && cp`: con `bash -e` un test que falla en la
             # ultima vuelta del bucle tumba el paso entero, y que falte un
             # fichero de estado la primera vez es NORMAL.
