@@ -39,6 +39,8 @@ CODIGO = RAIZ / "astroweather"
 FUERA = {
     "apscheduler": "el planificador de proceso vivo; el colector no planifica",
     "photutils": "solo el pipeline de FWHM, que corre a mano sobre FITS en disco",
+    "google": "google-cloud-bigquery, solo fetch_weathernext; el scheduler no lo "
+              "llama hasta que Google apruebe el acceso (pedido el 07-09-2026)",
 }
 
 

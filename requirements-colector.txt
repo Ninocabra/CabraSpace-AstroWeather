@@ -7,6 +7,10 @@
 #                planifica: mira que esta vencido y lo hace (`colector.py`).
 #   photutils    solo lo usa el pipeline de FWHM, que corre a mano sobre FITS
 #                que ya estan en disco y por eso esta fuera del scheduler.
+#   google       google-cloud-bigquery, que solo importa `fetch_weathernext`
+#                (dentro de `run`, no arriba). El scheduler NO lo llama aun:
+#                el acceso a WeatherNext 3 se pidio el 07-09-2026 y tarda 5-7
+#                dias. Cuando llegue, se declara aqui y se quita de FUERA.
 #
 # Las versiones van fijadas por MINOR (`~=`) y son las que corren en el
 # escritorio: sin fijar, una version nueva de astropy o de numpy cambia numeros

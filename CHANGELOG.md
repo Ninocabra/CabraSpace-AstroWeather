@@ -12,6 +12,38 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 07-09-2026 — WeatherNext 3 entra como candidato, no como sustituto
+
+Google publicó el 03-09 WeatherNext 3: inicialización horaria con imagen
+geoestacionaria en vivo, nubes por capas a 0,1°, 64 miembros servidos como
+media y cinco cuantiles, horizonte 48 h en las corridas horarias. Lo que NO
+publica es una sola cifra de nubosidad: las mejoras anunciadas son de
+precipitación. Por eso entra como **un modelo más del marcador** (`scoreboard`,
+Brier y AUC contra el fotómetro), y no toca nada hasta que gane en AUC al
+ifs025 con la misma verdad.
+
+**Worker `fetch_weathernext.py`** (escrito por Gemini vía `coop/`, integrado
+con tres correcciones): media y cuantiles como seis modelos con `member=None`,
+para que el esquema no cambie; unidades a las canónicas (fracción→%, K→°C,
+m→mm, Pa→hPa); `lead_h` comprobado contra `valid-run` como invariante;
+consulta filtrada por partición `init_time` antes de nada. Las correcciones:
+dirección del viento y humedad derivadas **solo de la media** (el p10 de u con
+el p10 de v no es un vector; un cuantil de una función no es la función de los
+cuantiles); `model_grid_elevation=None` porque la cota de la celda de Open-Meteo
+no es la de WeatherNext, y la provenance no puede prestar números; y el BOM
+que PowerShell deja en los ficheros. 10 tests en frío con fixture; sin acceso
+todavía, así que nada de esto ha visto un dato real: los nombres de columna y
+la forma de `geography` están marcados SIN COMPROBAR hasta el primer
+`SELECT * LIMIT 1`.
+
+**Licencia, corregida:** el pronóstico del futuro cae bajo los términos
+experimentales de GDM, no bajo CC BY (eso es solo el dato de hace más de una
+hora). Uso interno sin límite; publicable solo como servicio de valor añadido
+**no recuperable** con la cita obligatoria. Publicar la nubosidad por capas tal
+cual en la web no está permitido. Condiciona el lienzo, no el motor.
+
+Acceso pedido el 07-09-2026 (formulario de Google DeepMind, 5-7 días hábiles).
+
 ## 05-09-2026 — El veredicto se calibra contra el techo real, y nombra su ventana
 
 **El síntoma (04-09, 21 UTC):** la web decía «Abierto 92 %» con 100 % de nubes

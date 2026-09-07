@@ -39,6 +39,15 @@ empieza antes que ninguna otra cosa.
 - [x] Credenciales ADS (CAMS) en `.env`
 - [x] Pipeline FWHM (`fwhm_pipeline.py`) — sobre los FITS reales de `E:\ASTRO Sin Procesar\Observatorio Nerpio`
 - [ ] Pendientes de terceros: credenciales BDRC (opcional)
+- [ ] **WeatherNext 3** (Google DeepMind) como un modelo mas del marcador:
+      worker `fetch_weathernext.py` escrito y probado en frio (fixture, 10 tests);
+      acceso a BigQuery **pedido el 07-09-2026**, pendiente de aprobacion (5-7 dias).
+      Cuando llegue: proyecto de Google Cloud + `gcloud auth application-default
+      login`, `GOOGLE_CLOUD_PROJECT` y `WEATHERNEXT_BQ_TABLE` en `.env`, declarar
+      `google-cloud-bigquery`, y puntuar el backfill 2024-2025 contra el fotometro
+      ANTES de darle sitio en el scheduler. Licencia: el pronostico del futuro es
+      dato experimental de GDM (uso interno libre; en la web solo como servicio de
+      valor anadido no recuperable, con cita), no CC BY.
 
 ## Fase 1 — en curso
 
