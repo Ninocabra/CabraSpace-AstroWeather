@@ -12,6 +12,49 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 08-09-2026 (tarde) — H_a no se puede calibrar, y no es falta de datos
+
+Intento de cerrar el pendiente historico: medir `AEROSOL_SCALE_HEIGHT_M`, el
+1700 que lleva desde el principio con el comentario «calibrable contra AERONET».
+Modulo nuevo `aerosolfit.py` con el estimador, su guardian y 12 tests.
+
+**Correccion de lo escrito esta misma manana:** el PM2.5 de AstroCamp NO sirve
+para esto. H_a es una altura de escala de extincion optica y el PM2.5 es masa
+por metro cubico; y una sola altura no separa el perfil del sesgo del aparato.
+El dato lo canta: el sensor da 6,99 ug/m3 donde CAMS da 5,10 a 583 m mas abajo
+— razon 1,37, que bajo el modelo exponencial daria una altura NEGATIVA.
+
+**Lo medido, contra el repo de datos** (el `data/` local estaba atrasado y por
+poco concluyo con un cero falso):
+
+- **Sin especies, H_a es indeterminable POR CONSTRUCCION.** `site_aod =
+  aod_total * exp(-583/H_a)`: la pendiente absorbe el factor. Barriendo H_a de
+  500 m a 20 km sobre 3.200 horas limpias, el R2 sale **identico a doce
+  decimales**. Esa es la rama que corre hoy en `extinction.evaluate`.
+- **Con especies tampoco, con el fotometro como observable.** Colinealidad
+  `aod_dust`~`aod_total` = 0,957. Senal/ruido = 0,138 por hora (0,033 mag de
+  senal contra 0,241 de dispersion). Simulado sobre la distribucion real de
+  AOD, +/-16 % pide ~100.000 horas; con 1.000 el intervalo sigue en [562, 3746].
+- **Ritmo real: 7 horas utiles en 16 dias** (129 h de CAMS ADS -> 40 con
+  fotometro en noche astronomica -> 7 sin Luna). 1.000 horas son seis anios.
+
+**No es «todavia no», es «asi no».** El prerrequisito es un observable con
+coeficiente CONOCIDO: `k_extinction` medida, donde B = 1,086 por definicion y f
+se despeja de una noche con estrellas a varias masas de aire. Esa columna esta
+**VACIA (0 de 3.765.260 filas)**, el hueco que SPEC §1.1 ya declaraba. Queda
+como el cuello de botella declarado.
+
+`aerosolfit.fit_scale_height` se NIEGA con motivo en las tres situaciones
+reales (sin especies, colinealidad alta, pocas horas) en vez de devolver un
+numero. El observable entra por parametro: el dia que haya k medida, el mismo
+estimador la acepta sin tocar una linea.
+
+Ademas, un fallo que era del TEST y no del codigo: `assert bajo < verdad < alto`
+sobre UN intervalo del 68 % falla una de cada tres veces por definicion.
+Sustituido por una prueba de cobertura sobre 60 realizaciones.
+
+---
+
 ## 08-09-2026 — El PM2.5 de AstroCamp, leido de un PNG
 
 Nino pregunto si el numero de particulas en suspension de la pagina de
