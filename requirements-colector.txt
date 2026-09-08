@@ -26,6 +26,9 @@ duckdb~=1.5.5
 # log que nadie leia mientras el trabajo se marcaba OK todos los dias.
 netCDF4~=1.7.4
 numpy~=2.4.4
+# Lee el PNG de polvo de AstroCamp (`fetch_astrocamp_dust`), que es la
+# unica forma en que publican ese sensor: no hay CSV ni API.
+pillow~=12.2
 pyarrow~=25.0
 requests~=2.34
 scipy~=1.18.1

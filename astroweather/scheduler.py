@@ -122,6 +122,11 @@ def _job_allsky():
     return fetch_allsky.run()
 
 
+def _job_polvo():
+    from .workers import fetch_astrocamp_dust
+    return fetch_astrocamp_dust.run()
+
+
 def _job_archive():
     from .archivepush import push, repo_path
     if repo_path() is None:
@@ -373,6 +378,11 @@ JOBS: dict[str, Trabajo] = {
     # La allsky sirve 19,2 h como mucho (medido) a 15 s de cadencia. Cada 4
     # horas pidiendo 5 deja una hora de solape: una caida corta no abre hueco.
     "allsky": Trabajo(_job_allsky, timedelta(hours=4)),
+    # El grafico de polvo abarca 24 h, asi que cada 8 h se recoge cada punto
+    # TRES veces y hacen falta dos pasadas seguidas fallidas para abrir un
+    # hueco. Mas a menudo no anade dato: solo pesa en el archivo, que son 64 KB
+    # de PNG comprimido por pasada y ahi si se nota (~70 MB al anio).
+    "polvo": Trabajo(_job_polvo, timedelta(hours=8)),
     "verificacion": Trabajo(_job_verification, timedelta(hours=24), desde_hora_utc=8),
     # El suelo del cielo, remedido cada dia contra el fotometro. Va DESPUES del
     # relleno del TESS: el numero que usa el recomendador tiene que ser el de

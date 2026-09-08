@@ -38,6 +38,7 @@ Cobertura = porcentaje de las 3.668.510 filas que llevan ese dato.
 | Racha | `gust` | — | — | **VACÍA** | **Alimenta un gate de SEGURIDAD y no tiene ni un dato.** Ver §4 |
 | Presión de estación | `station_pressure` | Estación meteo | ~5 min | **0,01 %** (362) | Contraste con la presión del modelo |
 | Techos abiertos | `roof_open` | Página de AstroCamp | ~5 min | 0,005 % (183) | **Censura**: nadie observando ≠ mal tiempo. Solo desde el 27-08 |
+| Aerosol en superficie | `pm2_5` | Sensor de AstroCamp, **digitalizado de su PNG** | 1 h | nueva (08-09-2026) | **La única medida in situ de aerosol que tenemos.** Todo lo demás es CAMS, o sea modelo. Es con lo que por fin se puede calibrar `AEROSOL_SCALE_HEIGHT_M`. No es un calímetro: mide superficie, y la calima viaja a 1,5-5 km (53 % de las horas de AOD alto tienen PM2.5 normal) |
 | Seeing (FWHM) | `fwhm_zenith_500nm` | Pipeline propio sobre frames | por frame | **0,002 %** (60) | Calibrar el modelo de seeing, que hoy predice 1,21″ donde se midieron 3,16″ |
 | Brillo calibrado en banda | `sky_mag_calibrated` | — | — | **VACÍA** | Requiere una conversión TESS→V versionada que no existe (SPEC §2.3) |
 | Coeficiente de extinción | `k_extinction` | — | — | **VACÍA** | Lo mediría la allsky, que no existe. Hoy `k` es un valor de partida de 0,18 |

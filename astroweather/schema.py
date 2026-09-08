@@ -137,6 +137,11 @@ MEASUREMENT_SCHEMA = pa.schema(
         pa.field("wind", pa.float32()),
         pa.field("gust", pa.float32()),
         pa.field("station_pressure", pa.float32()),
+        # Aerosol MEDIDO en el sitio, no modelado: PM2.5 en superficie, ug/m3,
+        # del sensor que AstroCamp publica en su grafico. Es lo unico in situ
+        # que tenemos frente al AOD de CAMS, y por eso vive en `measurements` y
+        # no junto al `dust_surface` de `forecasts`, que es de modelo.
+        pa.field("pm2_5", pa.float32()),
         # censoring: roofs tell us whether anyone was observing at all
         pa.field("roof_open", pa.bool_()),
         pa.field("censored", pa.bool_()),
@@ -222,4 +227,8 @@ RANGOS = {
     "wind10m": (0.0, 150.0), "gust10m": (0.0, 150.0),
     "precipitation": (0.0, 500.0),
     "t2m": (-90.0, 60.0), "td2m": (-90.0, 60.0),
+    # Una concentracion no es negativa. El techo es generoso a proposito: el
+    # record mundial de PM2.5 horario esta en unos pocos miles, asi que por
+    # encima el numero no es "alto", es un error de lectura.
+    "pm2_5": (0.0, 5000.0),
 }

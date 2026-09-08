@@ -12,6 +12,48 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 08-09-2026 — El PM2.5 de AstroCamp, leido de un PNG
+
+Nino pregunto si el numero de particulas en suspension de la pagina de
+AstroCamp tiene que ver con la calima. **Medido sobre nuestro archivo** (22.752
+horas, feb-2024 -> sep-2026): correlacionados pero no lo mismo. PM2.5 contra
+AOD total r = +0,67; contra el polvo en superficie r = +0,84. En las colas se
+despegan: con umbral p95, el **53 % de las horas de AOD alto tienen PM2.5
+normal** y el **51 % de las de PM2.5 alto tienen AOD normal**. La calima viaja
+en capa elevada (1,5-5 km) y a 1650 m el observatorio esta dentro o debajo, que
+es justo por lo que `site_aod()` no escala el termino de polvo. Sirve de
+**alarma de episodio**, no de medidor de transparencia: en el 1 % de horas de
+mas polvo, el PM2.5 se pone en su propio percentil 99.
+
+**Worker nuevo `fetch_astrocamp_dust.py`.** Se sondeo el servidor entero: no
+hay CSV, JSON ni API -- ese sensor solo existe como PNG. Asi que se digitaliza.
+Media horaria a `measurements.pm2_5` (columna nueva), cada 8 h, con el PNG
+archivado entero para poder recalcular cualquier otra agregacion.
+
+**El control positivo -- curvas de valor conocido inyectadas en el PNG real --
+destapo tres fallos que ya estaban escritos y ninguno daba error, solo numeros:**
+
+1. La calibracion iba contra las lineas de rejilla; matplotlib no siempre las
+   pone cada 10 y el digitalizador devolvia la mitad. Ahora va contra las
+   MARCAS del eje.
+2. Con la curva alta el relleno tapa la rejilla de debajo (a 45 ug/m3
+   desaparecen 4 de 9) y el guardian saltaba en falso.
+3. **La leyenda es opaca**: por encima de ~90 ug/m3 se publicaba su borde
+   inferior como si fuera el sensor. Un 7 % de menos, en silencio, y solo en el
+   episodio mas fuerte que puede haber. Esas columnas se declaran desconocidas
+   y la hora sale marcada.
+
+Precision final: **error maximo 0,23 ug/m3 de 4 a 86**. Contra CAMS en las
+ultimas 23 h: r = +0,76, sesgo +1,7 ug/m3. Y **guardian**, visto en rojo: si
+AstroCamp reescala el eje o cambia el tamano del grafico, el worker revienta en
+vez de publicar numeros mal escalados con el trabajo en verde.
+
+De regalo, el ejemplo en vivo de la pregunta: de 09-07 12h a 09-08 10h el AOD
+se multiplico por 4,6 (0,050 -> 0,230) mientras el sensor de superficie subia un
+30 % (6,5 -> 8,5 ug/m3).
+
+---
+
 ## 07-09-2026 — WeatherNext 3 entra como candidato, no como sustituto
 
 Google publicó el 03-09 WeatherNext 3: inicialización horaria con imagen

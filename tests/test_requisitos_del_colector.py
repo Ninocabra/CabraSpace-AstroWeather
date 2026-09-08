@@ -44,6 +44,12 @@ FUERA = {
 }
 
 
+# El modulo que se importa y la distribucion que se instala no siempre se
+# llaman igual. Sin esto, `pillow` declarado y `PIL` importado parecen dos
+# cosas distintas y el test acusa a un huerfano que no lo es.
+ALIAS = {"pil": "pillow"}
+
+
 def _declarados() -> set[str]:
     """Los nombres de distribucion del fichero de requisitos, normalizados."""
     nombres = set()
@@ -55,6 +61,12 @@ def _declarados() -> set[str]:
         if nombre:
             nombres.add(nombre.lower().replace("-", "_"))
     return nombres
+
+
+def _distribucion(modulo: str) -> str:
+    """El nombre con el que se instala el modulo, normalizado."""
+    normal = modulo.lower().replace("-", "_")
+    return ALIAS.get(normal, normal)
 
 
 def _importados() -> dict[str, set[str]]:
@@ -89,7 +101,7 @@ def test_todo_lo_que_importa_el_codigo_esta_declarado_o_excluido():
     huerfanos = {
         modulo: sorted(ficheros)
         for modulo, ficheros in _importados().items()
-        if modulo.lower().replace("-", "_") not in declarados and modulo not in FUERA
+        if _distribucion(modulo) not in declarados and modulo not in FUERA
     }
     assert not huerfanos, (
         "modulos que el codigo importa y el runner no tiene forma de tener:\n"
