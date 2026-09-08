@@ -18,6 +18,10 @@ data/raw/site=nerpio/*
 *.grib2
 *.zip
 
+# Capturas de la allsky para medir k: ~40 MB por noche de JPEG que se pueden
+# volver a mirar pero no volver a bajar. Viven en disco, no en git.
+capturas/
+
 # Secretos
 .env
 .cdsapirc
