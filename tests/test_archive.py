@@ -61,3 +61,16 @@ def test_raw_is_content_addressed_and_never_rewritten(tmp_path):
 
 def test_empty_rows_write_nothing(tmp_path):
     assert write_canonical([], dataset="forecasts", site_id="test", root=tmp_path) is None
+
+
+def test_tag_goes_into_the_file_name_and_is_checked(tmp_path):
+    """The archive push sorts WeatherNext files by name, not by opening them."""
+    path = write_canonical([_row("weathernext3", 1)], dataset="forecasts",
+                           site_id="test", root=tmp_path, tag="weathernext3")
+    assert path.name.endswith("_weathernext3.parquet")
+    untagged = write_canonical([_row("ecmwf_ifs", 1)], dataset="forecasts",
+                               site_id="test", root=tmp_path)
+    assert untagged.name.count("_") == 1
+    with pytest.raises(ValueError, match="tag"):
+        write_canonical([_row("x", 1)], dataset="forecasts", site_id="test",
+                        root=tmp_path, tag="../escape")

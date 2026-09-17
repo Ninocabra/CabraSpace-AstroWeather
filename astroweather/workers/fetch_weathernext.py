@@ -50,6 +50,16 @@ BANDS = tuple(
     for stat in STATS
 )
 
+# Decimals kept in the canonical row, the precision the other providers
+# already publish. The model hands out float noise (a cloud cover of
+# 0.0772 %) that zstd cannot compress: rounded, a run shrinks 42 % and a month
+# bundle 85 %, and the exam AUC moves in the fourth decimal (17-09-2026). The
+# raw keeps every digit.
+DECIMALS = {
+    "cloud_total": 1, "cloud_low": 1, "cloud_mid": 1, "cloud_high": 1,
+    "t2m": 1, "td2m": 1, "wind10m": 1, "pressure_msl": 1, "precipitation": 2,
+}
+
 MAGNUS_A = 17.62
 MAGNUS_B = 243.12
 
@@ -401,38 +411,38 @@ def _rows(
 
                 c_total = item.get(f"total_cloud_cover_{stat}")
                 if c_total is not None:
-                    row["cloud_total"] = round(float(c_total) * 100.0, 4)
+                    row["cloud_total"] = round(float(c_total) * 100.0, DECIMALS["cloud_total"])
 
                 c_low = item.get(f"low_cloud_cover_{stat}")
                 if c_low is not None:
-                    row["cloud_low"] = round(float(c_low) * 100.0, 4)
+                    row["cloud_low"] = round(float(c_low) * 100.0, DECIMALS["cloud_low"])
 
                 c_mid = item.get(f"medium_cloud_cover_{stat}")
                 if c_mid is not None:
-                    row["cloud_mid"] = round(float(c_mid) * 100.0, 4)
+                    row["cloud_mid"] = round(float(c_mid) * 100.0, DECIMALS["cloud_mid"])
 
                 c_high = item.get(f"high_cloud_cover_{stat}")
                 if c_high is not None:
-                    row["cloud_high"] = round(float(c_high) * 100.0, 4)
+                    row["cloud_high"] = round(float(c_high) * 100.0, DECIMALS["cloud_high"])
 
                 t_k = item.get(f"temperature_2m_{stat}")
                 t2m = None
                 if t_k is not None:
-                    t2m = round(float(t_k) - 273.15, 4)
-                    row["t2m"] = t2m
+                    t2m = float(t_k) - 273.15
+                    row["t2m"] = round(t2m, DECIMALS["t2m"])
 
                 td_k = item.get(f"dewpoint_temperature_2m_{stat}")
                 td2m = None
                 if td_k is not None:
-                    td2m = round(float(td_k) - 273.15, 4)
-                    row["td2m"] = td2m
+                    td2m = float(td_k) - 273.15
+                    row["td2m"] = round(td2m, DECIMALS["td2m"])
 
                 if stat == "mean" and t2m is not None and td2m is not None:
                     row["rh2m"] = derive_rh2m(t2m, td2m)
 
                 w_speed = item.get(f"wind_speed_10m_{stat}")
                 if w_speed is not None:
-                    wind10m = round(float(w_speed), 4)
+                    wind10m = round(float(w_speed), DECIMALS["wind10m"])
                     check_wind_units([wind10m], label=f"{model}:wind10m")
                     row["wind10m"] = wind10m
 
@@ -446,12 +456,12 @@ def _rows(
                 precip_m = item.get(f"total_precipitation_1hr_{stat}")
                 if precip_m is not None:
                     row["precipitation"] = round(
-                        float(precip_m) * 1000.0, 4
+                        float(precip_m) * 1000.0, DECIMALS["precipitation"]
                     )
 
                 p_pa = item.get(f"mean_sea_level_pressure_{stat}")
                 if p_pa is not None:
-                    row["pressure_msl"] = round(float(p_pa) / 100.0, 4)
+                    row["pressure_msl"] = round(float(p_pa) / 100.0, DECIMALS["pressure_msl"])
 
                 row.update(
                     {
@@ -562,6 +572,7 @@ def run(
         canonical_rows,
         dataset="forecasts",
         site_id=site.site_id,
+        tag=MODEL,          # archivepush bundles these by closed month
     )
 
     counts: dict[str, int] = {}

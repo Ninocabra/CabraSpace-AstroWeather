@@ -71,6 +71,15 @@ SKIPPED = {
                       "Google revoca el acceso hay que borrar cada copia del dato",
 }
 
+# Canonico que no sube pasada a pasada sino UN FICHERO POR MES CERRADO
+# (decidido por Nino el 17-09-2026). WeatherNext escribe 864 filas por pasada
+# con decimales de sobra: 50 kB sueltos, 25,6 MB el backfill de ene-sep 2026.
+# Redondeado en el worker y juntado por mes, marzo pasa de 3.043 kB a 443 kB y
+# el backfill a 3,6 MB, con el AUC del examen igual hasta el cuarto decimal.
+# Las pasadas sueltas se quedan en este disco; el mes en curso no viaja hasta
+# cerrarse, igual que un dia de scrapes sin terminar (`bundle_days`).
+MONTHLY_TAGS = ("weathernext3",)
+
 # Ficheros sueltos de `data/` que son estado del producto y valen su peso.
 #
 # `sky_floor.json` entro el 30-08-2026 y faltaba: es el suelo del cielo medido
@@ -112,13 +121,21 @@ def _day_of(name: str) -> str | None:
     return name[:8] if len(name) > 8 and name[:8].isdigit() else None
 
 
+def _per_run_tag(name: str) -> str | None:
+    """La etiqueta mensual de un fichero por pasada, o None si no lleva."""
+    for tag in MONTHLY_TAGS:
+        if name.endswith(f"_{tag}.parquet"):
+            return tag
+    return None
+
+
 def mirror_tree(source: Path, destination: Path) -> list[Path]:
     """Copia lo que falte. Los nombres son unicos, asi que falta == no existe."""
     copiados = []
     if not source.is_dir():
         return copiados
     for origen in sorted(source.rglob("*")):
-        if not origen.is_file():
+        if not origen.is_file() or _per_run_tag(origen.name):
             continue
         destino = destination / origen.relative_to(source)
         if destino.exists():
@@ -167,6 +184,45 @@ def bundle_days(source: Path, destination: Path, *, today: str) -> list[Path]:
     return creados
 
 
+def bundle_months(source: Path, destination: Path, *, today: str) -> list[Path]:
+    """Un Parquet por mes TERMINADO con las pasadas sueltas de cada etiqueta.
+
+    El mes es el de la particion (`year=/month=`), que `write_canonical` pone
+    por la primera hora valida de la pasada. Filas ordenadas por modelo, pasada
+    y plazo, y zstd alto: juntas y en orden es donde se comprime.
+    """
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    creados = []
+    if not source.is_dir():
+        return creados
+    grupos: dict[tuple[Path, str], list[Path]] = {}
+    for fichero in source.rglob("*.parquet"):
+        tag = _per_run_tag(fichero.name)
+        if tag is None:
+            continue
+        particion = fichero.parent.relative_to(source)
+        partes = dict(p.split("=", 1) for p in particion.parts if "=" in p)
+        mes = partes.get("year", "") + partes.get("month", "")
+        if len(mes) == 6 and mes < today[:6]:          # solo meses TERMINADOS
+            grupos.setdefault((particion, tag), []).append(fichero)
+
+    for (particion, tag), ficheros in sorted(grupos.items()):
+        partes = dict(p.split("=", 1) for p in particion.parts if "=" in p)
+        destino = destination / particion / f"{partes['year']}{partes['month']}_{tag}_month.parquet"
+        if destino.exists():
+            continue
+        tabla = pa.concat_tables([pq.read_table(f) for f in sorted(ficheros)],
+                                 promote_options="default")
+        tabla = tabla.sort_by([("model", "ascending"), ("run_utc", "ascending"),
+                               ("lead_h", "ascending")])
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        pq.write_table(tabla, destino, compression="zstd", compression_level=19)
+        creados.append(destino)
+    return creados
+
+
 def collect(root: Path, repo: Path, *, today: str | None = None) -> dict[str, int]:
     """Deja el archivo al dia dentro del repo. Devuelve el recuento por bloque."""
     today = today or dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d")
@@ -174,6 +230,8 @@ def collect(root: Path, repo: Path, *, today: str | None = None) -> dict[str, in
 
     for almacen in MIRRORED:
         resumen[almacen] = len(mirror_tree(root / almacen, repo / almacen))
+    resumen["forecasts/mensual"] = len(
+        bundle_months(root / "forecasts", repo / "forecasts", today=today))
 
     raiz_raw = root / "raw"
     if raiz_raw.is_dir():

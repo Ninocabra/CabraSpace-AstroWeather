@@ -10,6 +10,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -74,13 +75,21 @@ def write_canonical(
     dataset: str,
     site_id: str,
     root: Path | None = None,
+    tag: str | None = None,
 ) -> Path | None:
     """Append typed rows to the partitioned Parquet dataset.
 
     `dataset` is 'forecasts' or 'measurements'. Rows are validated against the
     schema on the way in: a typo in a column name fails here, not silently
     three months later when the model is trained.
+
+    `tag` ends up in the file name (`<stamp>_<digest>_<tag>.parquet`) so the
+    archive push can treat a source differently without opening every file:
+    WeatherNext's per-run files stay on this disk and travel as one file per
+    closed month (`archivepush.bundle_months`).
     """
+    if tag is not None and not re.fullmatch(r"[a-z0-9_]+", tag):
+        raise ValueError(f"tag must be [a-z0-9_]+, got {tag!r}")
     rows = list(rows)
     if not rows:
         return None
@@ -148,10 +157,11 @@ def write_canonical(
     models = sorted({str(row.get("model")) for row in rows})
     fingerprint = f"{dataset}|{models}|{len(rows)}|{first}"
     digest = hashlib.sha256(fingerprint.encode()).hexdigest()[:8]
-    path = directory / f"{stamp:%Y%m%dT%H%M%SZ}_{digest}.parquet"
+    suffix = f"_{tag}" if tag else ""
+    path = directory / f"{stamp:%Y%m%dT%H%M%SZ}_{digest}{suffix}.parquet"
     counter = 0
     while path.exists():
         counter += 1
-        path = directory / f"{stamp:%Y%m%dT%H%M%SZ}_{digest}_{counter}.parquet"
+        path = directory / f"{stamp:%Y%m%dT%H%M%SZ}_{digest}_{counter}{suffix}.parquet"
     pq.write_table(table, path, compression="zstd")
     return path

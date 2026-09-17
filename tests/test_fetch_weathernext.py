@@ -93,7 +93,7 @@ def test_unit_conversions(fixture_records, retrieved_at):
     assert row["cloud_total"] == 42.0
     assert row["t2m"] == 10.0
     assert row["precipitation"] == 1.2
-    assert row["pressure_msl"] == 1013.25
+    assert row["pressure_msl"] == round(1013.25, 1)
     assert 0.0 <= row["rh2m"] <= 100.0
     assert 0.0 <= row["wind_dir10m"] < 360.0
 
@@ -529,6 +529,7 @@ def test_run_with_fake_ee_archives_and_writes(
     assert write_kwargs == {
         "dataset": "forecasts",
         "site_id": NERPIO.site_id,
+        "tag": "weathernext3",
     }
 
 
@@ -561,3 +562,15 @@ def test_run_refuses_incomplete_initialization(
 
     assert store_calls == []
     assert write_calls == []
+
+
+def test_canonical_rows_are_rounded_to_published_precision(ee_region, retrieved_at):
+    """The model's float noise does not compress: 0.0772 % is stored as 0.1."""
+    rows = _rows(records_from_region(ee_region, NERPIO), NERPIO, retrieved_at)
+    lead_one = next(r for r in rows if r["model"] == "weathernext3" and r["lead_h"] == 1)
+    assert lead_one["cloud_total"] == 0.1
+    for row in rows:
+        for column, decimals in worker.DECIMALS.items():
+            value = row.get(column)
+            if value is not None:
+                assert value == round(value, decimals), (column, value)

@@ -127,3 +127,36 @@ def test_pushing_commits_what_it_collected(datos, repo):
     assert "measurements" in mensaje          # el commit dice QUE entro
     assert archivepush.push(root=datos, repo=repo, push_remote=False,
                             today="20260829") is None
+
+
+def _pasada(raiz, mes, stamp, horas, tag="weathernext3"):
+    """Una pasada canonica de verdad, escrita por la frontera de escritura."""
+    import datetime as dt
+    from astroweather.archive import write_canonical
+    run = dt.datetime(2026, mes, 3, 0, tzinfo=dt.timezone.utc) + dt.timedelta(hours=stamp)
+    filas = [{"site_id": "nerpio", "model": "weathernext3", "run_utc": run,
+              "valid_utc": run + dt.timedelta(hours=h), "lead_h": h, "member": None,
+              "cloud_total": 12.3} for h in range(1, horas + 1)]
+    return write_canonical(filas, dataset="forecasts", site_id="nerpio", root=raiz, tag=tag)
+
+
+def test_weathernext_runs_travel_as_one_file_per_closed_month(tmp_path, repo):
+    """Nino, 17-09-2026: sueltas en este disco, un fichero por mes cerrado."""
+    import pyarrow.parquet as pq
+    raiz = tmp_path / "data"
+    _pasada(raiz, 8, 0, 6)
+    _pasada(raiz, 8, 12, 6)
+    _pasada(raiz, 9, 0, 6)                       # mes en curso
+    sin_etiqueta = _pasada(raiz, 8, 24, 3, tag=None)
+
+    resumen = archivepush.collect(raiz, repo, today="20260917")
+
+    agosto = repo / "forecasts" / "site=nerpio" / "year=2026" / "month=08"
+    assert sorted(p.name for p in agosto.iterdir()) == sorted(
+        [sin_etiqueta.name, "202608_weathernext3_month.parquet"])
+    assert pq.read_table(agosto / "202608_weathernext3_month.parquet").num_rows == 12
+    assert not (repo / "forecasts" / "site=nerpio" / "year=2026" / "month=09").exists()
+    assert resumen["forecasts/mensual"] == 1
+
+    # Idempotente: una segunda pasada no rehace ni duplica el mes.
+    assert archivepush.collect(raiz, repo, today="20260918")["forecasts/mensual"] == 0
