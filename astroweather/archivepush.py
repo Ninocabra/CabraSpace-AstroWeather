@@ -90,6 +90,22 @@ MONTHLY_TAGS = ("weathernext3",)
 # `estado_colector.json` entro el mismo dia y es lo que hace posible que la
 # recogida viva en un runner que se destruye: sin el, cada pasada creeria que
 # no ha corrido nunca nada.
+# Lo que el repo del archivo NO debe versionar, escrito por `collect` para que
+# no dependa de que alguien se acuerde de crearlo a mano.
+#
+# EN EL RUNNER `data/forecasts` ES UN ENLACE al clon del archivo (workflow
+# `colector.yml`), asi que una pasada de WeatherNext no se "copia" al repo: nace
+# dentro. Sin esto, el `git add -A` de `push` subiria las dos pasadas diarias
+# una a una -- justo lo que se decidio el 17-09-2026 que no pasara -- y la
+# agrupacion mensual no llegaria a actuar. Las sueltas sobreviven entre pasadas
+# en la cache del runner, como el raw del dia; si se pierde la cache, se vuelven
+# a pedir a Earth Engine, que es donde siguen estando.
+IGNORADOS = (
+    "# Escrito por astroweather.archivepush: las pasadas sueltas de WeatherNext",
+    "# viajan agrupadas por mes cerrado, no una a una.",
+    "forecasts/**/*_weathernext3.parquet",
+)
+
 ESTADO = "estado_colector.json"
 
 LOOSE = ("cloud_calibration.json", "roof_calibration.json", "open_hours_nerpio.json",
@@ -256,10 +272,22 @@ def fundir_estado(origen: Path, destino: Path) -> bool:
     return True
 
 
+def asegurar_gitignore(repo: Path) -> bool:
+    """Deja las reglas de `IGNORADOS` en el .gitignore del archivo."""
+    destino = repo / ".gitignore"
+    lineas = destino.read_text(encoding="utf-8").splitlines() if destino.exists() else []
+    faltan = [linea for linea in IGNORADOS if linea not in lineas]
+    if not faltan:
+        return False
+    destino.write_text(chr(10).join(lineas + faltan) + chr(10), encoding="utf-8")
+    return True
+
+
 def collect(root: Path, repo: Path, *, today: str | None = None) -> dict[str, int]:
     """Deja el archivo al dia dentro del repo. Devuelve el recuento por bloque."""
     today = today or dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d")
     resumen: dict[str, int] = {}
+    asegurar_gitignore(repo)
 
     for almacen in MIRRORED:
         resumen[almacen] = len(mirror_tree(root / almacen, repo / almacen))

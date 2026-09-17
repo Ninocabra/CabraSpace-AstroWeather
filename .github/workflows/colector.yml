@@ -216,6 +216,13 @@ jobs:
     env:
       ASTROWEATHER_ARCHIVE_REPO: ${{ github.workspace }}/archivo
       ASTROWEATHER_DATA_REPO: ${{ github.workspace }}/datos
+      # WeatherNext 3: vacios hasta que Google conceda acceso a la cuenta de
+      # servicio (pedido el 17-09-2026). Sin ellos el trabajo se salta diciendolo
+      # en el log -- `credentials_source()` no toca la red -- y mientras tanto
+      # recoge el escritorio. NO se ponen en la comprobacion de secretos de
+      # abajo: faltar es el estado normal hoy, no un fallo.
+      GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+      EE_SERVICE_ACCOUNT_KEY: ${{ secrets.EE_SERVICE_ACCOUNT_KEY }}
       AEMET_API_KEY: ${{ secrets.AEMET_API_KEY }}
       ADS_URL: ${{ secrets.ADS_URL }}
       ADS_KEY: ${{ secrets.ADS_KEY }}
@@ -288,6 +295,17 @@ jobs:
           key: colector-raw-${{ github.run_id }}
           restore-keys: colector-raw-
 
+      - name: Las pasadas sueltas de WeatherNext, de la pasada anterior
+        # Nacen dentro del clon del archivo (data/forecasts es un enlace) y NO
+        # se versionan: viajan agrupadas por mes cerrado. Entre pasada y pasada
+        # viven aqui, igual que el raw del dia. Si la cache se pierde, se
+        # vuelven a pedir a Earth Engine, que las sigue sirviendo.
+        uses: actions/cache/restore@v5
+        with:
+          path: archivo/forecasts/**/*_weathernext3.parquet
+          key: colector-weathernext-${{ github.run_id }}
+          restore-keys: colector-weathernext-
+
       - name: Montar data/ sobre el archivo
         # Los almacenes canonicos se ENLAZAN al clon del archivo: asi lo que
         # escriban los workers cae directamente donde se va a commitear, sin
@@ -349,6 +367,15 @@ jobs:
         with:
           path: data/raw
           key: colector-raw-${{ github.run_id }}
+
+      - name: Guardar las pasadas sueltas de WeatherNext para la siguiente
+        # `always()`: una pasada ya pedida es dato aunque otro trabajo fallara
+        # despues, y sin esto el mes se quedaria sin las horas de hoy.
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: archivo/forecasts/**/*_weathernext3.parquet
+          key: colector-weathernext-${{ github.run_id }}
 
       - name: Que se hizo
         if: always()

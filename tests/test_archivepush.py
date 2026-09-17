@@ -204,3 +204,26 @@ def test_the_collector_state_is_merged_between_machines(tmp_path, repo):
     estado = json.loads((repo / "estado_colector.json").read_text(encoding="utf-8"))
     assert estado["trabajos"]["forecast"] == "2026-09-17T16:01:34+00:00"   # no se pierde
     assert estado["trabajos"]["weathernext"] == "2026-09-17T20:08:42+00:00"  # gana el nuevo
+
+
+def test_a_run_born_inside_the_repo_is_not_versioned(tmp_path, repo):
+    """En el runner `data/forecasts` ES el clon del archivo: no se copia, nace dentro.
+
+    Sin la regla, el `git add -A` de `push` subiria las dos pasadas diarias de
+    WeatherNext una a una y la agrupacion mensual no llegaria a actuar.
+    """
+    raiz = tmp_path / "data"
+    (raiz / "measurements").mkdir(parents=True)
+    archivepush.collect(raiz, repo, today="20260918")
+
+    suelta = repo / "forecasts" / "site=nerpio" / "year=2026" / "month=09"
+    suelta.mkdir(parents=True, exist_ok=True)
+    for nombre, ignorado in (("20260918T000000Z_abcd1234_weathernext3.parquet", True),
+                             ("202609_weathernext3_month.parquet", False),
+                             ("20260918T000000Z_abcd1234_weathernext3_backfill.parquet", False),
+                             ("20260918T000000Z_abcd1234.parquet", False)):
+        ruta = suelta / nombre
+        ruta.write_bytes(b"PAR1")
+        comprobado = subprocess.run(
+            ["git", "-C", str(repo), "check-ignore", "-q", str(ruta.relative_to(repo))])
+        assert (comprobado.returncode == 0) is ignorado, nombre

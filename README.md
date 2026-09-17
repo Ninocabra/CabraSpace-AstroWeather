@@ -48,12 +48,14 @@ empieza antes que ninguna otra cosa.
       Trabajo `weathernext` cada 12 h, pasadas 00Z y 12Z de 144 h.
 - [ ] **WeatherNext en el runner**: PENDIENTE de que Google conceda acceso a
       `astroweather-runner@astroweather-cabra.iam.gserviceaccount.com` (pedido
-      el 17-09-2026 a weathernext@google.com). Hasta entonces recoge EL
-      ESCRITORIO: si esta apagado, esas pasadas no se archivan. Cuando llegue:
-      secreto `EE_SERVICE_ACCOUNT_KEY` en Actions, declarar `earthengine-api`
-      en `requirements-colector.txt`, quitar `ee` de FUERA, y resolver que las
-      pasadas sueltas no viajen sueltas (en el runner `data/forecasts` es un
-      enlace al clon del archivo, asi que `git add -A` las subiria una a una).
+      el 17-09-2026 por el formulario, campo de cuenta de servicio adicional).
+      Hasta entonces recoge EL ESCRITORIO, con una tarea cada 3 h: si el PC
+      esta apagado, esas pasadas no se archivan. El runner ya esta listo
+      (`.gitignore` del archivo escrito por `archivepush`, cache de las
+      pasadas sueltas y las dos variables en el workflow); cuando llegue el
+      acceso solo faltan DOS cosas: poner los secretos `EE_SERVICE_ACCOUNT_KEY`
+      y `GOOGLE_CLOUD_PROJECT` en Actions, y declarar `earthengine-api` en
+      `requirements-colector.txt` quitando `ee` de FUERA.
 - [ ] **WeatherNext en el veredicto**: su curva en `calibration.py` y ver si
       mezclado con el ECMWF mejora a cada uno por separado. En la web, solo el
       veredicto derivado y con la cita de Google: su nubosidad no se publica.
