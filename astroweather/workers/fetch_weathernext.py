@@ -1,15 +1,13 @@
-"""Ingestion worker for Google DeepMind WeatherNext 3 via BigQuery.
+"""Ingestion worker for Google DeepMind WeatherNext 3 via Earth Engine.
 
-Table: weathernext_3_0_0_0p1deg (0.1 degree gridded forecast).
-Ensemble: 64 members summarized into mean and 5 quantiles (p10, p25, p50, p75, p90).
-Architectural model layout: 6 models (mean as 'weathernext3', quantiles as 'weathernext3_pXX')
-with member=None to conform to canonical schema and allow individual scoring.
+The ensemble is represented as six canonical models: the mean
+(`weathernext3`) and five quantiles (`weathernext3_pXX`).
 """
 
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import math
 import os
 import re
@@ -19,28 +17,49 @@ from ..archive import store_raw, utcnow, write_canonical
 from ..invariants import check_wind_units
 from ..site import NERPIO, Site
 
-ENDPOINT_KIND = "bigquery"
-LICENSE_TAG = "weathernext3-gdm-experimental"   # el forecast del futuro NO es CC BY
-MODEL = "weathernext3"
-RESOLUTION_KM = 10.0                           # 0.1 deg, NO 5 km (eso es solo T/Td de estación)
-STATS = ("mean", "p10", "p25", "p50", "p75", "p90")
+ENDPOINT_KIND = "earthengine"
+COLLECTION_ID = (
+    "projects/gcp-public-data-weathernext/assets/"
+    "weathernext_3_0_0_0p1deg"
+)
+NATIVE_CRS = "EPSG:4326"
+NATIVE_TRANSFORM = (0.1, 0.0, -180.05, 0.0, -0.1, 90.05)
 
+LICENSE_TAG = "weathernext3-gdm-experimental"
+MODEL = "weathernext3"
+RESOLUTION_KM = 10.0
+STATS = ("mean", "p10", "p25", "p50", "p75", "p90")
 PROVIDER_MODEL_VERSION = "weathernext_3_0_0_0p1deg"
 
-# Magnus-Sonntag constants (Sonntag 1990) for saturation vapor pressure over water
-# E(T) = 6.112 * exp(17.62 * T / (243.12 + T)) [hPa, T in deg C]
-# RH = 100 * E(Td) / E(T) = 100 * exp(17.62 * Td / (243.12 + Td) - 17.62 * T / (243.12 + T))
+VARIABLES = (
+    "total_cloud_cover",
+    "low_cloud_cover",
+    "medium_cloud_cover",
+    "high_cloud_cover",
+    "temperature_2m",
+    "dewpoint_temperature_2m",
+    "wind_speed_10m",
+    "u_component_of_wind_10m",
+    "v_component_of_wind_10m",
+    "total_precipitation_1hr",
+    "mean_sea_level_pressure",
+)
+BANDS = tuple(
+    f"{variable}_{stat}"
+    for variable in VARIABLES
+    for stat in STATS
+)
+
 MAGNUS_A = 17.62
 MAGNUS_B = 243.12
 
+_IMAGE_ID_RE = re.compile(
+    r"(?:.*/)?(?P<start>\d{12})_(?P<end>\d{12})\Z"
+)
+
 
 def derive_rh2m(t_c: float, td_c: float) -> float:
-    """Derive 2m relative humidity (%) from temperature and dew point in Celsius.
-
-    Uses Magnus-Sonntag formulation (Sonntag 1990):
-        RH = 100 * exp(a * Td / (b + Td) - a * T / (b + T))
-    with a = 17.62, b = 243.12 deg C. Clamped to [0.0, 100.0] %.
-    """
+    """Derive 2 m relative humidity from Celsius temperature and dew point."""
     gamma_td = (MAGNUS_A * td_c) / (MAGNUS_B + td_c)
     gamma_t = (MAGNUS_A * t_c) / (MAGNUS_B + t_c)
     rh = 100.0 * math.exp(gamma_td - gamma_t)
@@ -48,98 +67,275 @@ def derive_rh2m(t_c: float, td_c: float) -> float:
 
 
 def derive_wind_direction(u: float, v: float) -> float:
-    """Derive 10m wind direction in degrees (0..360) from zonal (u) and meridional (v) components.
-
-    Meteorological convention: direction FROM which the wind is blowing.
-    u: eastward wind (blowing towards East).
-    v: northward wind (blowing towards North).
-    Vector of origin is (-u, -v).
-    Angle clockwise from North: atan2(-u, -v) converted to degrees modulo 360.
-    """
+    """Return meteorological wind direction: where the wind comes from."""
     dir_deg = math.degrees(math.atan2(-u, -v)) % 360.0
     return round(dir_deg, 2)
 
 
-def _extract_centroid(geography: Any) -> tuple[float | None, float | None]:
-    """Extract (latitude, longitude) centroid from BigQuery geography field.
-
-    Accepts WKT (POINT(lon lat)), GeoJSON dict or string, or dict with lat/lon.
-    """
-    if geography is None:
-        return None, None
-
-    if isinstance(geography, dict):
-        if "latitude" in geography and "longitude" in geography:
-            return float(geography["latitude"]), float(geography["longitude"])
-        if geography.get("type") == "Point" and "coordinates" in geography:
-            lon, lat = geography["coordinates"][:2]
-            return float(lat), float(lon)
-
-    if isinstance(geography, str):
-        geo_str = geography.strip()
-        if geo_str.startswith("{"):
-            try:
-                import json
-                parsed = json.loads(geo_str)
-                return _extract_centroid(parsed)
-            except Exception:
-                pass
-        match = re.search(r"POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)", geo_str, re.IGNORECASE)
-        if match:
-            lon, lat = float(match.group(1)), float(match.group(2))
-            return lat, lon
-
-    return None, None
+def _utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
-def build_query(table: str, site: Site, init_time: datetime | None, max_hours: int) -> tuple[str, dict]:
-    """SQL parametrizado + parámetros. Filtra por init_time (partición) y por
-    ST_CONTAINS(geography_polygon, ST_GEOGPOINT(lon, lat)). Si init_time es None,
-    usa la inicialización MÁS RECIENTE disponible para esa celda.
-
-    Coste y particionamiento:
-    La tabla WeatherNext 3 está particionada por `init_time`. Filtrar por `init_time`
-    en la cláusula WHERE antes de cualquier otra condición es indispensable para que
-    BigQuery realice partition pruning y evite un escaneo completo (full table scan)
-    de todo el histórico de previsiones mundiales, cuyo coste monetario sería severo.
-    """
-    table_ref = table if table.startswith("`") and table.endswith("`") else f"`{table}`"
-
-    params: dict[str, Any] = {
-        "lon": site.longitude,
-        "lat": site.latitude,
-        "max_hours": max_hours,
-    }
-
-    if init_time is not None:
-        init_filter = "init_time = @init_time"
-        params["init_time"] = init_time
-    else:
-        init_filter = f"init_time = (SELECT MAX(init_time) FROM {table_ref})"
-
-    query = f"""
-SELECT
-    init_time,
-    geography,
-    geography_polygon,
-    ARRAY(
-        SELECT AS STRUCT *
-        FROM UNNEST(forecast)
-        WHERE hours <= @max_hours
-        ORDER BY hours
-    ) AS forecast
-FROM {table_ref}
-WHERE {init_filter}
-  AND ST_CONTAINS(geography_polygon, ST_GEOGPOINT(@lon, @lat))
-""".strip()
-
-    return query, params
+def _iso_z(value: datetime) -> str:
+    return _utc(value).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def _rows(records: list[dict], site: Site, retrieved_at: datetime) -> list[dict]:
-    """records = filas de BigQuery ya convertidas a dict (una por init_time+celda,
-    con `forecast` como lista de dicts). Devuelve filas CANÓNICAS.
-    """
+def _stable_floor(value: float) -> int:
+    """Floor a grid quotient after removing representation noise at integers."""
+    nearest = round(value)
+    if math.isclose(value, nearest, rel_tol=0.0, abs_tol=1e-10):
+        value = float(nearest)
+    return math.floor(value)
+
+
+def native_cell(lat: float, lon: float) -> tuple[float, float]:
+    """Return the native WeatherNext cell centre containing a coordinate."""
+    lat = float(lat)
+    lon = float(lon)
+
+    if not math.isfinite(lat) or not math.isfinite(lon):
+        raise ValueError("lat/lon deben ser finitos")
+    if not -90.0 <= lat <= 90.0:
+        raise ValueError("lat fuera de [-90, 90]")
+
+    lon = ((lon + 180.0) % 360.0) - 180.0
+
+    i = _stable_floor((lon + 180.05) / 0.1)
+    j = _stable_floor((90.05 - lat) / 0.1)
+
+    # The half-cell interval [179.95, 180) belongs to the dateline cell,
+    # represented by column zero in this 3600-column raster.
+    i %= 3600
+
+    centre_lat = 90.0 - 0.1 * j
+    centre_lon = -180.0 + 0.1 * i
+    return round(centre_lat, 6), round(centre_lon, 6)
+
+
+def parse_image_id(image_id: str) -> tuple[datetime, datetime]:
+    """Parse `<initialization>_<valid>` image IDs, optionally path-prefixed."""
+    match = _IMAGE_ID_RE.fullmatch(str(image_id))
+    if match is None:
+        raise ValueError(f"id de imagen WeatherNext inválido: {image_id!r}")
+
+    try:
+        start = datetime.strptime(
+            match.group("start"), "%Y%m%d%H%M"
+        ).replace(tzinfo=timezone.utc)
+        end = datetime.strptime(
+            match.group("end"), "%Y%m%d%H%M"
+        ).replace(tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise ValueError(
+            f"fecha inválida en id WeatherNext: {image_id!r}"
+        ) from exc
+
+    if end <= start:
+        raise ValueError(
+            f"el fin no es posterior al inicio en id WeatherNext: {image_id!r}"
+        )
+    return start, end
+
+
+def records_from_region(
+    table: list[list],
+    site: Site,
+    expected_init: datetime | None = None,
+) -> list[dict]:
+    """Convert an Earth Engine getRegion table into `_rows` records."""
+    if not table:
+        return []
+
+    header = table[0]
+    if list(header[:4]) != ["id", "longitude", "latitude", "time"]:
+        raise ValueError(
+            "cabecera getRegion inválida: se esperaba "
+            "id, longitude, latitude, time"
+        )
+    if len(table) == 1:
+        return []
+
+    if len(set(header)) != len(header):
+        raise ValueError("cabecera getRegion con columnas duplicadas")
+
+    expected = _utc(expected_init) if expected_init is not None else None
+    expected_lat, expected_lon = native_cell(site.latitude, site.longitude)
+
+    common_init: datetime | None = None
+    seen_ids: set[str] = set()
+    forecast: list[dict] = []
+    grid_lat: float | None = None
+    grid_lon: float | None = None
+
+    for row_number, raw_row in enumerate(table[1:], start=1):
+        if len(raw_row) != len(header):
+            raise ValueError(
+                f"fila getRegion {row_number} tiene longitud incorrecta"
+            )
+
+        values = dict(zip(header, raw_row))
+        image_id = str(values["id"])
+        if image_id in seen_ids:
+            raise ValueError(f"id repetido en getRegion: {image_id}")
+        seen_ids.add(image_id)
+
+        start, end = parse_image_id(image_id)
+
+        if common_init is None:
+            common_init = start
+        elif start != common_init:
+            raise ValueError("filas con distinta init")
+
+        if expected is not None and start != expected:
+            raise ValueError(
+                f"init {start.isoformat()} distinta de expected_init "
+                f"{expected.isoformat()}"
+            )
+
+        raw_time = values["time"]
+        try:
+            region_init = datetime.fromtimestamp(
+                float(raw_time) / 1000.0,
+                tz=timezone.utc,
+            )
+        except (TypeError, ValueError, OSError) as exc:
+            raise ValueError(
+                f"columna time inválida para init en fila {row_number}"
+            ) from exc
+
+        if region_init != start:
+            raise ValueError(
+                f"columna time no coincide con init en fila {row_number}"
+            )
+
+        lon = float(values["longitude"])
+        lat = float(values["latitude"])
+        if not (
+            math.isclose(lat, expected_lat, rel_tol=0.0, abs_tol=1e-6)
+            and math.isclose(lon, expected_lon, rel_tol=0.0, abs_tol=1e-6)
+        ):
+            raise ValueError(
+                f"pixel inesperado en fila {row_number}: "
+                f"({lat}, {lon}), esperado ({expected_lat}, {expected_lon})"
+            )
+
+        # Provenance carries the exact cell centre, not the float noise of
+        # the server (38.199999999999996).
+        grid_lat, grid_lon = expected_lat, expected_lon
+
+        lead_seconds = (end - start).total_seconds()
+        if lead_seconds <= 0 or lead_seconds % 3600 != 0:
+            raise ValueError(
+                f"lead no entero en horas para imagen {image_id}"
+            )
+        hours = int(lead_seconds // 3600)
+        if hours < 1:
+            raise ValueError(f"lead menor que uno para imagen {image_id}")
+
+        item: dict[str, Any] = {
+            "time": end,
+            "hours": hours,
+        }
+        for band in header[4:]:
+            value = values[band]
+            if value is not None:
+                item[str(band)] = float(value)
+        forecast.append(item)
+
+    forecast.sort(key=lambda item: item["hours"])
+
+    assert common_init is not None
+    assert grid_lat is not None
+    assert grid_lon is not None
+    return [
+        {
+            "init_time": common_init,
+            "provider_grid_lat": grid_lat,
+            "provider_grid_lon": grid_lon,
+            "forecast": forecast,
+        }
+    ]
+
+
+def select_complete_init(
+    counts: dict[str, int],
+    hours: int,
+) -> datetime | None:
+    """Select the most recent initialization containing exactly `hours` images."""
+    if not 1 <= hours <= 360:
+        raise ValueError("hours debe estar entre 1 y 360")
+
+    complete: list[datetime] = []
+    for raw_start, raw_count in counts.items():
+        if int(raw_count) != hours:
+            continue
+        try:
+            start = datetime.fromisoformat(
+                str(raw_start).replace("Z", "+00:00")
+            )
+        except ValueError as exc:
+            raise ValueError(
+                f"start_time inválido en histograma: {raw_start!r}"
+            ) from exc
+        complete.append(_utc(start))
+
+    return max(complete) if complete else None
+
+
+def fetch_region(
+    ee,
+    site: Site,
+    init_time: datetime,
+    hours: int,
+) -> list[list]:
+    """Fetch one native WeatherNext pixel for one initialization."""
+    collection = (
+        ee.ImageCollection(COLLECTION_ID)
+        .filter(ee.Filter.eq("start_time", _iso_z(init_time)))
+        .filter(ee.Filter.lte("forecast_hour", hours))
+        .select(list(BANDS))
+    )
+    return collection.getRegion(
+        geometry=ee.Geometry.Point([site.longitude, site.latitude]),
+        crs=NATIVE_CRS,
+        crsTransform=list(NATIVE_TRANSFORM),
+    ).getInfo()
+
+
+def latest_complete_init(
+    ee,
+    hours: int,
+    now: datetime,
+    lookback_h: int = 30,
+) -> datetime | None:
+    """Find the latest fully ingested initialization in the lookback window."""
+    if not 1 <= hours <= 360:
+        raise ValueError("hours debe estar entre 1 y 360")
+    if lookback_h < 1:
+        raise ValueError("lookback_h debe ser positivo")
+
+    now = _utc(now)
+    counts = (
+        ee.ImageCollection(COLLECTION_ID)
+        .filterDate(
+            _iso_z(now - timedelta(hours=lookback_h)),
+            _iso_z(now + timedelta(hours=1)),
+        )
+        .filter(ee.Filter.lte("forecast_hour", hours))
+        .aggregate_histogram("start_time")
+        .getInfo()
+    )
+    return select_complete_init(counts or {}, hours)
+
+
+def _rows(
+    records: list[dict],
+    site: Site,
+    retrieved_at: datetime,
+) -> list[dict]:
+    """Convert provider records to canonical forecast rows."""
     rows: list[dict] = []
 
     for record in records:
@@ -147,19 +343,26 @@ def _rows(records: list[dict], site: Site, retrieved_at: datetime) -> list[dict]
         if raw_init is None:
             continue
         if isinstance(raw_init, str):
-            init_time = datetime.fromisoformat(raw_init.replace("Z", "+00:00"))
+            init_time = datetime.fromisoformat(
+                raw_init.replace("Z", "+00:00")
+            )
         else:
             init_time = raw_init
-        if init_time.tzinfo is None:
-            init_time = init_time.replace(tzinfo=timezone.utc)
-        else:
-            init_time = init_time.astimezone(timezone.utc)
+        init_time = _utc(init_time)
 
-        grid_lat, grid_lon = _extract_centroid(record.get("geography"))
-        if grid_lat is None and "provider_grid_lat" in record:
-            grid_lat = record["provider_grid_lat"]
-        if grid_lon is None and "provider_grid_lon" in record:
-            grid_lon = record["provider_grid_lon"]
+        grid_lat = record.get("provider_grid_lat")
+        grid_lon = record.get("provider_grid_lon")
+        if grid_lat is None or grid_lon is None:
+            geography = record.get("geography")
+            if isinstance(geography, str):
+                match = re.search(
+                    r"POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)",
+                    geography,
+                    re.IGNORECASE,
+                )
+                if match:
+                    grid_lon = float(match.group(1))
+                    grid_lat = float(match.group(2))
 
         forecast = record.get("forecast") or []
 
@@ -171,13 +374,12 @@ def _rows(records: list[dict], site: Site, retrieved_at: datetime) -> list[dict]
                 if raw_valid is None:
                     continue
                 if isinstance(raw_valid, str):
-                    valid_utc = datetime.fromisoformat(raw_valid.replace("Z", "+00:00"))
+                    valid_utc = datetime.fromisoformat(
+                        raw_valid.replace("Z", "+00:00")
+                    )
                 else:
                     valid_utc = raw_valid
-                if valid_utc.tzinfo is None:
-                    valid_utc = valid_utc.replace(tzinfo=timezone.utc)
-                else:
-                    valid_utc = valid_utc.astimezone(timezone.utc)
+                valid_utc = _utc(valid_utc)
 
                 lead_h = int(item["hours"])
                 diff_seconds = (valid_utc - init_time).total_seconds()
@@ -197,7 +399,6 @@ def _rows(records: list[dict], site: Site, retrieved_at: datetime) -> list[dict]
                     "member": None,
                 }
 
-                # Cloud covers (fraction 0..1 -> %)
                 c_total = item.get(f"total_cloud_cover_{stat}")
                 if c_total is not None:
                     row["cloud_total"] = round(float(c_total) * 100.0, 4)
@@ -214,7 +415,6 @@ def _rows(records: list[dict], site: Site, retrieved_at: datetime) -> list[dict]
                 if c_high is not None:
                     row["cloud_high"] = round(float(c_high) * 100.0, 4)
 
-                # Temperatures (Kelvin -> Celsius)
                 t_k = item.get(f"temperature_2m_{stat}")
                 t2m = None
                 if t_k is not None:
@@ -227,49 +427,38 @@ def _rows(records: list[dict], site: Site, retrieved_at: datetime) -> list[dict]
                     td2m = round(float(td_k) - 273.15, 4)
                     row["td2m"] = td2m
 
-                # Relative humidity derived via Magnus from t2m and td2m. Only
-                # for the mean: the p10 of T paired with the p10 of Td is not
-                # the p10 of RH (a quantile of a function is not the function
-                # of the quantiles), so the quantile models leave it null.
                 if stat == "mean" and t2m is not None and td2m is not None:
                     row["rh2m"] = derive_rh2m(t2m, td2m)
 
-                # Wind speed (m/s) and check invariant
                 w_speed = item.get(f"wind_speed_10m_{stat}")
                 if w_speed is not None:
                     wind10m = round(float(w_speed), 4)
                     check_wind_units([wind10m], label=f"{model}:wind10m")
                     row["wind10m"] = wind10m
 
-                # Wind direction derived from u and v, mean only: the p10 of
-                # u and the p10 of v are two marginal numbers, not a vector,
-                # and their atan2 points nowhere physical.
                 u_w = item.get(f"u_component_of_wind_10m_{stat}")
                 v_w = item.get(f"v_component_of_wind_10m_{stat}")
                 if stat == "mean" and u_w is not None and v_w is not None:
-                    row["wind_dir10m"] = derive_wind_direction(float(u_w), float(v_w))
+                    row["wind_dir10m"] = derive_wind_direction(
+                        float(u_w), float(v_w)
+                    )
 
-                # Precipitation (m -> mm)
                 precip_m = item.get(f"total_precipitation_1hr_{stat}")
                 if precip_m is not None:
-                    row["precipitation"] = round(float(precip_m) * 1000.0, 4)
+                    row["precipitation"] = round(
+                        float(precip_m) * 1000.0, 4
+                    )
 
-                # Pressure at MSL (Pa -> hPa)
                 p_pa = item.get(f"mean_sea_level_pressure_{stat}")
                 if p_pa is not None:
                     row["pressure_msl"] = round(float(p_pa) / 100.0, 4)
 
-                # Provenance
                 row.update(
                     {
                         "provider_model_version": PROVIDER_MODEL_VERSION,
                         "provider_grid_lat": grid_lat,
                         "provider_grid_lon": grid_lon,
                         "site_elevation": float(site.site_elevation),
-                        # `site.model_grid_elevation` is the Open-Meteo 9 km
-                        # cell, verified against THAT API (site.py). WeatherNext
-                        # publishes no cell elevation, and borrowing another
-                        # provider's number would be provenance that lies.
                         "model_grid_elevation": None,
                         "downscaling_elevation": None,
                         "native_resolution_km": float(RESOLUTION_KM),
@@ -279,14 +468,13 @@ def _rows(records: list[dict], site: Site, retrieved_at: datetime) -> list[dict]
                         "license_tag": LICENSE_TAG,
                     }
                 )
-
                 rows.append(row)
 
     return rows
 
 
 def _to_json_serializable(obj: Any) -> Any:
-    """Recursively convert datetimes to ISO format strings for raw JSON storage."""
+    """Recursively convert datetimes to ISO strings for raw storage."""
     if isinstance(obj, datetime):
         return obj.isoformat()
     if isinstance(obj, dict):
@@ -301,81 +489,126 @@ def run(
     *,
     hours: int = 48,
     init_time: datetime | None = None,
-    table: str | None = None,
     project: str | None = None,
+    ee_module=None,
 ) -> dict[str, int]:
-    """Consulta, archiva raw, escribe canónico, imprime '[fetch_weathernext] ...'."""
+    """Fetch, archive and write one complete WeatherNext initialization."""
     project = project or os.getenv("GOOGLE_CLOUD_PROJECT")
-    table = table or os.getenv("WEATHERNEXT_BQ_TABLE")
-
-    if not project or not table:
+    if not project:
         raise RuntimeError(
-            "Faltan variables de entorno requeridas para WeatherNext BigQuery.\n"
-            "Configura en tu fichero .env:\n"
-            "  GOOGLE_CLOUD_PROJECT=<tu_proyecto_gcp>\n"
-            "  WEATHERNEXT_BQ_TABLE=<proyecto.dataset.tabla>"
+            "Faltan variables de entorno requeridas para WeatherNext.\n"
+            "Configura GOOGLE_CLOUD_PROJECT=<tu_proyecto_gcp>"
         )
 
-    # Dynamic import so module and tests can be imported without google-cloud-bigquery
-    from google.cloud import bigquery
+    if not 1 <= hours <= 360:
+        raise ValueError("hours debe estar entre 1 y 360")
 
-    client = bigquery.Client(project=project)
-    query_sql, params = build_query(table, site, init_time, hours)
+    if ee_module is None:
+        import ee as ee_module
 
-    query_params = []
-    for k, v in params.items():
-        if isinstance(v, datetime):
-            query_params.append(bigquery.ScalarQueryParameter(k, "TIMESTAMP", v))
-        elif isinstance(v, float):
-            query_params.append(bigquery.ScalarQueryParameter(k, "FLOAT64", v))
-        elif isinstance(v, int):
-            query_params.append(bigquery.ScalarQueryParameter(k, "INT64", v))
-        elif isinstance(v, str):
-            query_params.append(bigquery.ScalarQueryParameter(k, "STRING", v))
+    ee_module.Initialize(project=project)
 
-    job_config = bigquery.QueryJobConfig(query_parameters=query_params)
-    job = client.query(query_sql, job_config=job_config)
-    results = job.result()
+    selected_init = _utc(init_time) if init_time is not None else None
+    if selected_init is None:
+        selected_init = latest_complete_init(
+            ee_module,
+            hours,
+            utcnow(),
+        )
+        if selected_init is None:
+            print("[fetch_weathernext] sin inicializacion completa")
+            return {}
 
-    records: list[dict] = []
-    for row in results:
-        rec = dict(row.items()) if hasattr(row, "items") else dict(row)
-        if "forecast" in rec and rec["forecast"]:
-            rec["forecast"] = [
-                dict(f.items()) if hasattr(f, "items") else dict(f)
-                for f in rec["forecast"]
-            ]
-        records.append(rec)
+    table = fetch_region(
+        ee_module,
+        site,
+        selected_init,
+        hours,
+    )
+    records = records_from_region(
+        table,
+        site,
+        expected_init=selected_init,
+    )
+    if not records:
+        print("[fetch_weathernext] sin inicializacion completa")
+        return {}
+
+    forecast = records[0].get("forecast") or []
+    if len(forecast) != hours:
+        raise ValueError(
+            f"inicializacion incompleta: esperadas {hours} horas, "
+            f"recibidas {len(forecast)}"
+        )
 
     retrieved_at = utcnow()
-    raw_payload = _to_json_serializable(records)
-    store_raw(raw_payload, source="weathernext_bq", site_id=site.site_id, retrieved_at=retrieved_at)
+    raw_payload = {
+        "collection": COLLECTION_ID,
+        "init_time": _iso_z(selected_init),
+        "hours": hours,
+        "crs": NATIVE_CRS,
+        "crs_transform": list(NATIVE_TRANSFORM),
+        "region": table,
+    }
+    store_raw(
+        _to_json_serializable(raw_payload),
+        source="weathernext_ee",
+        site_id=site.site_id,
+        retrieved_at=retrieved_at,
+    )
 
     canonical_rows = _rows(records, site, retrieved_at)
-    write_canonical(canonical_rows, dataset="forecasts", site_id=site.site_id)
+    write_canonical(
+        canonical_rows,
+        dataset="forecasts",
+        site_id=site.site_id,
+    )
 
     counts: dict[str, int] = {}
-    for r in canonical_rows:
-        m = r["model"]
-        counts[m] = counts.get(m, 0) + 1
+    for row in canonical_rows:
+        model = row["model"]
+        counts[model] = counts.get(model, 0) + 1
 
-    print("[fetch_weathernext] " + ", ".join(f"{m}={n}" for m, n in sorted(counts.items())))
+    print(
+        "[fetch_weathernext] "
+        + ", ".join(
+            f"{model}={count}"
+            for model, count in sorted(counts.items())
+        )
+    )
     return counts
+
+
+def _parse_cli_init(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return _utc(parsed)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--hours", type=int, default=48, help="Horas de predicción a consultar")
-    parser.add_argument("--init-time", type=str, default=None, help="Timestamp ISO de inicialización")
-    parser.add_argument("--table", type=str, default=None, help="Tabla de BigQuery")
-    parser.add_argument("--project", type=str, default=None, help="Proyecto de GCP")
+    parser.add_argument(
+        "--hours",
+        type=int,
+        default=48,
+        help="Horas de predicción a consultar",
+    )
+    parser.add_argument(
+        "--init-time",
+        type=str,
+        default=None,
+        help="Timestamp ISO de inicialización; sin zona se interpreta como UTC",
+    )
+    parser.add_argument(
+        "--project",
+        type=str,
+        default=None,
+        help="Proyecto de Google Cloud para Earth Engine",
+    )
     args = parser.parse_args()
-
-    parsed_init = datetime.fromisoformat(args.init_time) if args.init_time else None
     run(
         hours=args.hours,
-        init_time=parsed_init,
-        table=args.table,
+        init_time=_parse_cli_init(args.init_time),
         project=args.project,
     )
-

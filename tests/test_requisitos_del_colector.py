@@ -39,15 +39,15 @@ CODIGO = RAIZ / "astroweather"
 FUERA = {
     "apscheduler": "el planificador de proceso vivo; el colector no planifica",
     "photutils": "solo el pipeline de FWHM, que corre a mano sobre FITS en disco",
-    "google": "google-cloud-bigquery, solo fetch_weathernext; el scheduler no lo "
-              "llama hasta que Google apruebe el acceso (pedido el 07-09-2026)",
+    "ee": "earthengine-api, solo fetch_weathernext; el scheduler no lo llama "
+          "hasta que WeatherNext 3 gane en el marcador (acceso desde el 17-09-2026)",
 }
 
 
 # El modulo que se importa y la distribucion que se instala no siempre se
 # llaman igual. Sin esto, `pillow` declarado y `PIL` importado parecen dos
 # cosas distintas y el test acusa a un huerfano que no lo es.
-ALIAS = {"pil": "pillow"}
+ALIAS = {"pil": "pillow", "ee": "earthengine-api"}
 
 
 def _declarados() -> set[str]:

@@ -40,6 +40,8 @@ def datos(tmp_path):
               / "year=2026" / "month=08" / "20260828T161000Z_eps.json.gz", b"{}")
     _escribir(raiz / "raw" / "site=nerpio" / "source=tess_stars289"
               / "year=2026" / "month=08" / "20260828T161000Z_tess.json.gz", b"{}" * 5000)
+    _escribir(raiz / "raw" / "site=nerpio" / "source=weathernext_ee"
+              / "year=2026" / "month=09" / "20260917T093948Z_wn.json.gz", b"{}" * 5000)
     return raiz
 
 
@@ -62,6 +64,16 @@ def test_the_photometer_raw_is_the_one_thing_left_behind(datos, repo):
     assert not (repo / "raw" / "site=nerpio" / "source=tess_stars289").exists()
     # Y la exclusion lleva su motivo escrito, no es un olvido.
     assert "fetch_tess" in archivepush.SKIPPED["tess_stars289"]
+
+
+def test_weathernext_raw_stays_home_and_its_rows_travel(datos, repo):
+    """Nino, 17-09-2026: de WeatherNext sube solo lo canonico."""
+    archivepush.collect(datos, repo, today="20260829")
+
+    assert not (repo / "raw" / "site=nerpio" / "source=weathernext_ee").exists()
+    # The exclusion is by source, not a blanket one on raw.
+    assert (repo / "raw" / "site=nerpio" / "source=openmeteo_ensemble").exists()
+    assert "fetch_weathernext" in archivepush.SKIPPED["weathernext_ee"]
 
 
 def test_a_day_that_has_not_finished_is_not_bundled(datos, repo):

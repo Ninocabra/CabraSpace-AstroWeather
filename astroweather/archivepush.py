@@ -64,6 +64,11 @@ BUNDLED = ("astrocamp_cloudhtml", "astrocamp_allsky")
 SKIPPED = {
     "tess_stars289": "37 MB recuperables con `python -m astroweather.workers."
                      "fetch_tess`, y sus valores ya viajan en measurements/",
+    # Decidido por Nino el 17-09-2026: de WeatherNext sube solo lo canonico.
+    "weathernext_ee": "39 MB del backfill ene-sep 2026 recuperables con `python -m "
+                      "astroweather.workers.fetch_weathernext --init-time ...` mientras "
+                      "Earth Engine los sirva; sus nubes ya viajan en forecasts/, y si "
+                      "Google revoca el acceso hay que borrar cada copia del dato",
 }
 
 # Ficheros sueltos de `data/` que son estado del producto y valen su peso.
