@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import io
+import json
 import gzip
 import os
 import shutil
@@ -89,6 +90,8 @@ MONTHLY_TAGS = ("weathernext3",)
 # `estado_colector.json` entro el mismo dia y es lo que hace posible que la
 # recogida viva en un runner que se destruye: sin el, cada pasada creeria que
 # no ha corrido nunca nada.
+ESTADO = "estado_colector.json"
+
 LOOSE = ("cloud_calibration.json", "roof_calibration.json", "open_hours_nerpio.json",
          "roof_climatology.json", "sky_floor.json", "estado_colector.json")
 
@@ -223,6 +226,36 @@ def bundle_months(source: Path, destination: Path, *, today: str) -> list[Path]:
     return creados
 
 
+def fundir_estado(origen: Path, destino: Path) -> bool:
+    """El estado del colector es de DOS maquinas: se funde, no se sustituye.
+
+    Cada una corre unos trabajos (el runner casi todos, el escritorio el de
+    WeatherNext mientras Google no de acceso a la cuenta de servicio), y cada
+    una escribe solo lo suyo. Copiar el fichero entero borraba las fechas de la
+    otra, y un trabajo sin fecha esta VENCIDO: el runner rehacia la pasada
+    completa. Se queda la marca mas reciente de cada trabajo.
+    """
+    nuevo = json.loads(origen.read_text(encoding="utf-8"))
+    if destino.exists():
+        viejo = json.loads(destino.read_text(encoding="utf-8"))
+    else:
+        viejo = {}
+    trabajos = dict(viejo.get("trabajos", {}))
+    for nombre, marca in nuevo.get("trabajos", {}).items():
+        if nombre not in trabajos or marca > trabajos[nombre]:
+            trabajos[nombre] = marca
+    fundido = {
+        "escrito_utc": max(filter(None, (viejo.get("escrito_utc"),
+                                         nuevo.get("escrito_utc"))), default=""),
+        "trabajos": dict(sorted(trabajos.items())),
+    }
+    texto = json.dumps(fundido, indent=2) + chr(10)
+    if destino.exists() and destino.read_text(encoding="utf-8") == texto:
+        return False
+    destino.write_text(texto, encoding="utf-8")
+    return True
+
+
 def collect(root: Path, repo: Path, *, today: str | None = None) -> dict[str, int]:
     """Deja el archivo al dia dentro del repo. Devuelve el recuento por bloque."""
     today = today or dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d")
@@ -251,11 +284,25 @@ def collect(root: Path, repo: Path, *, today: str | None = None) -> dict[str, in
     sueltos = 0
     for nombre in LOOSE:
         origen = root / nombre
-        if origen.is_file():
-            destino = repo / nombre
-            if not destino.exists() or destino.read_bytes() != origen.read_bytes():
-                shutil.copy2(origen, destino)
-                sueltos += 1
+        if not origen.is_file():
+            continue
+        destino = repo / nombre
+        if nombre == ESTADO:
+            sueltos += int(fundir_estado(origen, destino))
+            continue
+        # UNA MAQUINA VIEJA NO PISA A LA QUE RECOGE. El 17-09-2026 este PC,
+        # que llevaba desde el 31-08 sin recoger, copio su `open_hours` encima
+        # del que el runner venia manteniendo: 258 -> 254, 155 -> null, el
+        # total de 1635 a 1476. Lo canonico es de solo-anadir y no puede
+        # perderse asi; estos sueltos SE REESCRIBEN, y por eso son justo los
+        # que hay que proteger. Se compara la fecha del fichero: en el runner
+        # el del repo se acaba de clonar y el de `data/` lo reescriben los
+        # workers despues, asi que sube; en un PC atrasado, no.
+        if destino.exists() and destino.stat().st_mtime > origen.stat().st_mtime:
+            continue
+        if not destino.exists() or destino.read_bytes() != origen.read_bytes():
+            shutil.copy2(origen, destino)
+            sueltos += 1
     resumen["sueltos"] = sueltos
     return resumen
 

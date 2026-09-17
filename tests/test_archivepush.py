@@ -160,3 +160,47 @@ def test_weathernext_runs_travel_as_one_file_per_closed_month(tmp_path, repo):
 
     # Idempotente: una segunda pasada no rehace ni duplica el mes.
     assert archivepush.collect(raiz, repo, today="20260918")["forecasts/mensual"] == 0
+
+
+def test_a_stale_machine_does_not_overwrite_the_state_of_the_one_collecting(tmp_path, repo):
+    """El caso real del 17-09-2026: este PC piso `open_hours` del runner.
+
+    Su copia era del 31-08 y cambio 258 -> 254, 155 -> null y el total de 1635
+    a 1476. Lo canonico es de solo-anadir, pero estos sueltos SE REESCRIBEN.
+    """
+    import os, time
+    raiz = tmp_path / "data"
+    (raiz / "measurements").mkdir(parents=True)
+    viejo, nuevo = b'{"total": 1476}', b'{"total": 1635}'
+    (raiz / "open_hours_nerpio.json").write_bytes(viejo)
+    (repo / "open_hours_nerpio.json").write_bytes(nuevo)
+    antiguo = time.time() - 86400
+    os.utime(raiz / "open_hours_nerpio.json", (antiguo, antiguo))
+
+    archivepush.collect(raiz, repo, today="20260918")
+    assert (repo / "open_hours_nerpio.json").read_bytes() == nuevo
+
+    # ...y al reves: la maquina que SI recoge sigue subiendo lo suyo.
+    (raiz / "open_hours_nerpio.json").write_bytes(b'{"total": 1700}')
+    archivepush.collect(raiz, repo, today="20260918")
+    assert (repo / "open_hours_nerpio.json").read_bytes() == b'{"total": 1700}'
+
+
+def test_the_collector_state_is_merged_between_machines(tmp_path, repo):
+    """Cada maquina escribe solo sus trabajos; un trabajo sin fecha esta vencido."""
+    import json
+    raiz = tmp_path / "data"
+    (raiz / "measurements").mkdir(parents=True)
+    (repo / "estado_colector.json").write_text(json.dumps({
+        "escrito_utc": "2026-09-17T20:01:44+00:00",
+        "trabajos": {"forecast": "2026-09-17T16:01:34+00:00",
+                     "weathernext": "2026-09-16T20:00:00+00:00"}}), encoding="utf-8")
+    (raiz / "estado_colector.json").write_text(json.dumps({
+        "escrito_utc": "2026-09-17T20:08:47+00:00",
+        "trabajos": {"weathernext": "2026-09-17T20:08:42+00:00"}}), encoding="utf-8")
+
+    archivepush.collect(raiz, repo, today="20260918")
+
+    estado = json.loads((repo / "estado_colector.json").read_text(encoding="utf-8"))
+    assert estado["trabajos"]["forecast"] == "2026-09-17T16:01:34+00:00"   # no se pierde
+    assert estado["trabajos"]["weathernext"] == "2026-09-17T20:08:42+00:00"  # gana el nuevo
