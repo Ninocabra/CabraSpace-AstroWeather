@@ -39,15 +39,24 @@ empieza antes que ninguna otra cosa.
 - [x] Credenciales ADS (CAMS) en `.env`
 - [x] Pipeline FWHM (`fwhm_pipeline.py`) — sobre los FITS reales de `E:\ASTRO Sin Procesar\Observatorio Nerpio`
 - [ ] Pendientes de terceros: credenciales BDRC (opcional)
-- [ ] **WeatherNext 3** (Google DeepMind) como un modelo mas del marcador:
-      worker `fetch_weathernext.py` escrito y probado en frio (fixture, 10 tests);
-      acceso a BigQuery **pedido el 07-09-2026**, pendiente de aprobacion (5-7 dias).
-      Cuando llegue: proyecto de Google Cloud + `gcloud auth application-default
-      login`, `GOOGLE_CLOUD_PROJECT` y `WEATHERNEXT_BQ_TABLE` en `.env`, declarar
-      `google-cloud-bigquery`, y puntuar el backfill 2024-2025 contra el fotometro
-      ANTES de darle sitio en el scheduler. Licencia: el pronostico del futuro es
-      dato experimental de GDM (uso interno libre; en la web solo como servicio de
-      valor anadido no recuperable, con cita), no CC BY.
+- [x] **WeatherNext 3** (Google DeepMind) por Earth Engine, proyecto
+      `astroweather-cabra`, sin facturacion (BigQuery descartado: factura la
+      malla global aunque se pida un punto). Gano el examen del 17-09-2026
+      contra el ECMWF sobre las mismas 1270 h de fotometro: +0,024 de AUC a
+      1 dia (IC [+0,004, +0,046]) y hasta +0,074 a 4 dias. Backfill ene-sep
+      2026 archivado en 9 ficheros mensuales (4,3 MB); el crudo no sube.
+      Trabajo `weathernext` cada 12 h, pasadas 00Z y 12Z de 144 h.
+- [ ] **WeatherNext en el runner**: PENDIENTE de que Google conceda acceso a
+      `astroweather-runner@astroweather-cabra.iam.gserviceaccount.com` (pedido
+      el 17-09-2026 a weathernext@google.com). Hasta entonces recoge EL
+      ESCRITORIO: si esta apagado, esas pasadas no se archivan. Cuando llegue:
+      secreto `EE_SERVICE_ACCOUNT_KEY` en Actions, declarar `earthengine-api`
+      en `requirements-colector.txt`, quitar `ee` de FUERA, y resolver que las
+      pasadas sueltas no viajen sueltas (en el runner `data/forecasts` es un
+      enlace al clon del archivo, asi que `git add -A` las subiria una a una).
+- [ ] **WeatherNext en el veredicto**: su curva en `calibration.py` y ver si
+      mezclado con el ECMWF mejora a cada uno por separado. En la web, solo el
+      veredicto derivado y con la cita de Google: su nubosidad no se publica.
 
 ## Fase 1 — en curso
 

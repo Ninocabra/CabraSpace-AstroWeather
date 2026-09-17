@@ -39,8 +39,11 @@ CODIGO = RAIZ / "astroweather"
 FUERA = {
     "apscheduler": "el planificador de proceso vivo; el colector no planifica",
     "photutils": "solo el pipeline de FWHM, que corre a mano sobre FITS en disco",
-    "ee": "earthengine-api, solo fetch_weathernext; el scheduler no lo llama "
-          "hasta que WeatherNext 3 gane en el marcador (acceso desde el 17-09-2026)",
+    "ee": "earthengine-api, solo fetch_weathernext. El trabajo `weathernext` SI "
+          "esta en JOBS desde el 17-09-2026, pero corre en el escritorio: Google "
+          "concedio WeatherNext a la cuenta de Nino y no a la cuenta de servicio "
+          "del runner, que recibe 'asset not found'. Acceso para ella PEDIDO el "
+          "17-09-2026; cuando llegue, se declara aqui y se quita de FUERA",
 }
 
 

@@ -8,12 +8,14 @@
 #   photutils    solo lo usa el pipeline de FWHM, que corre a mano sobre FITS
 #                que ya estan en disco y por eso esta fuera del scheduler.
 #   ee           earthengine-api, que solo importa `fetch_weathernext`
-#                (dentro de `run`, no arriba). Acceso a WeatherNext 3 desde el
-#                17-09-2026 por Earth Engine (BigQuery descartado: factura la
-#                malla global aunque se pida un punto). El scheduler NO lo
-#                llama: primero tiene que ganar en el marcador. Si gana, se
-#                declara aqui, se quita de FUERA y el runner necesita
-#                credenciales de Earth Engine.
+#                (dentro de `run`, no arriba). Gano el examen del 17-09-2026 y
+#                el trabajo `weathernext` ya esta en JOBS, pero AQUI NO CORRE:
+#                Google concedio el acceso a la cuenta de Nino, no a la cuenta
+#                de servicio, que entra y recibe "asset not found". Sin
+#                credenciales el trabajo se salta diciendolo (scheduler.py).
+#                Acceso para la cuenta de servicio PEDIDO el 17-09-2026 a
+#                weathernext@google.com; cuando llegue, se declara aqui, se
+#                quita de FUERA y el workflow pasa EE_SERVICE_ACCOUNT_KEY.
 #
 # Las versiones van fijadas por MINOR (`~=`) y son las que corren en el
 # escritorio: sin fijar, una version nueva de astropy o de numpy cambia numeros

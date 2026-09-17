@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import traceback
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -85,6 +86,65 @@ def _job_sensors():
 def _job_ensemble():
     from .workers import fetch_ensemble
     return fetch_ensemble.run(NERPIO, forecast_days=7)
+
+
+def _job_weathernext():
+    """WeatherNext 3 de las 00Z y 12Z, las pasadas que gano el examen.
+
+    DONDE CORRE Y POR QUE. El 17-09-2026 Google tiene concedido el acceso a la
+    cuenta de Nino, no al proyecto: la cuenta de servicio del runner entra y
+    recibe "asset not found". Se ha pedido acceso para ella
+    (weathernext@google.com, 17-09-2026) y mientras tanto esto recoge en el
+    escritorio; en el runner no hay credenciales y el trabajo SE SALTA DICIENDOLO,
+    que no es lo mismo que fallar en silencio ni que fallar cada media hora.
+
+    Y no vuelve a pedir una pasada que ya esta archivada: el periodo de 12 h y
+    la inicializacion mas reciente completa no van sincronizados, asi que sin
+    esta comprobacion la mitad de las pasadas serian una copia.
+    """
+    from .workers import fetch_weathernext
+
+    if fetch_weathernext.credentials_source() is None:
+        logger.info("weathernext  se salta: esta maquina no tiene credenciales "
+                    "de Earth Engine (acceso de la cuenta de servicio pedido "
+                    "el 17-09-2026)")
+        return 0
+
+    import ee
+
+    project = os.getenv("GOOGLE_CLOUD_PROJECT", "astroweather-cabra")
+    fetch_weathernext.initialize(ee, project)
+    ultima = fetch_weathernext.latest_complete_init(
+        ee, WEATHERNEXT_HOURS, datetime.now(timezone.utc),
+        allowed_hours=WEATHERNEXT_RUNS)
+    if ultima is None:
+        logger.info("weathernext  sin inicializacion completa de 00Z/12Z")
+        return 0
+
+    archivada = _weathernext_archivada()
+    if archivada is not None and ultima <= archivada:
+        logger.info("weathernext  %s ya archivada", ultima.strftime("%Y-%m-%dT%HZ"))
+        return 0
+
+    counts = fetch_weathernext.run(hours=WEATHERNEXT_HOURS, init_time=ultima,
+                                   project=project, ee_module=ee)
+    return sum(counts.values())
+
+
+def _weathernext_archivada():
+    """La inicializacion mas reciente que ya esta en el archivo, o None."""
+    from .queries import connect
+    try:
+        fila = connect().execute(
+            "SELECT max(run_utc) FROM forecasts WHERE model = 'weathernext3'"
+        ).fetchone()
+    except Exception:          # archivo vacio o sin la particion todavia
+        return None
+    if not fila or fila[0] is None:
+        return None
+    marca = fila[0]
+    return marca.astimezone(timezone.utc) if marca.tzinfo else marca.replace(
+        tzinfo=timezone.utc)
 
 
 def _job_ahora():
@@ -244,6 +304,11 @@ def _heartbeat():
                 f"  <-- CON FALLOS: {', '.join(failing)}" if failing else "")
 
 
+# 144 h y solo 00Z/12Z: exactamente lo que se bajo y se puntuo en el examen.
+WEATHERNEXT_HOURS = 144
+WEATHERNEXT_RUNS = (0, 12)
+
+
 class Trabajo(NamedTuple):
     """Un trabajo y CADA CUANTO tiene que correr. Nada mas.
 
@@ -349,6 +414,11 @@ JOBS: dict[str, Trabajo] = {
                         ritmo=ritmo_de_techos),
     # Los miembros del EPS caducan aguas arriba en ~4 dias.
     "ensemble": Trabajo(_job_ensemble, timedelta(hours=12)),
+    # Gano el examen del 17-09-2026 contra el ECMWF a todos los plazos (+0,024
+    # de AUC a 1 dia, IC [+0,004, +0,046]). Dos pasadas al dia, 144 h, las
+    # mismas que se puntuaron. Todavia NO entra en el veredicto: primero su
+    # curva de calibracion.
+    "weathernext": Trabajo(_job_weathernext, timedelta(hours=12)),
     "forecast": Trabajo(_job_forecast, timedelta(hours=6)),
     # Justo despues del forecast: lo que NOSOTROS decimos, guardado antes de
     # que pase. Sin esto, cambiar el calibrador cambia retroactivamente lo que

@@ -406,9 +406,11 @@ class FakeEE:
         self.calls = []
         self.Filter = FakeFilter(self)
         self.Geometry = FakeGeometry(self)
+        self.ServiceAccountCredentials = lambda *a, **k: ("sa", a, k)
 
-    def Initialize(self, **kwargs):
+    def Initialize(self, credentials=None, **kwargs):
         self.calls.append(("Initialize", kwargs))
+        self.credentials = credentials
 
     def ImageCollection(self, collection_id):
         self.calls.append(("ImageCollection", collection_id))
@@ -476,6 +478,7 @@ def test_run_with_fake_ee_archives_and_writes(
     ee_region,
 ):
     ee = FakeEE(region=ee_region)
+    monkeypatch.setattr(worker, "credentials_source", lambda: "user")
     stored = []
     written = []
 
@@ -538,6 +541,7 @@ def test_run_refuses_incomplete_initialization(
     ee_region,
 ):
     ee = FakeEE(region=ee_region)
+    monkeypatch.setattr(worker, "credentials_source", lambda: "user")
     store_calls = []
     write_calls = []
 
@@ -574,3 +578,42 @@ def test_canonical_rows_are_rounded_to_published_precision(ee_region, retrieved_
             value = row.get(column)
             if value is not None:
                 assert value == round(value, decimals), (column, value)
+
+
+def test_initialize_prefers_the_service_account_key(monkeypatch, tmp_path):
+    """The runner will pass the key as an environment variable, not a file."""
+    key = json.dumps({"client_email": "runner@astroweather-cabra.iam.gserviceaccount.com"})
+    monkeypatch.setenv(worker.SERVICE_ACCOUNT_ENV, key)
+    ee = FakeEE()
+    ee.ServiceAccountCredentials = lambda email, key_file=None, key_data=None: (
+        "sa", email, key_file, key_data)
+    assert worker.initialize(ee, "astroweather-cabra") == "service_account"
+    init = next(c for c in ee.calls if c[0] == "Initialize")
+    assert init[1] == {"project": "astroweather-cabra"}
+    assert ee.credentials[0] == "sa"        # went in as credentials, not as env
+
+    path = tmp_path / "key.json"
+    path.write_text(key, encoding="utf-8")
+    monkeypatch.setenv(worker.SERVICE_ACCOUNT_ENV, str(path))
+    assert worker.initialize(FakeEE(), "astroweather-cabra") == "service_account"
+
+
+def test_without_credentials_it_says_so_instead_of_failing_obscurely(monkeypatch, tmp_path):
+    """On the GitHub runner there are none: the job must skip, not crash blind."""
+    monkeypatch.delenv(worker.SERVICE_ACCOUNT_ENV, raising=False)
+    monkeypatch.setattr(worker, "USER_CREDENTIALS", tmp_path / "nope")
+    assert worker.credentials_source() is None
+    with pytest.raises(RuntimeError, match="sin credenciales"):
+        worker.initialize(FakeEE(), "astroweather-cabra")
+
+
+def test_only_the_runs_the_exam_scored(monkeypatch):
+    """00Z and 12Z: archiving 06Z too would score what was not compared."""
+    counts = {"2026-09-17T00:00:00Z": 144, "2026-09-17T06:00:00Z": 144,
+              "2026-09-17T12:00:00Z": 144}
+    assert select_complete_init(counts, 144) == datetime(2026, 9, 17, 12, tzinfo=UTC)
+    assert select_complete_init(counts, 144, allowed_hours=(0, 12)) == datetime(
+        2026, 9, 17, 12, tzinfo=UTC)
+    del counts["2026-09-17T12:00:00Z"]
+    assert select_complete_init(counts, 144, allowed_hours=(0, 12)) == datetime(
+        2026, 9, 17, 0, tzinfo=UTC)

@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timedelta, timezone
+import json
 import math
 import os
+import pathlib
 import re
 from typing import Any
 
@@ -272,8 +274,14 @@ def records_from_region(
 def select_complete_init(
     counts: dict[str, int],
     hours: int,
+    allowed_hours: tuple[int, ...] | None = None,
 ) -> datetime | None:
-    """Select the most recent initialization containing exactly `hours` images."""
+    """Select the most recent initialization containing exactly `hours` images.
+
+    `allowed_hours` keeps the live job on the same runs the exam scored (00Z and
+    12Z). 06Z and 18Z are just as long, but scoring what is not archived the
+    same way is how a comparison stops comparing.
+    """
     if not 1 <= hours <= 360:
         raise ValueError("hours debe estar entre 1 y 360")
 
@@ -289,9 +297,55 @@ def select_complete_init(
             raise ValueError(
                 f"start_time inválido en histograma: {raw_start!r}"
             ) from exc
-        complete.append(_utc(start))
+        start = _utc(start)
+        if allowed_hours is not None and start.hour not in allowed_hours:
+            continue
+        complete.append(start)
 
     return max(complete) if complete else None
+
+
+# Where the credentials come from, in order. A service account is what the
+# ephemeral runner would need, but on 17-09-2026 Google had granted WeatherNext
+# to Nino's user account only: `astroweather-runner@astroweather-cabra` signs in
+# and then gets "asset not found (does not exist or caller does not have
+# access)". Access for it is REQUESTED (weathernext@google.com, 17-09-2026);
+# until it arrives this job runs on the desktop with the user credentials that
+# `earthengine authenticate` left behind, and the runner skips it.
+SERVICE_ACCOUNT_ENV = "EE_SERVICE_ACCOUNT_KEY"
+USER_CREDENTIALS = pathlib.Path.home() / ".config" / "earthengine" / "credentials"
+
+
+def credentials_source() -> str | None:
+    """'service_account', 'user' or None, without touching the network."""
+    if os.getenv(SERVICE_ACCOUNT_ENV):
+        return "service_account"
+    if USER_CREDENTIALS.is_file():
+        return "user"
+    return None
+
+
+def initialize(ee, project: str) -> str:
+    """Start Earth Engine with whatever credentials this machine has."""
+    source = credentials_source()
+    if source is None:
+        raise RuntimeError(
+            "sin credenciales de Earth Engine: define "
+            f"{SERVICE_ACCOUNT_ENV} (JSON de la cuenta de servicio o ruta al "
+            "fichero) o ejecuta `earthengine authenticate` en esta maquina")
+
+    if source == "service_account":
+        raw = os.environ[SERVICE_ACCOUNT_ENV]
+        key_file = raw if os.path.isfile(raw) else None
+        info = json.loads(pathlib.Path(raw).read_text(encoding="utf-8")
+                          if key_file else raw)
+        email = info["client_email"]
+        credentials = (ee.ServiceAccountCredentials(email, key_file) if key_file
+                       else ee.ServiceAccountCredentials(email, key_data=raw))
+        ee.Initialize(credentials, project=project)
+    else:
+        ee.Initialize(project=project)
+    return source
 
 
 def fetch_region(
@@ -319,6 +373,7 @@ def latest_complete_init(
     hours: int,
     now: datetime,
     lookback_h: int = 30,
+    allowed_hours: tuple[int, ...] | None = None,
 ) -> datetime | None:
     """Find the latest fully ingested initialization in the lookback window."""
     if not 1 <= hours <= 360:
@@ -337,7 +392,7 @@ def latest_complete_init(
         .aggregate_histogram("start_time")
         .getInfo()
     )
-    return select_complete_init(counts or {}, hours)
+    return select_complete_init(counts or {}, hours, allowed_hours)
 
 
 def _rows(
@@ -501,6 +556,7 @@ def run(
     init_time: datetime | None = None,
     project: str | None = None,
     ee_module=None,
+    allowed_hours: tuple[int, ...] | None = None,
 ) -> dict[str, int]:
     """Fetch, archive and write one complete WeatherNext initialization."""
     project = project or os.getenv("GOOGLE_CLOUD_PROJECT")
@@ -516,7 +572,7 @@ def run(
     if ee_module is None:
         import ee as ee_module
 
-    ee_module.Initialize(project=project)
+    source = initialize(ee_module, project)
 
     selected_init = _utc(init_time) if init_time is not None else None
     if selected_init is None:
@@ -524,6 +580,7 @@ def run(
             ee_module,
             hours,
             utcnow(),
+            allowed_hours=allowed_hours,
         )
         if selected_init is None:
             print("[fetch_weathernext] sin inicializacion completa")
@@ -581,7 +638,7 @@ def run(
         counts[model] = counts.get(model, 0) + 1
 
     print(
-        "[fetch_weathernext] "
+        f"[fetch_weathernext] {source} {selected_init:%Y-%m-%dT%HZ} "
         + ", ".join(
             f"{model}={count}"
             for model, count in sorted(counts.items())
