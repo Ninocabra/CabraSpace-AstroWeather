@@ -1055,18 +1055,24 @@ function renderRoof(){
   card.style.display = '';
   document.getElementById('roofP').textContent = Math.round(r.probability * 100) + ' %';
   document.getElementById('roofTag').innerHTML =
-    `<span class="tag ${r.probability >= .7 ? 'good' : r.probability >= .45 ? 'warn' : 'crit'}">${r.verdict}</span>`;
+    `<span class="tag ${r.verdict === 'Abierto' ? 'good' : 'crit'}">${r.verdict}</span>`;
   document.getElementById('roofFill').style.width = (r.probability * 100) + '%';
-  const span = Math.max(r.range_hours[1], r.typical_hours, 1);
-  document.getElementById('roofLo').style.left = (r.range_hours[0] / span * 100) + '%';
-  document.getElementById('roofHi').style.left = (r.range_hours[1] / span * 100) + '%';
+  // La costumbre del mes puede faltar (sin climatologia): entonces no hay
+  // marcas de rango, y se dice en vez de pintar un 0.
+  const rango = r.range_hours;
+  const span = Math.max(rango ? rango[1] : 0, r.typical_hours || 0, r.expected_hours, 1);
+  document.getElementById('roofLo').style.display = rango ? '' : 'none';
+  document.getElementById('roofHi').style.display = rango ? '' : 'none';
+  if (rango) {
+    document.getElementById('roofLo').style.left = (rango[0] / span * 100) + '%';
+    document.getElementById('roofHi').style.left = (rango[1] / span * 100) + '%';
+  }
   document.getElementById('roofH').textContent = r.expected_hours.toFixed(1) + ' h';
-  document.getElementById('roofT').textContent =
-    `${r.typical_hours.toFixed(1)} h (${r.range_hours[0].toFixed(1)}–${r.range_hours[1].toFixed(1)})`;
+  document.getElementById('roofT').textContent = r.typical_hours == null ? 'sin climatología'
+    : `${r.typical_hours.toFixed(1)} h (${rango[0].toFixed(1)}–${rango[1].toFixed(1)})`;
   document.getElementById('roofWhy').textContent = r.sentence +
-    '. El techo lo abren personas: la costumbre del mes sale de 13 años de horas ' +
-    'publicadas por el observatorio, y la previsión solo dice si esta noche está ' +
-    'por encima o por debajo de lo normal.';
+    '. Las horas típicas del mes son solo costumbre del observatorio (13 años ' +
+    'de horas publicadas), sin previsión dentro.';
 }
 
 function renderAdvice(){

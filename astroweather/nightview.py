@@ -247,6 +247,51 @@ def _site_weather(payload, index) -> dict:
             "dew_margin": margin, "wind_ms": at("wind_speed_10m")}
 
 
+def _techo_del_veredicto(day: dt.datetime, site: Site) -> dict | None:
+    """La tarjeta del techo, sacada del informe que alimenta el veredicto."""
+    from .roof import load_climatology, month_hours
+    from .roofcalibration import load_calibrator
+    from .tonight import report
+    from .webexport import UMBRAL_ABRIR
+
+    informe = report(day, site)
+    if not informe.hours:
+        return None
+    probabilidad = round(float(informe.opening_probability), 3)
+    abierto = probabilidad >= UMBRAL_ABRIR
+    ventana = informe.verdict_window
+    verdad = getattr(load_calibrator(), "truth", "fotometro")
+    frase = (f"{'Abierto' if abierto else 'Cerrado'} ({probabilidad * 100:.0f} %): "
+             f"la hora más floja de la mejor ventana de dos horas seguidas")
+    if ventana:
+        frase += (f", de {ventana[0].astimezone(LOCAL):%H:%M} a "
+                  f"{ventana[1].astimezone(LOCAL):%H:%M} (hora local)")
+    frase += (". Es el mismo número que publica el veredicto, calibrado contra "
+              + ("el techo real del observatorio" if verdad == "techo"
+                 else "el fotómetro (cielo despejado, no techo abierto)"))
+    tipicas = baja = alta = None
+    climatologia = load_climatology()
+    if climatologia:
+        tipicas, baja, alta = month_hours(day, climatologia, site)
+    return {"probability": probabilidad,
+            "verdict": "Abierto" if abierto else "Cerrado",
+            "sentence": frase,
+            "window": ([ventana[0].isoformat(), ventana[1].isoformat()]
+                       if ventana else None),
+            # Suma de la probabilidad utilizable de la ventana de producto
+            # (ocaso -1 h a orto +1 h): el mismo `horas_utilizables_esperadas`
+            # del JSON, crepusculo incluido.
+            "expected_hours": round(float(informe.usable_hours), 1),
+            "typical_hours": tipicas,
+            "range_hours": [baja, alta] if tipicas is not None else None,
+            "truth": verdad,
+            "source": "veredicto",
+            "hourly": [{"t": h.t_utc.isoformat(),
+                        "label": h.t_utc.astimezone(LOCAL).strftime("%H:%M"),
+                        "p_open": round(float(h.usable_probability), 3)}
+                       for h in informe.hours]}
+
+
 def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
           aod_total: float | None = None, aod_dust: float | None = None,
           jet_speed: float | None = None, serie: dict | None = None,
@@ -348,32 +393,21 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
         })
 
     # --- the question the observer actually asks -------------------------
-    # SIN REJILLA NO HAY PROBABILIDAD. El calculo de abajo hace
-    # `max(..., default=0.0)` sobre las nubes de cada marco, asi que con la
-    # rejilla caida contaria la noche como DESPEJADA y publicaria una
-    # probabilidad de abrir alta construida sobre ceros inventados. Mejor no
-    # decir nada que decir eso.
+    # EL MISMO NUMERO QUE EL VEREDICTO PUBLICADO, no una segunda estimacion.
+    # Hasta el 18-09-2026 la cupula calculaba el suyo: la curva del FOTOMETRO
+    # sobre la nube maxima de la rejilla, multiplicada por el factor humano de
+    # `roof.py`. Desde el 05-09 el veredicto usa la curva del TECHO real, y la
+    # del fotometro es 26 puntos optimista y no baja del 58 % ni con cielo
+    # cubierto: la vista interna podia decir "probable" la noche que el JSON
+    # decia Cerrado. Y con la curva del techo el factor humano ya va DENTRO de
+    # la probabilidad, asi que volver a multiplicarlo lo contaria dos veces.
+    # Tampoco depende ya de la rejilla: sale de la prevision del sitio
+    # archivada, como el veredicto, y sin ella no se estima nada.
     outlook = None
     try:
-        if not grid_times:
-            raise RuntimeError("sin rejilla de nubes: no se estima apertura")
-        from .calibration import Calibrator
-        from .roof import load_climatology, outlook as roof_outlook
-        climatology, calibrator = load_climatology(), Calibrator.load()
-        if climatology and calibrator:
-            clear = [calibrator.probability(
-                        max((c["cover"] for c in f["clouds"]), default=0.0), 24.0)
-                     for f in frames]
-            result = roof_outlook(day, clear, times, climatology, site)
-            outlook = {"probability": result.open_probability,
-                       "verdict": result.verdict,
-                       "sentence": result.sentence,
-                       "expected_hours": result.expected_open_hours,
-                       "typical_hours": result.climatological_hours,
-                       "range_hours": [result.low_hours, result.high_hours],
-                       "month_fraction": result.human_factor,
-                       "hourly": result.hourly}
-    except Exception:
+        outlook = _techo_del_veredicto(day, site)
+    except Exception as exc:
+        print("[nightview] sin veredicto de techo -- %s: %s" % (type(exc).__name__, exc))
         outlook = None
 
     darkest = max((f["sky_mag"] for f in frames if f["sky_mag_trustworthy"]),

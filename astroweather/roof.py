@@ -200,6 +200,26 @@ class RoofOutlook:
                 f" de una noche normal")
 
 
+def month_hours(day: dt.datetime, climatology: dict,
+                site: Site = NERPIO) -> tuple[float, float, float]:
+    """Horas abiertas de una noche TIPICA de ese mes: mediana, p10 y p90.
+
+    Es solo costumbre del observatorio (13 anios de horas publicadas), sin
+    prevision dentro: por eso puede ir al lado de cualquier curva sin contar
+    dos veces nada.
+    """
+    night = night_for(day, site)
+    month = night.night.month
+    record = climatology["months"].get(str(month)) or climatology["months"].get(month)
+    if record is None:
+        raise ValueError(f"no climatology for month {month}")
+    available = dark_hours(night.night.year, month, site) / calendar.monthrange(
+        night.night.year, month)[1]
+    return (round(record["median_fraction"] * available, 1),
+            round(record["low_fraction"] * available, 1),
+            round(record["high_fraction"] * available, 1))
+
+
 def outlook(day: dt.datetime, clear_probability: list[float],
             times: list[dt.datetime], climatology: dict,
             site: Site = NERPIO,
