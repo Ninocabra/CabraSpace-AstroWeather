@@ -129,17 +129,29 @@ def _safety_rows(connection, site: Site, start: dt.datetime, end: dt.datetime):
     nubes -- que corre en cada recogida -- desplace a la de superficie completa,
     que corre una vez al dia.
     """
+    # EL DESEMPATE. Varias pasadas comparten `run_utc` (ecmwf_ifs y WeatherNext
+    # salen las dos a 00Z), y con `arg_max(col, run_utc)` a secas DuckDB elegia
+    # una cualquiera en cada consulta -- incluida la lluvia de un PERCENTIL de
+    # WeatherNext. La clave es (pasada, publica racha, modelo): gana la mas
+    # reciente; a igualdad, la de superficie completa, que es la que el resto
+    # de este docstring da por supuesta; y el nombre deja el resto repetible.
+    # Los percentiles no entran: no son un pronostico, son su dispersion.
     filas = connection.execute("""
+        WITH f AS (
+            SELECT *, struct_pack(r := run_utc, g := gust10m IS NOT NULL, m := model) AS k
+            FROM forecasts
+            WHERE site_id = ? AND valid_utc BETWEEN ? AND ?
+              AND member IS NULL AND model NOT LIKE '%prev%'
+              AND NOT regexp_matches(model, '_p[0-9]{2}$')
+        )
         SELECT valid_utc,
-               arg_max(wind10m,       run_utc),
-               arg_max(gust10m,       run_utc),
-               arg_max(precipitation, run_utc),
-               arg_max(prob_precip,   run_utc),
-               arg_max(cape,          run_utc),
-               arg_max(model,         run_utc) FILTER (WHERE gust10m IS NOT NULL)
-        FROM forecasts
-        WHERE site_id = ? AND valid_utc BETWEEN ? AND ?
-          AND member IS NULL AND model NOT LIKE '%prev%'
+               arg_max(wind10m,       k),
+               arg_max(gust10m,       k),
+               arg_max(precipitation, k),
+               arg_max(prob_precip,   k),
+               arg_max(cape,          k),
+               arg_max(model,         k) FILTER (WHERE gust10m IS NOT NULL)
+        FROM f
         GROUP BY valid_utc
     """, [site.site_id, start, end]).fetchall()
     return {f[0]: f[1:] for f in filas}

@@ -25,6 +25,7 @@ verify it against, and inventing a proxy would be worse than the gap.
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 from .queries import connect
@@ -213,6 +214,16 @@ def gust_scores(root=None) -> list[dict]:
             for r in rows]
 
 
+def _models_with_gust(root=None) -> set[str]:
+    """Los modelos que publican racha: los unicos cuyo sesgo de viento puede
+    corregir la racha que decide la puerta."""
+    try:
+        return {fila[0] for fila in connect(root).execute(
+            "SELECT DISTINCT model FROM forecasts WHERE gust10m IS NOT NULL").fetchall()}
+    except Exception:
+        return set()
+
+
 def wind_correction(root=None, model: str | None = None) -> dict:
     """El factor por el que multiplicar la racha prevista, si se puede.
 
@@ -220,12 +231,30 @@ def wind_correction(root=None, model: str | None = None) -> dict:
     No se fuerza: una correccion sacada de 29 horas de agosto no sabe nada del
     viento de enero, y esto decide si se abre un techo.
     """
-    puntuaciones = [s for s in wind_scores(root)
-                    if model is None or s["model"] == model]
+    # Sin modelo pedido se elige el de mas pares, pero NUNCA un retroanalisis
+    # (`<modelo>_prev<N>d`): no es lo que corre esta noche. Desde el 18-09-2026
+    # hay retroanalisis de ICON, GFS y Meteo-France hasta el 31-08, y empatados
+    # a pares con WeatherNext uno de ellos pasaba a dictar el aviso publicado.
+    #
+    # Y SOLO un modelo que publique RACHA, que es a lo que se aplica el factor.
+    # El 18-09-2026 empataban siete modelos a 372 pares (ecmwf_ifs, la media de
+    # WeatherNext y sus cinco percentiles), `max` elegia uno distinto en cada
+    # pasada, y el factor aplicado a la racha de `ecmwf_ifs` saltaba entre x1,3
+    # y x3,7: la web publico "rachas de 104 km/h, por encima del cierre". El
+    # sesgo de un percentil de otro modelo no dice nada de la racha de este.
+    # El desempate por nombre deja el resultado repetible si alguna vez hay
+    # dos que publican racha con los mismos pares.
+    if model is None:
+        con_racha = _models_with_gust(root)
+        puntuaciones = [s for s in wind_scores(root)
+                        if s["model"] in con_racha
+                        and not re.search(r"_prev\d+d$", s["model"])]
+    else:
+        puntuaciones = [s for s in wind_scores(root) if s["model"] == model]
     if not puntuaciones:
         return {"factor": 1.0, "n": 0, "applied": False,
                 "why": "sin pares de viento previsto contra medido"}
-    mejor = max(puntuaciones, key=lambda s: s["n"])
+    mejor = min(puntuaciones, key=lambda s: (-s["n"], s["model"]))
     if not mejor["trustworthy"] or not mejor["ratio"]:
         return {"factor": 1.0, "n": mejor["n"], "applied": False,
                 "ratio": mejor["ratio"], "bias": mejor["bias"],
