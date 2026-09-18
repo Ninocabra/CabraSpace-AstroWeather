@@ -33,12 +33,13 @@ Run:  python -m astroweather.scoreboard
 from __future__ import annotations
 
 import datetime as dt
+import re
 from collections import defaultdict
 
 import numpy as np
 
 from .calibration import (WEATHERNEXT_LEAD_DAYS, WEATHERNEXT_MODEL, Calibrator,
-                          model_path, observed_clear_hours)
+                          is_backfill_of, model_path, observed_clear_hours)
 from .queries import connect
 
 # Below this a score is noise. 200 hours is roughly a season of usable nights
@@ -77,12 +78,21 @@ def _brier(probabilities: np.ndarray, outcomes: np.ndarray) -> float:
     return float(((probabilities - outcomes) ** 2).mean())
 
 
+_BACKFILL_SUFFIX = re.compile(r"_prev(\d+)d$")
+
+
+def _is_backfill(model: str) -> bool:
+    """Any model's backfill (`<model>_prev<N>d`), ECMWF or not."""
+    return _BACKFILL_SUFFIX.search(model) is not None
+
+
 def _lead_days(model: str, lead_hours: int) -> int:
     """The backfill encodes its lead in the model name (`..._prev3d`); a live
     run carries it in `lead_h`. Both end up as whole days so the two can sit in
-    the same table."""
-    if "prev" in model:
-        return int(model.split("prev")[1].rstrip("d"))
+    the same table. Generic on purpose: ICON's backfill reads the same way."""
+    match = _BACKFILL_SUFFIX.search(model)
+    if match:
+        return int(match.group(1))
     return int(lead_hours) // 24
 
 
@@ -122,7 +132,9 @@ def cloud_scores(root=None, since: str = "2024-02-01") -> dict:
         # Our own calibrated probability, scored as one more competitor. It is
         # the raw number of the same model passed through the logistic fit, so
         # the difference between the two rows IS what the calibration adds.
-        if calibrator is not None and member is None and "prev" in model:
+        # SOLO sobre el retroanalisis del ECMWF: la curva es suya, y la de ICON
+        # o GFS con ella encima seria corregir numeros que no son los suyos.
+        if calibrator is not None and member is None and is_backfill_of(model):
             single[("calibrado (nuestro)", days)].append(
                 (hour, calibrator.probability(float(cloud), days * 24.0)))
         if (wn_calibrator is not None and member is None
@@ -186,7 +198,7 @@ def decay_with_lead(scores: list[dict]) -> list[dict]:
     decays with lead time. Kept apart on purpose: it is ONE model at five
     leads, plus our calibration of it, not five models competing."""
     wanted = [entry for entry in scores
-              if entry["enough"] and ("prev" in entry["model"]
+              if entry["enough"] and (is_backfill_of(entry["model"])
                                       or entry["model"].startswith("calibrado"))]
     return sorted(wanted, key=lambda entry: (entry["model"].startswith("calibrado"),
                                              entry["lead_days"]))
@@ -323,7 +335,8 @@ def report(root=None) -> str:
         lines.append("")
 
     others = [entry for entry in result["models"]
-              if "prev" not in entry["model"] and not entry["model"].startswith("calibrado")]
+              if not _is_backfill(entry["model"])
+              and not entry["model"].startswith("calibrado")]
     if others:
         lines.append("  MULTIMODELO (empezo a archivarse el 27-08-2026)")
         for entry in others[:12]:

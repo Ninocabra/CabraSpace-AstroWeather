@@ -36,7 +36,7 @@ import numpy as np
 
 from .calibration import (CLEAR_LEVEL_CENTRE, CLEAR_LEVEL_TOLERANCE,
                           CLEAR_SCATTER_THRESHOLD, MIN_SAMPLES_PER_HOUR,
-                          MOON_IN_FIELD_ALTITUDE)
+                          MOON_IN_FIELD_ALTITUDE, BACKFILL_MODEL)
 from .queries import connect
 from .skymodel import predict
 
@@ -213,11 +213,13 @@ def report(since: str = "2019-01-01", root=None) -> str:
 
     lines.append("  4. CONTRA UNA ETIQUETA INDEPENDIENTE (no sale del fotometro)")
     connection = connect(root)
+    # SOLO el ECMWF a un dia. Con `LIKE '%prev1d%'` el avg() promediaba el
+    # retroanalisis de cada modelo que hubiera en el archivo.
     rows = connection.execute("""
         SELECT valid_utc, avg(cloud_total) FROM forecasts
-        WHERE cloud_total IS NOT NULL AND member IS NULL AND model LIKE '%prev1d%'
+        WHERE cloud_total IS NOT NULL AND member IS NULL AND model = ?
         GROUP BY valid_utc
-    """).fetchall()
+    """, [BACKFILL_MODEL + "_prev1d"]).fetchall()
     forecast = {r[0].astimezone(dt.timezone.utc).replace(tzinfo=None): float(r[1])
                 for r in rows}
     buckets: dict = defaultdict(list)

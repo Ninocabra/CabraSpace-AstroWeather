@@ -225,6 +225,19 @@ MODEL_PATH = DATA_ROOT / "cloud_calibration.json"
 # calibracion es SUYA y de nadie mas: aplicarla a otro proveedor, o a otra malla
 # del mismo proveedor, es usar una correccion medida sobre numeros distintos.
 BACKFILL_MODEL = "ecmwf_ifs025"
+# Los retroanalisis se llaman `<modelo>_prev<N>d`, y desde el 18-09-2026 no solo
+# los hay del ECMWF: ICON, GFS y Meteo-France tienen el suyo para compararse.
+# Todo lo que es del ECMWF (entrenar esta curva, aplicarla, su fila en el
+# marcador) tiene que casar con ESTE prefijo, no con "prev" a secas: con
+# `LIKE '%prev%'` la curva del ECMWF se reentrenaba en silencio con una mezcla
+# de cuatro modelos.
+BACKFILL_PREFIX = BACKFILL_MODEL + "_prev"
+
+
+def is_backfill_of(model: str, base: str = BACKFILL_MODEL) -> bool:
+    """¿Es `model` el retroanalisis (`<base>_prev<N>d`) de ESE modelo base?"""
+    lead = model[len(base) + len("_prev"):] if model.startswith(base + "_prev") else ""
+    return len(lead) > 1 and lead.endswith("d") and lead[:-1].isdigit()
 
 
 @dataclass
@@ -323,17 +336,20 @@ def training_pairs(truth: dict[dt.datetime, bool], root=None):
     rows = connection.execute("""
         SELECT valid_utc, cloud_total, model
         FROM forecasts
-        WHERE cloud_total IS NOT NULL AND member IS NULL AND model LIKE '%prev%'
-    """).fetchall()
+        WHERE cloud_total IS NOT NULL AND member IS NULL
+          AND starts_with(model, ?)
+    """, [BACKFILL_PREFIX]).fetchall()
 
     pairs = []
     for valid, cloud, model in rows:
+        if not is_backfill_of(model):
+            continue
         hour = valid.astimezone(dt.timezone.utc).replace(
             minute=0, second=0, microsecond=0, tzinfo=None)
         clear = truth.get(hour)
         if clear is None:
             continue
-        lead_days = float(model.split("prev")[1].rstrip("d"))
+        lead_days = float(model[len(BACKFILL_PREFIX):].rstrip("d"))
         pairs.append((float(cloud), lead_days, bool(clear)))
     return pairs
 

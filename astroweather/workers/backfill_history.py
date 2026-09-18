@@ -16,6 +16,15 @@ Two things it is NOT:
 The exact issue hour of each previous run is not published, so rows are stored
 with the lead expressed in days and the run timestamp derived from it. That
 approximation is recorded in quality_flags rather than hidden.
+
+Any model the API serves can be backfilled with `--model`; the rows are named
+`<model>_prev<N>d`. Only `ecmwf_ifs025_prev*` feeds the ECMWF cloud calibration
+(`calibration.training_pairs`): the other backfills exist to be compared, and a
+consumer that matched any "prev" would silently mix them into ECMWF's curve.
+Measured on 2026-09-18 at Nerpio: icon_seamless and gfs_seamless give leads 1-5
+from 2024-01-19; meteofrance_seamless only leads 1-3 (4 and 5 come back null,
+and its wind is null in early 2024); cloud_cover_low/mid/high come back null for
+every model, ECMWF included -- only the total survives.
 """
 
 from __future__ import annotations
@@ -34,6 +43,12 @@ ENDPOINT = "https://previous-runs-api.open-meteo.com/v1/forecast"
 MODEL = "ecmwf_ifs025"
 LICENSE_TAG = "open-meteo-cc-by-nc"
 LEAD_DAYS = (1, 2, 3, 4, 5)
+# Native grid spacing, only where it is one number. The "seamless" products
+# stitch several grids (ICON-D2/EU/global, AROME/ARPEGE), so no single figure
+# is true for every lead: None says so instead of inventing one.
+NATIVE_RESOLUTION_KM = {"ecmwf_ifs025": 25.0}
+# How far past [0, 100] a cloud cover is taken as rounding (see to_rows).
+CLOUD_ROUNDING_SLACK = 1.0
 
 # Variables worth carrying back: the cloud gate and the surface fields that the
 # AEMET station and our own sensors can verify.
@@ -57,7 +72,7 @@ def _hourly_names() -> list[str]:
     return names
 
 
-def fetch(site: Site, start: date, end: date) -> dict:
+def fetch(site: Site, start: date, end: date, model: str = MODEL) -> dict:
     response = requests.get(
         ENDPOINT,
         params={
@@ -67,7 +82,7 @@ def fetch(site: Site, start: date, end: date) -> dict:
             "start_date": start.isoformat(),
             "end_date": end.isoformat(),
             "hourly": ",".join(_hourly_names()),
-            "models": MODEL,
+            "models": model,
             "wind_speed_unit": "ms",
             "timezone": "UTC",
         },
@@ -77,13 +92,15 @@ def fetch(site: Site, start: date, end: date) -> dict:
     return response.json()
 
 
-def to_rows(payload: dict, site: Site, retrieved_at: datetime) -> list[dict]:
+def to_rows(payload: dict, site: Site, retrieved_at: datetime,
+            model: str = MODEL) -> list[dict]:
     hourly = payload["hourly"]
     times = [datetime.fromisoformat(t).replace(tzinfo=timezone.utc) for t in hourly["time"]]
 
     rows: list[dict] = []
     for lead_days in LEAD_DAYS:
         by_time: dict[datetime, dict] = {}
+        clamped: set[datetime] = set()
         for variable, column in VARIABLES.items():
             series = hourly.get(f"{variable}_previous_day{lead_days}")
             if series is None:
@@ -92,8 +109,18 @@ def to_rows(payload: dict, site: Site, retrieved_at: datetime) -> list[dict]:
                 check_wind_units(series, label=f"prev{lead_days}:{column}")
             for index, valid in enumerate(times):
                 value = series[index]
-                if value is not None:
-                    by_time.setdefault(valid, {})[column] = float(value)
+                if value is None:
+                    continue
+                value = float(value)
+                # GFS publishes 101 % and -1 % now and then (~0.1 % of its
+                # hours, seen 2026-09-18; ECMWF and ICON stay inside). That is
+                # rounding, not a unit error, so it is clamped and flagged;
+                # anything further out still reaches the write boundary and
+                # fails there.
+                if column.startswith("cloud_") and not 0.0 <= value <= 100.0                         and -CLOUD_ROUNDING_SLACK <= value <= 100.0 + CLOUD_ROUNDING_SLACK:
+                    value = min(100.0, max(0.0, value))
+                    clamped.add(valid)
+                by_time.setdefault(valid, {})[column] = value
 
         for valid, values in by_time.items():
             # The provider does not publish the issue hour of each previous
@@ -102,24 +129,25 @@ def to_rows(payload: dict, site: Site, retrieved_at: datetime) -> list[dict]:
                 hour=0, minute=0, second=0, microsecond=0)
             rows.append({
                 "site_id": site.site_id,
-                "model": f"{MODEL}_prev{lead_days}d",
+                "model": f"{model}_prev{lead_days}d",
                 "run_utc": run_utc,
                 "valid_utc": valid,
                 "lead_h": int((valid - run_utc).total_seconds() // 3600),
                 "member": None,
                 **values,
-                "provider_model_version": MODEL,
+                "provider_model_version": model,
                 "provider_grid_lat": payload.get("latitude"),
                 "provider_grid_lon": payload.get("longitude"),
                 "site_elevation": site.site_elevation,
                 "model_grid_elevation": site.model_grid_elevation,
                 "downscaling_elevation": payload.get("elevation"),
-                "native_resolution_km": 25.0,
+                "native_resolution_km": NATIVE_RESOLUTION_KM.get(model),
                 "native_timestep_minutes": 60,
                 "interpolated": False,
                 "retrieved_at": retrieved_at,
                 "license_tag": LICENSE_TAG,
-                "quality_flags": f"previous_runs;lead_days={lead_days};run_hour_assumed_00z",
+                "quality_flags": (f"previous_runs;lead_days={lead_days};run_hour_assumed_00z"
+                                  + (";cloud_clamped_to_range" if valid in clamped else "")),
             })
     return rows
 
@@ -133,29 +161,30 @@ def _months(start: date, end: date):
 
 
 def run(site: Site = NERPIO, *, start: date, end: date | None = None,
-        pause: float = 1.5) -> int:
+        pause: float = 1.5, model: str = MODEL) -> int:
     end = end or datetime.now(timezone.utc).date() - timedelta(days=1)
     total = 0
 
     for window_start, window_end in _months(start, end):
         retrieved_at = utcnow()
         try:
-            payload = fetch(site, window_start, window_end)
+            payload = fetch(site, window_start, window_end, model)
         except requests.HTTPError as error:
-            print(f"[backfill] {window_start:%Y-%m}: {error.response.status_code}, salto")
+            print(f"[backfill] {model} {window_start:%Y-%m}: "
+                  f"{error.response.status_code}, salto")
             time.sleep(pause)
             continue
 
         store_raw(payload, source="openmeteo_previous_runs", site_id=site.site_id,
                   retrieved_at=retrieved_at)
-        rows = to_rows(payload, site, retrieved_at)
+        rows = to_rows(payload, site, retrieved_at, model)
         write_canonical(rows, dataset="forecasts", site_id=site.site_id)
         total += len(rows)
-        print(f"[backfill] {window_start:%Y-%m}: {len(rows):>5} filas "
+        print(f"[backfill] {model} {window_start:%Y-%m}: {len(rows):>5} filas "
               f"({len(LEAD_DAYS)} leads)")
         time.sleep(pause)      # shared 10k/day quota with every other endpoint
 
-    print(f"[backfill] total {total} filas historicas")
+    print(f"[backfill] {model} total {total} filas historicas")
     return total
 
 
@@ -163,8 +192,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--start", default="2024-01-01", help="YYYY-MM-DD")
     parser.add_argument("--end", help="YYYY-MM-DD")
+    parser.add_argument("--model", default=MODEL,
+                        help="identificador de Open-Meteo (por defecto %(default)s)")
     args = parser.parse_args()
     run(
         start=date.fromisoformat(args.start),
         end=date.fromisoformat(args.end) if args.end else None,
+        model=args.model,
     )
