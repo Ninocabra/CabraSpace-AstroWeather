@@ -338,6 +338,61 @@ def training_pairs(truth: dict[dt.datetime, bool], root=None):
     return pairs
 
 
+# WeatherNext 3 tiene su PROPIA curva, en su propio fichero. No sustituye a la
+# del ECMWF ni entra en el veredicto: el veredicto va contra el techo real
+# (roofcalibration) y WeatherNext solo tiene ~20 noches de techo con prevision.
+# Lo que si esta medido (18-09-2026, deja-un-mes-fuera sobre feb-ago 2026, 6126
+# pares hora-alcance en 174 noches): calibrado, bate al ECMWF calibrado en los
+# cinco alcances, Brier -0,0069 [-0,0126, -0,0013] remuestreando noches, AUC
+# 0,789 frente a 0,730. Mezclar los dos NO mejora a WeatherNext solo (+0,0006,
+# IC por encima de cero), y la dispersion de sus miembros tampoco suma. Gemini
+# lo replico por separado y coincidio a cinco decimales (coop/gemini/).
+WEATHERNEXT_MODEL = "weathernext3"
+# Los alcances con los que se valido. El dia 0 no tiene ECMWF contra el que
+# medirse y el 6 solo existe para la pasada de 00Z: fuera de 1-5 la curva no
+# esta comprobada y no se entrena con ello.
+WEATHERNEXT_LEAD_DAYS = range(1, 6)
+
+
+def model_path(model: str = BACKFILL_MODEL, root: Path | None = None) -> Path:
+    """Donde vive la curva de cada modelo. La del ECMWF conserva su nombre de
+    siempre porque el producto y el runner la leen por ese nombre."""
+    base = root if root is not None else DATA_ROOT
+    name = ("cloud_calibration.json" if model == BACKFILL_MODEL
+            else f"cloud_calibration_{model}.json")
+    return base / name
+
+
+def training_pairs_weathernext(truth: dict[dt.datetime, bool], root=None):
+    """(nube %, alcance en dias, despejada) de la media de WeatherNext.
+
+    El alcance sale de `lead_h`, no del nombre del modelo como en el
+    retroanalisis del ECMWF. Las pasadas de 00Z y 12Z validas para la misma
+    hora y el mismo dia de alcance se PROMEDIAN en un solo par: son dos
+    opiniones sobre la misma hora, no dos horas, y contarlas por separado
+    duplicaria el peso de las horas que caen en las dos pasadas.
+    """
+    connection = connect(root)
+    rows = connection.execute(f"""
+        SELECT valid_utc, lead_h, cloud_total
+        FROM forecasts
+        WHERE model = '{WEATHERNEXT_MODEL}' AND member IS NULL
+          AND cloud_total IS NOT NULL AND lead_h IS NOT NULL
+    """).fetchall()
+
+    grouped: dict[tuple[dt.datetime, int], list[float]] = defaultdict(list)
+    for valid, lead_h, cloud in rows:
+        days = int(lead_h) // 24
+        if days not in WEATHERNEXT_LEAD_DAYS:
+            continue
+        hour = valid.astimezone(dt.timezone.utc).replace(
+            minute=0, second=0, microsecond=0, tzinfo=None)
+        if hour in truth:
+            grouped[(hour, days)].append(float(cloud))
+    return [(float(np.mean(clouds)), float(days), bool(truth[hour]))
+            for (hour, days), clouds in sorted(grouped.items())]
+
+
 def fit(pairs: list[tuple[float, float, bool]],
         model: str = BACKFILL_MODEL) -> Calibrator:
     """Logistic fit by maximum likelihood, scored against climatology."""
@@ -396,17 +451,35 @@ def reliability(pairs: list[tuple[float, float, bool]], calibrator: Calibrator,
     return curve
 
 
-def train(since: str = "2024-02-01", root=None) -> Calibrator:
+def train(since: str = "2024-02-01", root=None,
+          model: str = BACKFILL_MODEL) -> Calibrator:
     truth = observed_clear_hours(since, root)
-    pairs = training_pairs(truth, root)
-    calibrator = fit(pairs)
-    calibrator.save()
+    if model == BACKFILL_MODEL:
+        pairs = training_pairs(truth, root)
+    elif model == WEATHERNEXT_MODEL:
+        pairs = training_pairs_weathernext(truth, root)
+    else:
+        raise ValueError(f"no se como entrenar la curva de {model!r}")
+    calibrator = fit(pairs, model=model)
+    calibrator.save(model_path(model, root))
     return calibrator
 
 
 if __name__ == "__main__":
-    model = train()
-    print(f"entrenado con {model.trained_on} pares | tasa base {model.base_rate:.1%}")
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Ajusta la curva P(despejado | nube)")
+    parser.add_argument("--model", default=BACKFILL_MODEL,
+                        choices=(BACKFILL_MODEL, WEATHERNEXT_MODEL))
+    parser.add_argument("--since", default=None,
+                        help="primera fecha de verdad (por defecto 2024-02-01; "
+                             "2026-01-01 para WeatherNext, que empieza ahi)")
+    args = parser.parse_args()
+    since = args.since or ("2026-01-01" if args.model == WEATHERNEXT_MODEL else "2024-02-01")
+    model = train(since=since, model=args.model)
+    print(f"{args.model}: entrenado con {model.trained_on} pares | tasa base {model.base_rate:.1%}")
+    print(f"  curva: sigmoid({model.intercept:.3f} {model.cloud_weight:+.3f}*nube "
+          f"{model.lead_weight:+.3f}*dias) -> {model_path(args.model)}")
     print(f"  Brier del modelo      : {model.brier:.4f}")
     print(f"  Brier de climatologia : {model.brier_climatology:.4f}")
     print(f"  {'BATE' if model.beats_climatology else 'NO BATE'} a la climatologia")

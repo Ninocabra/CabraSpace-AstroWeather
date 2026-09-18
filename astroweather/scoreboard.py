@@ -37,7 +37,8 @@ from collections import defaultdict
 
 import numpy as np
 
-from .calibration import Calibrator, observed_clear_hours
+from .calibration import (WEATHERNEXT_LEAD_DAYS, WEATHERNEXT_MODEL, Calibrator,
+                          model_path, observed_clear_hours)
 from .queries import connect
 
 # Below this a score is noise. 200 hours is roughly a season of usable nights
@@ -100,6 +101,13 @@ def cloud_scores(root=None, since: str = "2024-02-01") -> dict:
     # Ensemble members are averaged into one probability per (model, lead, hour);
     # a deterministic run contributes its own single value.
     calibrator = Calibrator.load()
+    # La curva de WeatherNext es suya: solo se aplica a SU media y en los
+    # alcances con los que se valido. La etiqueta no empieza por "calibrado" a
+    # proposito: esas filas son las del ECMWF en `decay_with_lead`, y esta va
+    # con el resto de proveedores.
+    wn_calibrator = Calibrator.load(model_path(WEATHERNEXT_MODEL, root))
+    if wn_calibrator is not None and wn_calibrator.trained_on_model != WEATHERNEXT_MODEL:
+        wn_calibrator = None
     ensemble: dict[tuple, list[float]] = defaultdict(list)
     single: dict[tuple, list[tuple[dt.datetime, float]]] = defaultdict(list)
     for model, lead, valid, cloud, member in rows:
@@ -117,6 +125,10 @@ def cloud_scores(root=None, since: str = "2024-02-01") -> dict:
         if calibrator is not None and member is None and "prev" in model:
             single[("calibrado (nuestro)", days)].append(
                 (hour, calibrator.probability(float(cloud), days * 24.0)))
+        if (wn_calibrator is not None and member is None
+                and model == WEATHERNEXT_MODEL and days in WEATHERNEXT_LEAD_DAYS):
+            single[(f"{WEATHERNEXT_MODEL}_calibrado", days)].append(
+                (hour, wn_calibrator.probability(float(cloud), days * 24.0)))
     for (model, days, hour), values in ensemble.items():
         single[(model, days)].append((hour, float(np.mean(values))))
 
@@ -319,6 +331,12 @@ def report(root=None) -> str:
             lines.append("    %-22s %d dia(s)  n=%5d  Brier=%.4f%s"
                          % (entry["model"], entry["lead_days"], entry["n"],
                             entry["brier"], flag))
+        if any(entry["model"] == f"{WEATHERNEXT_MODEL}_calibrado" for entry in others):
+            lines.append("    %s_calibrado es DENTRO DE MUESTRA, como el calibrado del ECMWF,"
+                         % WEATHERNEXT_MODEL)
+            lines.append("    y sobre otras horas (2026, no 2,5 anios): no se compara con el de")
+            lines.append("    arriba. La comparacion justa, fuera de muestra y sobre las mismas")
+            lines.append("    horas, esta en el comentario de calibration.WEATHERNEXT_MODEL.")
         if not any(entry["enough"] for entry in others):
             lines.append("    Ninguno llega a %d horas: todavia NO hay marcador entre "
                          "proveedores." % MIN_SAMPLES)

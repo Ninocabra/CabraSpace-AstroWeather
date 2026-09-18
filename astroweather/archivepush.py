@@ -108,7 +108,8 @@ IGNORADOS = (
 
 ESTADO = "estado_colector.json"
 
-LOOSE = ("cloud_calibration.json", "roof_calibration.json", "open_hours_nerpio.json",
+LOOSE = ("cloud_calibration.json", "cloud_calibration_weathernext3.json",
+         "roof_calibration.json", "open_hours_nerpio.json",
          "roof_climatology.json", "sky_floor.json", "estado_colector.json")
 
 
