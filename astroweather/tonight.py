@@ -161,7 +161,14 @@ def _forecast_rows(site: Site, start: dt.datetime, end: dt.datetime, root=None,
     `_safety_rows`.
     """
     connection = connect(root)
-    condicion = "AND model = ?" if model else "AND model NOT LIKE '%prev%'"
+    # El plan B (sin el modelo de la curva) no puede coger un PERCENTIL: la
+    # media de WeatherNext y sus p10..p90 son la misma pasada, empatan en
+    # `run_utc`, y hasta el 18-09-2026 DuckDB elegia una al azar en cada
+    # consulta -- tres llamadas seguidas dieron 0,52, 0,61 y 0,66 la misma
+    # noche en un PC sin ECMWF. Y el desempate por modelo hace el resultado
+    # repetible cuando dos proveedores comparten hora de pasada.
+    condicion = ("AND model = ?" if model else
+                 "AND model NOT LIKE '%prev%' AND NOT regexp_matches(model, '_p[0-9]{2}$')")
     parametros = [site.site_id, start, end] + ([model] if model else [])
     nubes = connection.execute(f"""
         SELECT valid_utc, cloud_total, lead_h
@@ -169,7 +176,8 @@ def _forecast_rows(site: Site, start: dt.datetime, end: dt.datetime, root=None,
         WHERE site_id = ? AND valid_utc BETWEEN ? AND ?
           AND member IS NULL AND cloud_total IS NOT NULL
           {condicion}
-        QUALIFY row_number() OVER (PARTITION BY valid_utc ORDER BY run_utc DESC) = 1
+        QUALIFY row_number() OVER (PARTITION BY valid_utc
+                                   ORDER BY run_utc DESC, model) = 1
         ORDER BY valid_utc
     """, parametros).fetchall()
     seguridad = _safety_rows(connection, site, start, end)
