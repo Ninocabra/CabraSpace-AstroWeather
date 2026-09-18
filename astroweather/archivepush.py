@@ -243,6 +243,61 @@ def bundle_months(source: Path, destination: Path, *, today: str) -> list[Path]:
     return creados
 
 
+def _fundir(viejo: dict, nuevo: dict) -> dict:
+    """La marca mas reciente de cada trabajo, venga de donde venga."""
+    trabajos = dict(viejo.get("trabajos", {}))
+    for nombre, marca in nuevo.get("trabajos", {}).items():
+        if nombre not in trabajos or marca > trabajos[nombre]:
+            trabajos[nombre] = marca
+    return {
+        "escrito_utc": max(filter(None, (viejo.get("escrito_utc"),
+                                         nuevo.get("escrito_utc"))), default=""),
+        "trabajos": dict(sorted(trabajos.items())),
+    }
+
+
+def _texto_estado(estado: dict) -> str:
+    return json.dumps(estado, indent=2) + chr(10)
+
+
+def _rebase_en_curso(repo: Path) -> bool:
+    git_dir = Path(_git(repo, "rev-parse", "--absolute-git-dir").stdout.strip())
+    return (git_dir / "rebase-merge").exists() or (git_dir / "rebase-apply").exists()
+
+
+def ponerse_al_dia(repo: Path) -> None:
+    """`pull --rebase` que sabe resolver el UNICO choque esperable, o falla.
+
+    El 18-09-2026 la recogida de las 07:43 se quedo parada a mitad de un
+    rebase: este PC y el runner habian tocado las mismas lineas de
+    `estado_colector.json`, git no sabe fundir un JSON por trabajo, y el
+    fallo del pull no se miraba. La tarea salio con codigo 0 y, desde
+    entonces, cada recogida de este PC se quedaba en el clon sin subir.
+
+    Si el choque es SOLO en el estado, se resuelve como `fundir_estado`: la
+    marca mas reciente de cada trabajo. Durante un rebase la etapa 2 es lo que
+    ya estaba arriba y la 3 el commit propio que se reaplica. Cualquier otro
+    choque es un problema de verdad: se aborta el rebase -- el clon vuelve a
+    como estaba, con el commit propio intacto -- y se lanza, para que se vea.
+    """
+    resultado = _git(repo, "pull", "--rebase", "--autostash")
+    for _ in range(20):                      # un commit propio por vuelta
+        if resultado.returncode == 0 and not _rebase_en_curso(repo):
+            return
+        conflictos = _git(repo, "diff", "--name-only", "--diff-filter=U").stdout.split()
+        if not _rebase_en_curso(repo) or conflictos != [ESTADO]:
+            if _rebase_en_curso(repo):
+                _git(repo, "rebase", "--abort")
+            raise RuntimeError("no se pudo poner el archivo al dia: "
+                               + (resultado.stderr.strip() or ", ".join(conflictos)))
+        arriba = json.loads(_git(repo, "show", f":2:{ESTADO}").stdout)
+        propio = json.loads(_git(repo, "show", f":3:{ESTADO}").stdout)
+        (repo / ESTADO).write_text(_texto_estado(_fundir(arriba, propio)), encoding="utf-8")
+        _git(repo, "add", ESTADO)
+        resultado = _git(repo, "-c", "core.editor=true", "rebase", "--continue")
+    raise RuntimeError("el rebase del archivo no termina")
+
+
 def fundir_estado(origen: Path, destino: Path) -> bool:
     """El estado del colector es de DOS maquinas: se funde, no se sustituye.
 
@@ -257,16 +312,7 @@ def fundir_estado(origen: Path, destino: Path) -> bool:
         viejo = json.loads(destino.read_text(encoding="utf-8"))
     else:
         viejo = {}
-    trabajos = dict(viejo.get("trabajos", {}))
-    for nombre, marca in nuevo.get("trabajos", {}).items():
-        if nombre not in trabajos or marca > trabajos[nombre]:
-            trabajos[nombre] = marca
-    fundido = {
-        "escrito_utc": max(filter(None, (viejo.get("escrito_utc"),
-                                         nuevo.get("escrito_utc"))), default=""),
-        "trabajos": dict(sorted(trabajos.items())),
-    }
-    texto = json.dumps(fundido, indent=2) + chr(10)
+    texto = _texto_estado(_fundir(viejo, nuevo))
     if destino.exists() and destino.read_text(encoding="utf-8") == texto:
         return False
     destino.write_text(texto, encoding="utf-8")
@@ -342,6 +388,11 @@ def push(root: Path | None = None, repo: Path | None = None, *,
     repo = repo_path(repo)
     if repo is None:
         return None
+    # AL DIA ANTES DE RECOGER, no solo antes de empujar: el estado se funde con
+    # el que hay en el clon, y si el clon esta atrasado la fusion se hace contra
+    # una version vieja y el commit choca despues con la de arriba.
+    if push_remote:
+        ponerse_al_dia(repo)
     resumen = collect(Path(root or DATA_ROOT), repo, today=today)
 
     _git(repo, "add", "-A")
@@ -355,7 +406,7 @@ def push(root: Path | None = None, repo: Path | None = None, *,
         # este PC. Rebase antes de empujar: sin esto, dos recogidas seguidas se
         # pisan y la segunda muere con "non-fast-forward" dejando en el runner,
         # que se destruye, lo unico que la habia guardado.
-        _git(repo, "pull", "--rebase", "--autostash")
+        ponerse_al_dia(repo)
         subido = _git(repo, "push")
         if subido.returncode != 0:
             raise RuntimeError(f"archivado en local pero sin subir: {subido.stderr.strip()}")

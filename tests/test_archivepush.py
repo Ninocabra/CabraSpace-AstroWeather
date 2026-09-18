@@ -227,3 +227,86 @@ def test_a_run_born_inside_the_repo_is_not_versioned(tmp_path, repo):
         comprobado = subprocess.run(
             ["git", "-C", str(repo), "check-ignore", "-q", str(ruta.relative_to(repo))])
         assert (comprobado.returncode == 0) is ignorado, nombre
+
+
+# --- dos maquinas contra el mismo remoto (18-09-2026) -----------------------
+
+def _g(repo, *args):
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True,
+                          text=True, check=True).stdout
+
+
+def _dos_clones(tmp_path):
+    """Un remoto y dos clones: `runner` y `pc`, con el mismo estado inicial."""
+    import json
+    remoto = tmp_path / "remoto.git"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(remoto)], check=True)
+    clones = {}
+    for nombre in ("runner", "pc"):
+        clon = tmp_path / nombre
+        subprocess.run(["git", "clone", "-q", str(remoto), str(clon)], check=True,
+                       capture_output=True)
+        for clave, valor in (("user.email", "t@example.com"), ("user.name", nombre)):
+            _g(clon, "config", clave, valor)
+        clones[nombre] = clon
+    estado = {"escrito_utc": "2026-09-17T20:00:00+00:00",
+              "trabajos": {"forecast": "2026-09-17T16:00:00+00:00",
+                           "weathernext": "2026-09-17T08:00:00+00:00"}}
+    (clones["runner"] / "estado_colector.json").write_text(json.dumps(estado, indent=2) + "\n")
+    _g(clones["runner"], "add", "-A"); _g(clones["runner"], "commit", "-qm", "base")
+    _g(clones["runner"], "push", "-q", "origin", "main")
+    _g(clones["pc"], "pull", "-q", "origin", "main")
+    _g(clones["pc"], "branch", "--set-upstream-to=origin/main", "main")
+    return clones
+
+
+def _estado(ruta, **trabajos):
+    import json
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(json.dumps({"escrito_utc": max(trabajos.values()),
+                                "trabajos": trabajos}, indent=2) + "\n")
+
+
+def test_the_state_race_of_the_18th_is_resolved_by_merging(tmp_path):
+    """Lo que paso a las 07:43: el PC tenia un commit de estado sin subir, el
+    runner subio el suyo tocando las mismas lineas, y el `pull --rebase` se
+    quedo a medias sin que nadie lo mirara. Ahora se funde por trabajo."""
+    import json
+    clones = _dos_clones(tmp_path)
+    # El PC deja un commit local con SU estado (atrasado en `forecast`)...
+    _estado(clones["pc"] / "estado_colector.json",
+            forecast="2026-09-17T16:00:00+00:00", weathernext="2026-09-17T20:08:00+00:00")
+    _g(clones["pc"], "commit", "-qam", "pc"); 
+    # ...y el runner sube el suyo, mas nuevo en `forecast`.
+    _estado(clones["runner"] / "estado_colector.json",
+            forecast="2026-09-18T04:31:00+00:00", weathernext="2026-09-17T08:00:00+00:00")
+    _g(clones["runner"], "commit", "-qam", "runner"); _g(clones["runner"], "push", "-q")
+
+    datos = tmp_path / "data"
+    (datos / "measurements").mkdir(parents=True)
+    _estado(datos / "estado_colector.json",
+            forecast="2026-09-17T16:00:00+00:00", weathernext="2026-09-18T07:10:00+00:00")
+    assert archivepush.push(root=datos, repo=clones["pc"])
+
+    _g(clones["runner"], "pull", "-q")
+    subido = json.loads((clones["runner"] / "estado_colector.json").read_text())
+    assert subido["trabajos"] == {"forecast": "2026-09-18T04:31:00+00:00",
+                                  "weathernext": "2026-09-18T07:10:00+00:00"}
+    assert not archivepush._rebase_en_curso(clones["pc"])
+
+
+def test_a_conflict_that_is_not_the_state_aborts_and_says_so(tmp_path):
+    """Cualquier otro choque es un problema de verdad: no se resuelve a ciegas,
+    el clon vuelve a como estaba y el fallo SE VE (antes: codigo 0)."""
+    clones = _dos_clones(tmp_path)
+    (clones["pc"] / "open_hours_nerpio.json").write_text('{"total": 1476}\n')
+    _g(clones["pc"], "add", "-A"); _g(clones["pc"], "commit", "-qm", "pc")
+    (clones["runner"] / "open_hours_nerpio.json").write_text('{"total": 1635}\n')
+    _g(clones["runner"], "add", "-A"); _g(clones["runner"], "commit", "-qm", "runner")
+    _g(clones["runner"], "push", "-q")
+    antes = _g(clones["pc"], "rev-parse", "HEAD")
+
+    with pytest.raises(RuntimeError, match="al dia"):
+        archivepush.ponerse_al_dia(clones["pc"])
+    assert not archivepush._rebase_en_curso(clones["pc"])
+    assert _g(clones["pc"], "rev-parse", "HEAD") == antes     # su commit, intacto
