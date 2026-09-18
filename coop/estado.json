@@ -1,6 +1,6 @@
 {
   "sesion": "2026-09-18",
   "presupuesto": 10,
-  "usadas": 1,
-  "nota": "replica independiente de la curva de calibracion de WeatherNext"
+  "usadas": 2,
+  "nota": "replica calibracion WeatherNext: entregada 09:07, coincide con Claude a 5 decimales (re-ejecutada aqui)"
 }
