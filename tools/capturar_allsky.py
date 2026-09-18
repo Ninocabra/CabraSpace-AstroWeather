@@ -105,7 +105,18 @@ def main() -> None:
     parser.add_argument("--sol-maximo", type=float, default=SOL_MAXIMO)
     parser.add_argument("--una", action="store_true",
                         help="baja UNA imagen ahora, sea la hora que sea, y sale")
+    parser.add_argument("--log", type=Path,
+                        help="anade la salida a este fichero (para la tarea programada)")
     args = parser.parse_args()
+
+    if args.log:
+        # La tarea programada corre con `pythonw`, que no tiene consola: sin
+        # esto cada `print` se pierde en silencio y una noche fallida es
+        # indistinguible de una que ni arranco. Exit 0 y sin log es justo el
+        # modo de fallo que no queremos.
+        args.log.parent.mkdir(parents=True, exist_ok=True)
+        sys.stdout = sys.stderr = args.log.open("a", encoding="utf-8", buffering=1)
+        print(f"--- {dt.datetime.now(dt.timezone.utc):%Y-%m-%d %H:%M}Z arranque", flush=True)
 
     sesion = requests.Session()
     vistos: set[str] = set()
