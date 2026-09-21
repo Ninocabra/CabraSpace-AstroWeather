@@ -17,10 +17,15 @@ from astroweather import cloudmap
 from astroweather.site import NERPIO
 
 
-def _respuestas(n, marcas, valor=50):
+def _respuestas(n, marcas, valor=50, viento=(5.0, 90.0, 7.0)):
     """Lo que devolveria el proveedor: una entrada por punto, en orden."""
+    velocidad, direccion, racha = viento
+    fijo = {cloudmap.VIENTO["velocidad"]: [velocidad] * len(marcas),
+            cloudmap.VIENTO["direccion"]: [direccion] * len(marcas),
+            cloudmap.VIENTO["racha"]: [racha] * len(marcas)}
     return [{"hourly": {"time": list(marcas),
-                        **{v: [valor] * len(marcas) for v in cloudmap.CAMPOS.values()}}}
+                        **{v: [valor] * len(marcas) for v in cloudmap.CAMPOS.values()},
+                        **fijo}}
             for _ in range(n)]
 
 
@@ -61,17 +66,18 @@ def test_el_orden_declarado_es_el_orden_real():
 
 
 def test_la_caja_cubre_el_mapa_que_pinta_la_web():
-    """De donde salen el 15 y el 7. El mapa de la pagina ensena 888 x 499 km;
-    si la rejilla se queda corta, el campo no llega a los bordes y el borde
-    vacio parece cielo despejado."""
+    """De donde salen el 15 y el 7. Si la rejilla se queda corta, el campo no
+    llega a los bordes del marco y el borde vacio parece cielo despejado."""
     r = cloudmap.rejilla()
     km_lat = 111.32
     km_lon = km_lat * math.cos(math.radians(NERPIO.latitude))
     ancho = (r["nx"] - 1) * r["paso"] * km_lon
     alto = (r["ny"] - 1) * r["paso"] * km_lat
 
-    assert ancho > 888, f"solo {ancho:.0f} km de ancho"
-    assert alto > 499, f"solo {alto:.0f} km de alto"
+    assert ancho > 1300, f"solo {ancho:.0f} km de ancho"
+    assert alto > 770, f"solo {alto:.0f} km de alto"
+    # Y con la proporcion del marco de la web, o habria que estirar algo.
+    assert abs(ancho / alto - 1.686) < 0.02, f"proporcion {ancho / alto:.3f}"
 
 
 def test_un_hueco_no_es_cero_nubes():
@@ -159,3 +165,82 @@ def test_el_fichero_dice_como_se_descodifica():
     assert clave["sin_dato"] == cloudmap.SIN_DATO
     assert "orden" in payload["rejilla"]
     assert payload["modelo"] == cloudmap.MODELO
+
+
+# ------------------------------------------------------ el viento (flechas)
+
+def test_el_viento_viaja_en_componentes_y_no_en_angulo():
+    """LA razon de publicar u/v y no velocidad y direccion.
+
+    La direccion es un angulo y promediar angulos esta mal: entre 350 y 10
+    grados la media aritmetica da 180, que es el viento CONTRARIO. Eso pasaria
+    en cada paso intermedio de la animacion. Con componentes no hay nada que
+    arreglar, y este test lo ensena con el caso que rompe.
+    """
+    u_a, v_a = cloudmap._uv(10.0, 350.0)
+    u_b, v_b = cloudmap._uv(10.0, 10.0)
+    # Las dos soplan casi hacia el sur: la v tiene que ser negativa en ambas.
+    assert v_a < 0 and v_b < 0
+    # Y su media tambien, que es lo que la media de angulos se cargaba.
+    assert (v_a + v_b) / 2 < 0, "interpolar el viento no puede darle la vuelta"
+    assert abs((u_a + u_b) / 2) < 0.5, "las dos componentes este-oeste se cancelan"
+
+
+def test_la_direccion_meteorologica_es_de_donde_viene():
+    """0 grados es viento DEL norte, o sea que sopla HACIA el sur."""
+    u, v = cloudmap._uv(10.0, 0.0)
+    assert abs(u) < 1e-9 and v == pytest.approx(-10.0)
+    u, v = cloudmap._uv(10.0, 270.0)      # del oeste: sopla hacia el este
+    assert u == pytest.approx(10.0) and abs(v) < 1e-9
+
+
+def test_el_viento_va_en_rejilla_gruesa_y_lleva_sus_umbrales():
+    marcas = _marcas(dt.datetime(2026, 9, 21, 12, 0, tzinfo=dt.timezone.utc), 10)
+    r = cloudmap.rejilla()
+    payload = cloudmap.montar(_respuestas(r["nx"] * r["ny"], marcas),
+                              ahora=dt.datetime(2026, 9, 21, 12, 0, tzinfo=dt.timezone.utc))
+    v = payload["viento"]
+
+    assert v["nx"] < r["nx"] and v["ny"] < r["ny"], "la rejilla del viento es mas gruesa"
+    for nombre in ("u", "v", "racha"):
+        assert len(v["campos"][nombre]) == len(payload["horas"]), nombre
+        assert all(len(h) == v["nx"] * v["ny"] for h in v["campos"][nombre]), nombre
+    # Los umbrales son los de `gates.py`, no unos inventados para el mapa.
+    from astroweather.gates import GUST_DEGRADED, GUST_CLOSE
+    assert v["umbrales"]["degradado"] == GUST_DEGRADED
+    assert v["umbrales"]["cierre"] == GUST_CLOSE
+
+
+def test_la_ida_y_vuelta_del_viento():
+    """5 m/s del este (90 grados) sopla hacia el OESTE: u negativa."""
+    marcas = _marcas(dt.datetime(2026, 9, 21, 12, 0, tzinfo=dt.timezone.utc), 3)
+    r = cloudmap.rejilla()
+    payload = cloudmap.montar(
+        _respuestas(r["nx"] * r["ny"], marcas, viento=(5.0, 90.0, 9.0)),
+        ahora=dt.datetime(2026, 9, 21, 12, 0, tzinfo=dt.timezone.utc))
+    v = payload["viento"]
+
+    u = ord(v["campos"]["u"][0][0]) - cloudmap.BASE - v["offset"]
+    w = ord(v["campos"]["v"][0][0]) - cloudmap.BASE - v["offset"]
+    racha = ord(v["campos"]["racha"][0][0]) - cloudmap.BASE
+
+    assert u == pytest.approx(-5.0, abs=1.0)
+    assert abs(w) <= 1.0
+    assert racha == pytest.approx(9.0, abs=1.0)
+
+
+def test_el_sitio_tambien_tiene_flecha():
+    """La celda de Nerpio es la 15 de 31, impar. Tomando una de cada dos desde
+    el cero, el observatorio se quedaba entre dos flechas y la que se leia como
+    suya era la de 55 km al nordeste."""
+    marcas = _marcas(dt.datetime(2026, 9, 21, 12, 0, tzinfo=dt.timezone.utc), 3)
+    r = cloudmap.rejilla()
+    payload = cloudmap.montar(_respuestas(r["nx"] * r["ny"], marcas),
+                              ahora=dt.datetime(2026, 9, 21, 12, 0, tzinfo=dt.timezone.utc))
+    v = payload["viento"]
+
+    ies = list(range(v["i0"], r["nx"], v["salto"]))
+    jotas = list(range(v["j0"], r["ny"], v["salto"]))
+    assert r["ix"] in ies, "el sitio no cae en ninguna columna de flechas"
+    assert r["iy"] in jotas, "el sitio no cae en ninguna fila de flechas"
+    assert ies[v["ix"]] == r["ix"] and jotas[v["iy"]] == r["iy"]
