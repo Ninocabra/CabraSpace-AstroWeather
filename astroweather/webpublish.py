@@ -171,11 +171,67 @@ def publicar_ahora(site: Site = NERPIO, *, root=None, repo: Path | None = None,
     return _git(repo, "rev-parse", "--short", "HEAD").stdout.strip()
 
 
+# El campo de nubes del mapa. Aparte de `noche.json` por la misma razon que
+# `ahora.json`, solo que al reves: este no cambia MAS deprisa que la noche,
+# cambia al mismo ritmo -- una pasada de modelo -- pero son 91 kB que no le
+# hacen falta a nadie que solo quiera el veredicto. Meterlo dentro habria
+# subido el fichero grande de 800 kB a 890 para quien entra desde el movil a
+# ver si puede abrir el techo.
+FICHERO_NUBES = "nubes.json"
+
+
+def publicar_nubes(site: Site = NERPIO, *, repo: Path | None = None,
+                   push: bool = True, payload: dict | None = None) -> str | None:
+    """El campo de nubes de MAPA, al repo de datos.
+
+    Misma regla de silencio que los otros dos: si el contenido no ha cambiado,
+    no se commitea. Aqui casi siempre cambiara -- es una prevision nueva -- pero
+    la comprobacion no sobra: cuando el proveedor repite pasada porque la suya
+    aun no ha salido, el fichero es identico, y un commit diciendo lo mismo es
+    ruido en un historial que existe para poder auditar que dijimos y cuando.
+    """
+    repo = repo or repo_path()
+    if repo is None:
+        return None
+
+    if payload is None:
+        from .cloudmap import build
+        payload, _gasto = build(site)
+
+    destino = repo / FICHERO_NUBES
+    if destino.exists():
+        try:
+            previo = json.loads(destino.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            previo = None
+        if previo is not None and _significant(previo) == _significant(payload):
+            return None
+
+    # Sin `indent`: son 465 caracteres por linea de campo y 49 horas por
+    # campo. Indentado esto pasa de 91 kB a mas de 300 sin anadir NADA legible
+    # -- nadie va a leer a mano una cadena de 465 caracteres -- y el repo es
+    # publico y se reescribe cuatro veces al dia.
+    destino.write_text(json.dumps(payload, ensure_ascii=False,
+                                  separators=(",", ":")), encoding="utf-8")
+    _git(repo, "add", FICHERO_NUBES)
+    if _git(repo, "diff", "--cached", "--quiet").returncode == 0:
+        return None
+    _git(repo, "commit", "-m", f"Nubes de mapa de {payload.get('generado_utc', '')}")
+    if push:
+        _git(repo, "pull", "--rebase", "--autostash")
+        subido = _git(repo, "push")
+        if subido.returncode != 0:
+            raise RuntimeError(f"nubes sin subir: {subido.stderr.strip()}")
+    return _git(repo, "rev-parse", "--short", "HEAD").stdout.strip()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, default=None)
     parser.add_argument("--nights", type=int, default=2)
     parser.add_argument("--no-push", action="store_true")
+    parser.add_argument("--nubes", action="store_true",
+                        help="publica tambien el campo de nubes del mapa")
     args = parser.parse_args()
 
     repo = args.repo or repo_path()
@@ -185,6 +241,10 @@ def main() -> None:
     commit = publish(nights=args.nights, repo=repo, push=not args.no_push)
     print(f"[webpublish] {commit}" if commit
           else "[webpublish] la prevision no ha cambiado: nada que publicar")
+    if args.nubes:
+        nubes = publicar_nubes(repo=repo, push=not args.no_push)
+        print(f"[webpublish] nubes {nubes}" if nubes
+              else "[webpublish] el campo de nubes no ha cambiado")
 
 
 if __name__ == "__main__":

@@ -1,44 +1,70 @@
-TIEMPO: empecé 09:04 — terminé 09:07
+TIEMPO: empecé 18:20 — terminé 18:24
 
-# Informe de Réplica Independiente: Calibración de WeatherNext 3
+# Informe de Entrega: Pintor del Campo de Nubes (`AWNubes`)
 
-## Ficheros producidos
-- `C:\Users\ninoc\Documents\PixInsight\CabraSpace\Astroweather Cabraspace\coop\gemini\wn_calib_replica.py`
-- `C:\Users\ninoc\Documents\PixInsight\CabraSpace\Astroweather Cabraspace\coop\gemini\resultado_replica.json`
+## 1. Criterios de Aceptación (Mediciones Reales)
 
-## Filtro de Datos
-- **Filas válidas**: 6126 (lead_day entre 1 y 5 inclusive, ecmwf no vacío, 6 columnas wn_* finitas)
-- **Noches únicas**: 174
-- **Meses**: 7 (2026-02 a 2026-08)
+Todas las mediciones se han ejecutado directamente en motor real Chromium/Blink (Microsoft Edge Headless) sobre `coop/gemini/nubes_prueba.html`.
 
-## Tabla Global de Candidatos (Fuera de muestra, Leave-One-Month-Out)
-| Candidato | n | Brier | BSS (vs Clim) | Log-Loss | AUC |
-|---|---|---|---|---|---|
-| **A_ecmwf** | 6126 | 0.12913 | 0.12292 | 0.40875 | 0.72971 |
-| **B_wn** | 6126 | **0.12224** | **0.16970** | **0.38034** | **0.78935** |
-| **C_wn_spread** | 6126 | 0.12270 | 0.16655 | 0.38099 | 0.78427 |
-| **D_blend** | 6126 | 0.12279 | 0.16595 | 0.38160 | 0.78751 |
-| **E_control** | 6126 | 0.12916 | 0.12273 | 0.40882 | 0.72943 |
+### Criterio 1: Orientación (Norte = Arriba)
+- **Configuración:** Rejilla 31×15 con 100 en la fila más al NORTE (`j = ny - 1 = 14`) y 0 en todas las demás (`j = 0..13`), sobre lienzo de 310×150.
+- **Cuarto superior (`y: 0..37`):**
+  - Alfa Máximo: **217 / 255** (cobertura 100% con `opacidadMax: 0.85` -> `round(0.85 * 255) = 217`).
+  - Alfa Media: **31.68**.
+  - Píxeles opacos (alfa > 0): **3.100** de 11.470 píxeles.
+- **Cuarto inferior (`y: 113..150`):**
+  - Alfa Máximo: **0 / 255**.
+  - Alfa Media: **0.00**.
+  - Píxeles opacos (alfa > 0): **0** de 11.470 píxeles.
+- **Resultado:** **SUPERADO (PASS)**. El norte opaco queda arriba y el sur queda completamente limpio/transparente.
 
-*Climatología de referencia fuera de muestra: Brier_clim = 0.14722.*
+### Criterio 2: Hueco ≠ Despejado
+- **Configuración:** Rejilla 31×15 con el campo entero a `null` sobre lienzo de 310×150.
+- **Celdas y huecos reportados:**
+  - `celdas`: **465**
+  - `huecos`: **465** (se cumple `huecos === nx * ny`).
+- **Opacidad del lienzo:**
+  - Píxeles con alfa > 0: **11.624** de 46.500 (exactamente el **25.0%** del lienzo, correspondiente a la trama diagonal de 2 px de trazo cada 8 px).
+  - Alfa de la trama: **46 / 255** (correspondiente exacto a `rgba(207, 171, 74, 0.18)` -> `round(0.18 * 255) = 46`).
+- **Resultado:** **SUPERADO (PASS)**. Los huecos se contabilizan y el lienzo no queda transparente, mostrando la trama dorada.
 
-## Bootstrap por Noches (2000 rondas, default_rng(11)) de la Diferencia de Brier
-*(Negativo = el primer modelo es MEJOR)*
+### Criterio 3: Control Negativo y Discriminación
+- **Configuración:** Rejilla 31×15 con campo entero a 3 (por debajo del umbral por defecto 8) sobre lienzo de 310×150.
+- **Control negativo (campo = 3, umbral = 8):**
+  - Píxeles con alfa > 0: **0** (Alfa Máximo: 0).
+- **Prueba de discriminación (campo = 50, umbral = 8):**
+  - Píxeles con alfa > 0: **46.500** de 46.500 (100% del lienzo con velo).
+  - Alfa Máximo: **99 / 255** (`(50 - 8)/92 * 0.85 * 255 = 99`).
+- **Resultado:** **SUPERADO (PASS)**. No pinta nada por debajo del umbral y discrimina inmediatamente al superar el umbral.
 
-| Comparación | Valor Puntual | IC 95% (p2.5 - p97.5) | Frac. rondas < 0 | Conclusión |
-|---|---|---|---|---|
-| **B - A** | **-0.00689** | [-0.01262, -0.00128] | **0.9910** (99.1%) | B_wn supera contundentemente a A_ecmwf |
-| **D - A** | **-0.00634** | [-0.01207, -0.00057] | **0.9845** (98.5%) | D_blend supera a A_ecmwf |
-| **D - B** | **+0.00055** | [+0.00013, +0.00106] | **0.0030** (0.3%) | D_blend es PEOR que B_wn (añadir ECMWF resta precisión) |
-| **C - B** | **+0.00046** | [-0.00071, +0.00172] | **0.2410** (24.1%) | C_wn_spread no mejora a B_wn |
-| **E - A** | **+0.00003** | [-0.00001, +0.00008] | **0.0890** (8.9%) | Control negativo confirma nula aportación de ruido permutado |
+### Criterio 4: Coste y Rendimiento
+- **Configuración:** Rejilla 31×15 (465 celdas) sobre lienzo de 920×518 (476.560 píxeles) con gradientes continuos y huecos sintéticos.
+- **Tiempo medido en primera pasada (devuelto por `AWNubes.pintar`):** **12.20 ms**.
+- **Serie de 10 pasadas consecutivas (`performance.now`):**
+  - Media: **5.39 ms**
+  - Mínimo: **4.60 ms**
+  - Máximo: **8.60 ms**
+- **Tope contractual:** 30 ms.
+- **Resultado:** **SUPERADO (PASS)**. Se sitúa entre 5 y 12 ms, muy por debajo del límite de 30 ms.
 
-## Coeficientes con todos los datos filtrados
-- **B_wn**: `z = 3.68786 - 3.48501 * wn_mean - 0.05709 * L`
-- **D_blend**: `z = 3.69864 - 3.67755 * wn_mean + 0.18864 * ecmwf - 0.05734 * L`
+---
 
-## Lectura de Resultados
-1. WeatherNext 3 calibrado (`B_wn`) supera claramente y con alta significación estadística a ECMWF (`A_ecmwf`), reduciendo el Brier score en -0.00689 (IC 95%: [-0.01262, -0.00128], 99.1% de rondas bootstrap favorables), aumentando el BSS de 0.1229 a 0.1697 y el AUC de 0.7297 a 0.7893.
-2. La combinación de ambos modelos (`D_blend`) no mejora a WeatherNext en solitario; al contrario, empeora el Brier score (`D-B` = +0.00055, IC 95%: [+0.00013, +0.00106], con únicamente un 0.3% de rondas bootstrap a favor del blend), lo que indica que ECMWF actúa como ruido colineal fuera de muestra.
-3. Incorporar el spread ensamble (`C_wn_spread`) tampoco proporciona ventajas sobre la media directa (`C-B` = +0.00046, con solo un 24.1% de rondas favorables), mostrando que `wn_mean` concentra toda la señal efectiva de la predicción.
-4. El control negativo (`E_control`) no supera a ECMWF (`E-A` = +0.00003, fracción < 0 del 8.9%), validando la solidez metodológica y la ausencia de filtración de datos en el diseño experimental.
+## 2. Decisiones de Diseño Fuera del Contrato Estricto
+
+1. **Definición de `celdas` vs `huecos` devueltos:**
+   Se fijó que `celdas` represente el tamaño total de la rejilla (`nx * ny = 465`) y `huecos` el conteo de elementos `null` o indefinidos dentro del array, permitiendo verificar `huecos === nx * ny` cuando no hay datos.
+2. **Mapeo geométrico de bordes (Canvas vs Rejilla):**
+   Se proyecta el intervalo continuo `0..(ancho - 1)` sobre `0..(nx - 1)` y `0..(alto - 1)` sobre `(ny - 1)..0`. Esto garantiza que los extremos del lienzo coinciden con los puntos frontera de la caja calculada por `cloudmap.py` (`(nx - 1) * paso` y `(ny - 1) * paso`).
+3. **Composición con la imagen inferior del satélite (`source-over`):**
+   `putImageData` sobrescribe los píxeles del lienzo destruyendo cualquier capa previa donde el alfa sea 0. Para comportarse como un auténtico "velo encima de la imagen de satélite", `AWNubes.pintar` genera el buffer en un canvas offscreen y lo estampa sobre `ctx` mediante `ctx.drawImage(offscreen, 0, 0)`. Si el lienzo ya contenía la imagen de satélite, ésta se conserva debajo intacta.
+4. **Patrón de trama diagonal para huecos:**
+   Se adoptó una trama diagonal a 45 grados (`(px + py) % 8 < 2`) con ancho de 2 px cada 8 px en color `rgba(207, 171, 74, 0.18)`. Proporciona visibilidad clara sin tapar el fondo. En fronteras con datos válidos, se reponderan los vecinos no nulos para que un dato faltante no tire artificialmente la cobertura a 0%.
+5. **Precomputación y optimización:**
+   Se precalculan las coordenadas y factores de interpolación horizontal para cada columna `px` antes del barrido de filas, evitando divisiones y asignaciones de objetos en el bucle caliente (518 × 920 iteraciones).
+
+---
+
+## 3. Qué NO se ha Podido Comprobar
+
+- **Superposición con satélite real en vivo:** No se ha probado con el satélite Meteosat-12 ni la barra de tiempo en ejecución web integrada (la integración corre a cargo de Claude en `Pagina Web/` según el reparto de la tarea).
+- **Navegadores obsoletos sin Canvas 2D / ES5:** Se asume soporte de Canvas 2D y ES5 (IE9+ y todos los navegadores modernos).

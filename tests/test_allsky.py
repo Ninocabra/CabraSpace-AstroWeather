@@ -90,3 +90,51 @@ def test_the_measured_ceiling_is_written_down_not_guessed():
     assert fetch_allsky.MEASURED_CAP_POINTS == 4612
     assert (fetch_allsky.DEFAULT_WINDOW_S / fetch_allsky.CADENCE_S
             < fetch_allsky.MEASURED_CAP_POINTS)
+
+# ------------------------------------------- la hora del fotograma (21-09-2026)
+
+class _Respuesta:
+    def __init__(self, cabecera):
+        self.headers = {"Last-Modified": cabecera} if cabecera else {}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def _con_cabecera(monkeypatch, cabecera):
+    monkeypatch.setattr(fetch_allsky.urllib.request, "urlopen",
+                        lambda *a, **k: _Respuesta(cabecera))
+
+
+def test_la_hora_del_fotograma_sale_de_la_camara_y_en_utc(monkeypatch):
+    """La unica razon de que esto exista: el proxy por el que la web ve la
+    imagen sella con la hora en que la BAJO el, no con la de la exposicion."""
+    _con_cabecera(monkeypatch, "Mon, 21 Sep 2026 16:46:57 GMT")
+
+    cuando = fetch_allsky.frame_utc()
+
+    assert cuando.isoformat() == "2026-09-21T16:46:57+00:00"
+    assert cuando.tzinfo is not None, "sin zona no se puede comparar con nada"
+
+
+def test_una_camara_que_no_contesta_no_inventa_una_hora(monkeypatch):
+    """Callar es correcto; una hora inventada convierte una camara congelada en
+    una camara que parece al dia."""
+    def _revienta(*a, **k):
+        raise OSError("sin ruta al host")
+    monkeypatch.setattr(fetch_allsky.urllib.request, "urlopen", _revienta)
+
+    assert fetch_allsky.frame_utc() is None
+
+
+def test_sin_cabecera_tampoco(monkeypatch):
+    _con_cabecera(monkeypatch, None)
+    assert fetch_allsky.frame_utc() is None
+
+
+def test_una_cabecera_ilegible_no_tumba_la_recogida(monkeypatch):
+    _con_cabecera(monkeypatch, "ayer por la tarde")
+    assert fetch_allsky.frame_utc() is None

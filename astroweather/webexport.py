@@ -705,7 +705,18 @@ def _sensores(site: Site, root=None) -> dict | None:
     except Exception:
         ahora = None
 
+    # La hora del fotograma de la allsky. Va aqui y no en la noche porque
+    # caduca igual que los sensores: `ahora.json` se reescribe cada pocos
+    # minutos y `noche.json` cada seis horas. Si la camara no contesta se queda
+    # a None y la pagina se calla, como con todo lo demas de este bloque.
+    try:
+        from .workers.fetch_allsky import frame_utc
+        fotograma = frame_utc()
+    except Exception:
+        fotograma = None
+
     panel = {
+        "allsky_utc": fotograma.isoformat(timespec="seconds") if fotograma else None,
         "leido_utc": (ahora.retrieved_at.isoformat(timespec="seconds")
                       if ahora else None),
         "medido_utc": (ahora.t_utc.isoformat(timespec="seconds")

@@ -1,78 +1,118 @@
-# TAREA ACTIVA — réplica independiente: curva de calibración de WeatherNext 3 (18-09-2026)
+# TAREA ACTIVA — pintor del campo de nubes (21-09-2026)
 
-Repo: `C:\Users\ninoc\Documents\PixInsight\CabraSpace\Astroweather Cabraspace`
-Escribes SOLO ficheros NUEVOS dentro de
-`C:\Users\ninoc\Documents\PixInsight\CabraSpace\Astroweather Cabraspace\coop\gemini\`.
-**Prohibido editar cualquier fichero existente del repo**, incluido el CSV de
-entrada. Claude hace el mismo cálculo por su cuenta: tu trabajo es una RÉPLICA
-INDEPENDIENTE, así que no busques ni leas scripts de Claude — solo este enunciado.
+## Contexto en dos líneas
 
-## Qué es
+La web de CabraSpace va a dejar de incrustar el mapa de Windy y a pintar **su
+propio** campo de nubes del ECMWF encima de la imagen de Meteosat-12. El motor
+ya publica ese campo (`astroweather/cloudmap.py`, hecho y con 19 tests en
+verde). Falta **el pintor**: un módulo de JavaScript puro que convierta el
+campo en píxeles.
 
-Queremos saber si WeatherNext 3 (nube total prevista) da mejores probabilidades de
-cielo despejado que el ECMWF una vez CALIBRADO cada uno con su propia logística, y
-si mezclar los dos mejora a ambos. Todo medido FUERA DE MUESTRA.
+Tú haces el pintor. La integración —el bloque, el satélite de fondo, la barra
+de tiempo— la hago yo en paralelo. Por eso el contrato de abajo es literal: si
+cambias una firma o una orientación, lo que yo escriba no encajará.
 
-## Entrada (solo lectura)
+## REGLAS DE ORO (las de siempre, y aquí importan más que nunca)
 
-`C:\Users\ninoc\Documents\PixInsight\CabraSpace\Astroweather Cabraspace\coop\datos\wn_calibracion.csv`
+- **NO edites NINGÚN fichero existente de este repo.** Ni uno.
+- **NO toques** `C:\Users\ninoc\Documents\PixInsight\CabraSpace\Pagina Web\`.
+  Ese repo no es tuyo en esta tarea; yo integro tu fichero desde `coop\gemini\`.
+- Escribes **exactamente dos ficheros nuevos**, y ninguno más:
+  - `C:\Users\ninoc\Documents\PixInsight\CabraSpace\Astroweather Cabraspace\coop\gemini\astroweather-nubes.js`
+  - `C:\Users\ninoc\Documents\PixInsight\CabraSpace\Astroweather Cabraspace\coop\gemini\nubes_prueba.html`
+- **Sin dependencias.** Nada de npm, nada de CDN, nada de módulos ES. La web es
+  JavaScript de toda la vida servido estático.
+- Aviso honesto: **el repo NO está commiteado ahora mismo** (hay trabajo mío sin
+  cerrar). Por eso lo de no tocar nada existente no es formalismo: un borrado
+  tuyo aquí no se recupera con `git checkout`.
 
-Una fila por (hora UTC con verdad de fotómetro, día de adelanto). Columnas:
-- `hour_utc`, `night` (fecha de la noche, ISO), `month` (`YYYY-MM`), `lead_day` (0..6)
-- `clear` — verdad: 1 despejado, 0 no
-- `wn_mean`, `wn_p10`, `wn_p25`, `wn_p50`, `wn_p75`, `wn_p90` — nube total de WeatherNext en %, 0-100
-- `ecmwf` — nube total del ECMWF (ifs025, pasada de N días antes) en %, vacío si no hay
-- `wn_runs` — nº de pasadas promediadas (ignórala)
+## El contrato
 
-## Filtro (exacto)
+Fichero `astroweather-nubes.js`: una IIFE al estilo del resto del sitio
+(`(function () { 'use strict'; ... })();`), compatible con ES5, que deja en
+`window.AWNubes` exactamente esto:
 
-Usa SOLO filas con `lead_day` entre 1 y 5 inclusive, `ecmwf` no vacío y las seis
-columnas `wn_*` finitas. Informa cuántas filas, noches y meses quedan.
+### `AWNubes.version`
+Cadena, por ejemplo `"1.0"`.
 
-## Candidatos (logística por máxima verosimilitud, SIN regularización)
+### `AWNubes.descodificar(cadena, codificacion)`
+- `cadena`: un texto de `nx*ny` caracteres, uno por celda.
+- `codificacion`: `{ base: 35, paso: 2, max: 50, sin_dato: "V" }` (viene dentro
+  del propio JSON; **no lo hardcodees**, úsalo).
+- Devuelve un `Array` de `nx*ny` números en 0..100, o `null` en las celdas cuyo
+  código sea `sin_dato`.
+- Regla: `porcentaje = (codigo - base) * paso`, y si `codigo - base > max`, es
+  `null`.
 
-Nubes divididas entre 100. `L` = `lead_day`. `P(clear) = sigmoid(z)`:
-- **A_ecmwf**: `z = a + b*ecmwf + c*L`
-- **B_wn**: `z = a + b*wn_mean + c*L`
-- **C_wn_spread**: `z = a + b*wn_mean + c*(wn_p90 - wn_p10) + d*L`
-- **D_blend**: `z = a + b*wn_mean + c*ecmwf + d*L`
-- **E_control**: igual que D pero con `wn_mean` PERMUTADO al azar entre filas
-  (numpy `default_rng(0).permutation`, una vez, antes de la validación). Es el
-  control negativo: no debería mejorar a A.
+### `AWNubes.pintar(ctx, opciones)`
+Dibuja el campo interpolado sobre el canvas y **devuelve**
+`{ celdas: <int>, huecos: <int>, ms: <número> }` (milisegundos medidos).
 
-## Validación
+`opciones`:
 
-Deja-un-mes-fuera: para cada `month`, ajusta con el resto de meses y predice el
-mes excluido. Todo lo que se puntúa son predicciones FUERA DE MUESTRA juntadas.
-Climatología de cada pliegue = tasa de `clear` en los meses de entrenamiento.
+| clave | qué es |
+|---|---|
+| `campo` | el array que devuelve `descodificar`, de largo `nx*ny` |
+| `nx`, `ny` | columnas y filas de la rejilla |
+| `ancho`, `alto` | tamaño del lienzo en píxeles |
+| `umbral` | por debajo de este % no se pinta nada. Por defecto **8** |
+| `opacidadMax` | alfa máxima, 0..1. Por defecto **0,85** |
 
-## Métricas (sobre las predicciones fuera de muestra juntadas)
+**LA ORIENTACIÓN ES LO ÚNICO QUE NO SE PUEDE EQUIVOCAR.** El campo va en orden
+`indice = j*nx + i`, con **`j` creciendo hacia el NORTE** e `i` hacia el ESTE.
+En un canvas la `y` crece hacia ABAJO. Por tanto la fila `j = 0` se pinta en la
+parte **inferior** del lienzo. Si lo inviertes sale un mapa especular que
+parece perfectamente plausible y que nadie detecta mirando: un cielo nublado
+por el oeste en vez de por el este sigue pareciendo un mapa.
 
-Para cada candidato, global y por `lead_day`: `n`, Brier, BSS contra la
-climatología (`1 - Brier/Brier_clim`), log-loss, AUC (con empates promediados).
+**Interpolación bilineal** de la rejilla al lienzo. La rejilla es de 39 km por
+celda sobre un mapa de 900: se tiene que ver como un campo continuo, no como
+cuadraditos.
 
-Bootstrap POR NOCHES (se remuestrean noches enteras con reemplazo, 2000 rondas,
-`default_rng(11)`) de la DIFERENCIA de Brier global: `B-A`, `D-A`, `D-B`, `C-B`,
-`E-A`. Para cada una: valor puntual, percentiles 2,5 y 97,5, y fracción de rondas
-< 0. (Negativo = el primero es MEJOR.)
+**Paleta — esto se pinta ENCIMA de una imagen de satélite, así que es un velo,
+no un relleno.** Nada de escalas arcoíris. La nube es blanco cálido,
+`rgba(232, 228, 216, a)`, con `a` creciendo con la cobertura desde `umbral`
+hasta 100 y topando en `opacidadMax`. Por debajo del umbral, alfa 0 — se tiene
+que ver el satélite limpio.
 
-Tabla de fiabilidad de B_wn y D_blend: 10 bins iguales de probabilidad prevista en
-[0,1]; por bin con n >= 20: media prevista, frecuencia observada, n.
+**UN HUECO NO ES CIELO DESPEJADO.** Las celdas `null` no se pintan como 0: van
+con una trama diagonal tenue en `rgba(207, 171, 74, 0.18)` (el oro de la
+página), para que se lea "aquí no sabemos" y no "aquí está despejado". Y van
+contadas en `huecos`.
 
-Coeficientes de B_wn y D_blend ajustados con TODOS los datos filtrados.
+## Criterios de aceptación (mídelos y pon los números)
 
-## Entrega
+Haz `nubes_prueba.html` con casos sintéticos y **ejecútalo**. Estos cuatro:
 
-1. `...\coop\gemini\wn_calib_replica.py` — script autocontenido (numpy, scipy;
-   pandas NO está instalado, no lo uses). Se ejecuta con
-   `python wn_calib_replica.py` y escribe el JSON de abajo.
-2. `...\coop\gemini\resultado_replica.json` con claves: `filtro` {filas, noches,
-   meses}, `metricas` {candidato: {global: {...}, por_lead: {"1": {...}, ...}}},
-   `bootstrap` {"B-A": {punto, p2_5, p97_5, frac_neg}, ...}, `fiabilidad`
-   {B_wn: [[prevista, observada, n], ...], D_blend: [...]}, `coeficientes`.
-3. En `...\coop\ENTREGA.md`: TIEMPO, ficheros, la tabla global de los cinco
-   candidatos, el bootstrap, y tu lectura en 3-5 frases. Cada número tiene que
-   salir de EJECUTAR el script; lo que no hayas ejecutado, "SIN COMPROBAR".
+1. **Orientación.** Campo con 100 en la fila más al NORTE (`j = ny-1`) y 0 en
+   todo lo demás. Los píxeles opacos tienen que quedar **ARRIBA**. Compruébalo
+   leyendo el alfa con `getImageData` en el cuarto superior y en el inferior, y
+   da los dos números.
+2. **Hueco ≠ despejado.** Campo entero de `null`: `huecos === nx*ny`, y el
+   lienzo **no** puede quedar totalmente transparente.
+3. **Control negativo.** Campo entero a 3 (por debajo del umbral 8): **ningún**
+   píxel con alfa > 0. Si este no lo ves fallar cuando subes el campo a 50, es
+   que no discrimina.
+4. **Coste.** Pintar una rejilla 31×15 en un lienzo de 920×518. Da los
+   milisegundos MEDIDOS. Si pasa de 30 ms, dilo, no lo escondas.
 
-Escala de honestidad: una cifra que no salga de tu ejecución y se presente como
-medida vale -3; decir "no lo he podido ejecutar" vale 0.
+## Formato de la entrega
+
+En `ENTREGA.md`, y con la regla de honestidad de siempre —número ejecutado o
+"SIN COMPROBAR", nunca supuesto presentado como medido—:
+
+1. `TIEMPO: empecé HH:MM — terminé HH:MM`
+2. Los cuatro criterios, con sus números reales.
+3. Qué decisiones tomaste que el contrato no fijaba, y por qué.
+4. Qué NO has podido comprobar.
+
+## Presupuesto
+
+**Este es el UNICO encargo de la sesión.** A Nino le queda el 4 % de su cuota
+semanal, así que no habrá un segundo. Dos consecuencias prácticas:
+
+- Si algo del contrato te parece ambiguo, **elige y déjalo escrito** en
+  `ENTREGA.md` en vez de parar a preguntar: no hay ida y vuelta.
+- Si te quedas sin tiempo a medias, entrega **lo que tengas** con los criterios
+  que SÍ hayas medido y di cuáles no. Media pieza documentada se integra; una
+  pieza entera sin entregar no existe.

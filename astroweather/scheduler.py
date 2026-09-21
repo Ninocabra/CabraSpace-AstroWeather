@@ -215,6 +215,29 @@ def _job_publish():
     return commit or "la prevision no ha cambiado"
 
 
+def _job_cloudmap():
+    """El campo de nubes del MAPA, aparte de la noche.
+
+    Trabajo propio y no un apendice de `publicar` por dos razones. Una: son
+    dos fuentes distintas -- esto son 465 puntos de Open-Meteo y aquello es el
+    archivo ya recogido -- asi que un corte del proveedor no tiene por que
+    marcar en rojo la generacion de la noche, que no lo necesita para nada.
+    Dos: el gasto se mide aqui y se deja en el log. Open-Meteo cobra por PUNTO
+    y tiene tope diario; el dia que nos corten, el log tiene que poder decir en
+    que se fue el cupo sin tener que reconstruirlo de memoria.
+    """
+    from .cloudmap import build
+    from .webpublish import publicar_nubes, repo_path
+
+    payload, gasto = build()
+    resumen = (f"{gasto['puntos']} puntos en {gasto['lotes']} lotes, "
+               f"{gasto['segundos']} s, {len(payload['horas'])} horas")
+    if repo_path() is None:
+        return f"{resumen} (sin repo de datos en esta maquina: no se publica)"
+    commit = publicar_nubes(payload=payload)
+    return f"{commit} ({resumen})" if commit else f"sin cambios ({resumen})"
+
+
 def _job_prediction():
     from .workers import archive_prediction
     return archive_prediction.run(NERPIO)
@@ -428,6 +451,10 @@ JOBS: dict[str, Trabajo] = {
     # trabajo porque construirlo cuesta 26 s y hacerlo dos veces era la mitad
     # de la pasada.
     "publicar": Trabajo(_job_publish, timedelta(hours=6)),
+    # El campo de nubes del mapa, al mismo ritmo y por la misma razon: cada
+    # 6 h es cuando hay pasada nueva del ECMWF. Pedirlo mas a menudo seria
+    # gastar cupo para volver a bajar los mismos numeros.
+    "nubes": Trabajo(_job_cloudmap, timedelta(hours=6)),
     # Y los SENSORES aparte, en cada pasada. La prevision cambia cada 6 h; los
     # sensores cambian cada minuto y son lo que mira quien entra a las nueve de
     # la noche. Diez minutos de periodo para que este vencido siempre: lo que

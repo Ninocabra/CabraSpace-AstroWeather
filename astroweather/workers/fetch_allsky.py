@@ -46,6 +46,7 @@ import math
 import ssl
 import urllib.parse
 import urllib.request
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -71,6 +72,48 @@ CADENCE_S = 15
 _CONTEXT = ssl.create_default_context()
 _CONTEXT.check_hostname = False
 _CONTEXT.verify_mode = ssl.CERT_NONE
+
+
+IMAGEN = f"{BASE}/indi-allsky/images/latest.jpg"
+
+
+# Ocho segundos y no veinte: esto cuelga del trabajo `ahora`, que pasa cada
+# diez minutos. La camara contesta en decimas cuando esta viva, asi que un tope
+# largo solo sirve para que, cuando este muerta, cada pasada se quede parada
+# esperandola. Mas vale callar la hora que retrasar los sensores.
+def frame_utc(timeout: int = 8) -> dt.datetime | None:
+    """Cuando EXPUSO la camara el fotograma que sirve ahora mismo.
+
+    Existe porque la pagina no lo puede averiguar. La imagen le llega por un
+    proxy -- el certificado de la camara es autofirmado y ningun navegador lo
+    carga --, y lo que el proxy pone en `Last-Modified` es cuando la bajo EL,
+    no cuando se expuso: medido el 21-09-2026, 16:47:06 contra 16:46:57 de la
+    camara. Nueve segundos, irrelevante... mientras todo funcione.
+
+    Y ahi esta el problema: un reloj sirve justo para cuando NO funciona. Si la
+    camara se congela, el proxy sigue bajando el mismo JPEG y sigue sellandolo
+    con la hora de ahora, asi que la pagina diria "hace 0 minutos" sobre una
+    imagen de anoche. La hora de verdad solo la puede leer quien habla con la
+    camara, y eso es el motor. Un HEAD basta: cabeceras, sin cuerpo.
+
+    Devuelve None si no contesta, y entonces la pagina se calla -- que es lo
+    que manda aqui cuando no se sabe algo.
+    """
+    peticion = urllib.request.Request(
+        IMAGEN, method="HEAD",
+        headers={"User-Agent": "astroweather/1.0 (+https://cabraspace.com)"})
+    try:
+        with urllib.request.urlopen(peticion, timeout=timeout,
+                                    context=_CONTEXT) as respuesta:
+            cabecera = respuesta.headers.get("Last-Modified")
+    except Exception:
+        return None
+    if not cabecera:
+        return None
+    try:
+        return parsedate_to_datetime(cabecera).astimezone(dt.timezone.utc)
+    except (TypeError, ValueError):
+        return None
 
 
 def fetch(window_s: int = DEFAULT_WINDOW_S, camera_id: int = 1) -> dict:

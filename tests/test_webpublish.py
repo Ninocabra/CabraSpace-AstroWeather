@@ -95,3 +95,63 @@ def test_a_directory_that_is_not_a_repo_is_not_a_repo(tmp_path, monkeypatch):
     suelto.mkdir()
     monkeypatch.setenv(webpublish.ENV_VAR, str(suelto))
     assert webpublish.repo_path() is None
+
+# ---------------------------------------------------------- el campo de nubes
+
+def _nubes(generado, celda="#"):
+    """Lo minimo que tiene forma de campo de nubes."""
+    return {
+        "generado_utc": generado,
+        "modelo": "ecmwf_ifs025",
+        "rejilla": {"paso": 0.35, "nx": 2, "ny": 1, "orden": "j*nx+i",
+                    "lon0": -2.6, "lat0": 38.1, "ix": 0, "iy": 0},
+        "horas": ["2026-09-21T15:00Z"],
+        "codificacion": {"base": 35, "paso": 2, "max": 50, "sin_dato": "V"},
+        "campos": {"total": [celda * 2]},
+    }
+
+
+def test_las_nubes_se_publican_en_su_propio_fichero(repo, monkeypatch):
+    """Aparte de `noche.json` a proposito: son 91 kB que no le hacen falta a
+    quien solo entra a ver si podra abrir el techo."""
+    monkeypatch.setattr("astroweather.cloudmap.build",
+                        lambda *a, **k: (_nubes("2026-09-21T15:00:00+00:00"), {}))
+
+    assert webpublish.publicar_nubes(repo=repo, push=False)
+    assert (repo / "nubes.json").exists()
+    assert not (repo / "noche.json").exists(), "no debe tocar la noche"
+    assert len(_commits(repo)) == 1
+
+
+def test_una_pasada_de_nubes_identica_no_deja_rastro(repo, monkeypatch):
+    """Cuando el proveedor repite pasada porque la suya aun no ha salido, el
+    campo es identico. Un commit diciendo lo mismo es ruido en un historial
+    que existe para auditar que dijimos y cuando."""
+    monkeypatch.setattr("astroweather.cloudmap.build",
+                        lambda *a, **k: (_nubes("2026-09-21T15:00:00+00:00"), {}))
+    webpublish.publicar_nubes(repo=repo, push=False)
+
+    monkeypatch.setattr("astroweather.cloudmap.build",
+                        lambda *a, **k: (_nubes("2026-09-21T21:00:00+00:00"), {}))
+    assert webpublish.publicar_nubes(repo=repo, push=False) is None
+    assert len(_commits(repo)) == 1
+
+
+def test_un_campo_que_cambio_si_deja_commit(repo, monkeypatch):
+    """El control negativo del test de arriba: si nunca lo viera en verde, no
+    sabriamos si la comparacion discrimina o si es que no commitea nunca."""
+    monkeypatch.setattr("astroweather.cloudmap.build",
+                        lambda *a, **k: (_nubes("2026-09-21T15:00:00+00:00", "#"), {}))
+    webpublish.publicar_nubes(repo=repo, push=False)
+
+    monkeypatch.setattr("astroweather.cloudmap.build",
+                        lambda *a, **k: (_nubes("2026-09-21T21:00:00+00:00", "V"), {}))
+    assert webpublish.publicar_nubes(repo=repo, push=False)
+    assert len(_commits(repo)) == 2
+
+
+def test_sin_clon_las_nubes_tampoco_fallan(tmp_path, monkeypatch):
+    """El scheduler corre en maquinas que no publican, y no publicar no es un
+    error."""
+    monkeypatch.setattr(webpublish, "repo_path", lambda: None)
+    assert webpublish.publicar_nubes() is None
