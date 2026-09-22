@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Semaforo AstroWeather - propuestas de diseno</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c0c0e; --card:#121215;
+  --gold:#cfab4a; --gold-light:#e5cc8a; --gold-border:rgba(207,171,74,.2);
+  --gold-border-muted:rgba(207,171,74,.08);
+  --tp:#f5f4f0; --ts:#9f9c94; --tm:#5e5b54;
+  --ok:#6ec177; --no:#d15f5f; --warn:#e8ad52;
+  --font:'Inter',-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tp);font-family:var(--font);
+     padding:28px 20px 80px;}
+.wrap{max-width:1000px;margin:0 auto}
+h1{font-size:1.2rem;font-weight:800;letter-spacing:-.01em;margin:0 0 4px}
+h1 span{color:var(--gold)}
+.sub{color:var(--tm);font-size:.82rem;margin:0 0 30px}
+.caso{margin:0 0 14px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.caso h2{font-size:1rem;margin:0;font-weight:700}
+.caso h2 b{color:var(--gold)}
+.caso .alto{font-size:.72rem;color:var(--tm);border:1px solid var(--gold-border-muted);
+            padding:2px 8px;border-radius:99px}
+.caso p{margin:0;flex:1 1 100%;font-size:.82rem;color:var(--ts);line-height:1.5;max-width:70ch}
+.panel{background:rgba(255,255,255,.025);border:1px solid var(--gold-border);
+       border-radius:16px;padding:20px 24px;margin:0 0 10px;overflow:hidden}
+.sep{height:52px}
+.vars{font-size:.7rem;color:var(--tm);text-transform:uppercase;letter-spacing:.07em;margin:22px 0 8px}
+.vars span{color:var(--ts);font-weight:700;margin-left:8px}
+.ab .col.hoy{border-radius:12px}
+.rot{font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--tm)}
+.num{font-variant-numeric:tabular-nums}
+
+/* ============ ACTUAL (replica aproximada) ============ */
+.old{display:flex;flex-wrap:wrap;gap:14px 34px;align-items:flex-start}
+.old .palabra{font-size:3.2rem;font-weight:700;line-height:1}
+.old .verd{max-width:340px}
+.old .verd .palabra{color:var(--ok)}
+.old .prob{margin-top:8px;font-size:.85rem;color:#888;line-height:1.5}
+.old .prob b{color:var(--ts)}
+.old .vent{font-size:.72rem;margin-top:4px;opacity:.85;color:#888}
+.old .man{align-self:flex-end;padding-bottom:4px;font-size:.78rem;line-height:1.4}
+.old .man b{display:block;color:var(--ok);font-size:1.15rem}
+.old .man .p{color:var(--tm)}
+.old .tec{max-width:260px}
+.old .tec .palabra{color:var(--ts)}
+.old .tec .de{font-size:1.5rem;color:var(--tm);font-weight:600;margin-left:10px}
+
+/* ============ A - TRES CUPULAS ============ */
+.a{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+.a .col{padding:4px 18px;display:flex;flex-direction:column;align-items:center;
+        text-align:center;position:relative}
+.a .col+.col{border-left:1px solid var(--gold-border-muted)}
+.a .col.hoy{background:radial-gradient(120% 100% at 50% 0%,rgba(207,171,74,.07),transparent 70%);
+            border-radius:12px}
+.a svg{margin:8px 0 6px}
+.a .pal{font-size:1.5rem;font-weight:800;line-height:1;letter-spacing:-.01em}
+.a .col.hoy .pal{font-size:1.9rem}
+.a .det{font-size:.74rem;color:var(--tm);margin-top:5px;line-height:1.45}
+.a .det b{color:var(--ts);font-weight:600}
+.ok{color:var(--ok)} .no{color:var(--no)} .neu{color:var(--ts)} .nd{color:var(--tm)}
+
+/* ============ A+B - TRES CUPULAS CON ANILLO ============ */
+.ab{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+.ab .col{padding:4px 18px 2px;display:flex;flex-direction:column;align-items:center;
+         text-align:center}
+.ab .col+.col{border-left:1px solid var(--gold-border-muted)}
+.ab .col.hoy{background:radial-gradient(120% 100% at 50% 0%,rgba(207,171,74,.07),transparent 70%);
+             border-radius:12px}
+.ab .col > span > svg{margin:8px 0 6px}
+.ab .halo{position:relative;display:flex;align-items:center;justify-content:center;
+          margin:9px 0 7px}
+.ab .halo .ring{position:absolute;inset:0}
+.ab .halo .d{position:relative;top:3px;line-height:0}
+.ab .pal{font-size:1.5rem;font-weight:800;line-height:1;letter-spacing:-.01em}
+.ab .col.hoy .pal{font-size:1.9rem}
+.ab .det{font-size:.74rem;color:var(--tm);margin-top:5px;line-height:1.45}
+.ab .det b{color:var(--ts);font-weight:600}
+.nota{font-size:.78rem;color:var(--ts);line-height:1.5;max-width:74ch;margin:9px 2px 0}
+
+/* ============ B - CUPULA RELOJ ============ */
+.b{display:flex;align-items:center;gap:30px;flex-wrap:wrap}
+.b .hero{position:relative;width:148px;height:148px;flex:0 0 auto;
+         display:flex;align-items:center;justify-content:center}
+.b .hero .ring{position:absolute;inset:0}
+.b .hero .dome{position:relative;top:6px}
+.b .pct{position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);
+        background:var(--bg);padding:0 8px;font-size:.92rem;font-weight:700;
+        color:var(--gold-light)}
+.b .txt{flex:1 1 220px;min-width:200px}
+.b .txt .pal{font-size:2.6rem;font-weight:800;line-height:1;letter-spacing:-.02em}
+.b .txt .vent{font-size:.88rem;color:var(--ts);margin-top:7px}
+.b .txt .vent b{color:var(--tp)}
+.b .side{flex:0 0 232px;display:flex;flex-direction:column;gap:10px;
+         border-left:1px solid var(--gold-border-muted);padding-left:22px}
+.b .mini{display:flex;align-items:center;gap:11px}
+.b .mini .tx{line-height:1.35}
+.b .mini .w{font-size:1rem;font-weight:700}
+.b .mini .d{font-size:.72rem;color:var(--tm)}
+
+/* ============ C - CINTA ============ */
+.c{display:flex;align-items:stretch;border:1px solid var(--gold-border-muted);
+   border-radius:12px;overflow:hidden;background:rgba(255,255,255,.02)}
+.c .seg{flex:1;display:flex;align-items:center;gap:12px;padding:13px 16px;
+        border-left:3px solid transparent;position:relative}
+.c .seg+.seg{box-shadow:inset 1px 0 0 var(--gold-border-muted)}
+.c .seg.hoy{flex:1.25;background:rgba(207,171,74,.05)}
+.c .seg .tx{line-height:1.3;min-width:0}
+.c .seg .w{font-size:1.18rem;font-weight:800;letter-spacing:-.01em;white-space:nowrap}
+.c .seg.hoy .w{font-size:1.45rem}
+.c .seg .d{font-size:.71rem;color:var(--tm);white-space:nowrap;overflow:hidden;
+           text-overflow:ellipsis}
+.c .seg.s-ok{border-left-color:var(--ok)}
+.c .seg.s-no{border-left-color:var(--no)}
+.c .seg.s-neu{border-left-color:#4a4a4a}
+.c .seg.s-nd{border-left-color:var(--warn)}
+
+@media(max-width:700px){
+  .a{grid-template-columns:1fr;gap:2px}
+  .a .col+.col{border-left:0;border-top:1px solid var(--gold-border-muted)}
+  .b .side{flex:1 1 100%;border-left:0;padding-left:0;
+           border-top:1px solid var(--gold-border-muted);padding-top:14px}
+  .c{flex-direction:column}
+  .c .seg+.seg{box-shadow:inset 0 1px 0 var(--gold-border-muted)}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>El semáforo de <span>hoy · mañana · ahora</span></h1>
+  <p class="sub">Las propuestas que se barajaron el 22-09-2026 para la cabecera, sobre los
+     datos reales del JSON de esa noche, cada una seguida de sus estados límite.
+     <b style="color:var(--ok)">Se implementó A+B&nbsp;·&nbsp;2</b> — tres cúpulas gemelas con el arco
+     de probabilidad pegado a la silueta en las tres. Se queda aquí como registro de lo
+     que se descartó y por qué, que es la parte que no viaja en el diff.</p>
+
+  <!-- ---------- ACTUAL ---------- -->
+  <div class="caso">
+    <h2>Lo que hay hoy</h2><span class="alto">≈ 240 px en la web real</span>
+    <p>Tres bloques apilados que se envuelven mal: la palabra «Cerrado» del estado
+       real cae a una fila propia y compite en tamaño con la previsión. Nada dibuja
+       nada: todo es tipografía grande.</p>
+  </div>
+  <div class="panel">
+    <div class="old">
+      <div class="verd">
+        <span class="rot">Previsión apertura de techo · esta noche · martes, 22 de septiembre</span>
+        <div class="palabra">Abierto</div>
+        <div class="prob"><b>74%</b> de probabilidad de que haya condiciones para abrir</div>
+        <div class="vent">ventana 04:00–06:00</div>
+      </div>
+      <div class="man">
+        <span class="rot">Mañana</span>
+        <b>Abierto</b>
+        <span class="p num">74% · miércoles, 23 de septiembre</span>
+      </div>
+      <div class="tec" style="flex:1 1 100%">
+        <span class="rot">Estado actual de techos</span>
+        <div class="palabra">Cerrado<span class="de num">0/18</span></div>
+        <div class="prob">abiertos de 18 · 06:30 UTC</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sep"></div>
+
+  <!-- ---------- A ---------- -->
+  <div class="caso">
+    <h2><b>A.</b> Tres cúpulas gemelas</h2><span class="alto">156 px medidos</span>
+    <p>Un solo renglón, tres columnas iguales en orden de tiempo: lo que pasa AHORA,
+       lo que se espera ESTA NOCHE, y MAÑANA. La cúpula es el semáforo — abierta con
+       su rendija y sus estrellas, o cerrada y apagada — y el color hace el resto.
+       La columna de esta noche lleva un halo dorado y una letra mayor: se ve de un
+       vistazo cuál manda sin romper la simetría.</p>
+  </div>
+  <div class="panel"><div class="a" id="A"></div></div>
+  <div class="vars">Estados límite</div>
+  <div class="panel"><div class="a" id="A2"></div></div>
+
+  <div class="sep"></div>
+
+  <!-- ---------- A+B ---------- -->
+  <div class="caso">
+    <h2><b>A+B.</b> Las tres cúpulas con el anillo de probabilidad</h2>
+    <p>La simetría de A con el reloj de B injertado. La clave es DÓNDE se dibuja el
+       arco, porque de eso depende lo que cuesta en alto: pegado a la silueta de la
+       cúpula cabe en el mismo hueco y no cuesta ni un píxel; alrededor, como en B,
+       aísla la columna que manda pero se lleva 50 px.</p>
+  </div>
+
+  <div class="vars">1 · arco sobre la silueta, solo en esta noche <span id="altoAB1"></span></div>
+  <div class="panel"><div class="ab" id="AB1"></div></div>
+  <p class="nota">El arco marca cuál de las tres es la decisión. «Ahora» no lleva
+     ninguno: no es una probabilidad, es un hecho, y dibujarle un arco lo disfrazaría
+     de previsión.</p>
+
+  <div class="vars">2 · arco sobre la silueta, en las tres <span id="altoAB2"></span></div>
+  <div class="panel"><div class="ab" id="AB2"></div></div>
+  <p class="nota">Más simétrico, y con una trampa que hay que mirar de frente: el arco
+     de «ahora» no es probabilidad ninguna, son los techos abiertos sobre el total
+     (0 de 18). El mismo dibujo pasa a significar dos cosas, y eso solo se sostiene
+     si el rótulo de la columna lo dice — por eso pone «techos abiertos» y no la hora.</p>
+
+  <div class="vars">3 · anillo completo alrededor, el de B <span id="altoAB3"></span></div>
+  <div class="panel"><div class="ab" id="AB3"></div></div>
+  <p class="nota">El reloj de B tal cual, repetido tres veces. Es el que más pesa
+     visualmente y el único que sube de los 200 px: la cúpula es ancha, así que el
+     círculo que la rodea tiene que ser tan alto como ella de ancha.</p>
+
+  <div class="vars">Estados límite (sobre la variante del arco)</div>
+  <div class="panel"><div class="ab" id="AB4"></div></div>
+
+  <div class="sep"></div>
+
+  <!-- ---------- B ---------- -->
+  <div class="caso">
+    <h2><b>B.</b> Cúpula-reloj</h2><span class="alto">148 px medidos</span>
+    <p>Una sola cúpula grande para esta noche, con el 74 % dibujado como arco
+       alrededor: la probabilidad deja de ser un número suelto y pasa a ser cuánto
+       da la vuelta el anillo. A la derecha, separadas por una línea, las dos cosas
+       que son contexto y no decisión: lo que el observatorio hace ahora y lo que
+       vendrá mañana, cada una con su cúpula en miniatura.</p>
+  </div>
+  <div class="panel"><div class="b" id="B"></div></div>
+  <div class="vars">Estado límite: noche cerrada y techos sin dato</div>
+  <div class="panel"><div class="b" id="B2"></div></div>
+
+  <div class="sep"></div>
+
+  <!-- ---------- C ---------- -->
+  <div class="caso">
+    <h2><b>C.</b> Cinta de estado</h2><span class="alto">94 px medidos</span>
+    <p>La opción más agresiva en espacio: una sola barra partida en tres, con la
+       cúpula reducida a glifo y un filo de color a la izquierda de cada tramo.
+       Se lee como la barra de estado de un instrumento — de un vistazo y sin
+       detenerse — y deja toda la página para la franja horaria y el mapa de nubes,
+       que es donde está la información fina.</p>
+  </div>
+  <div class="panel" style="padding:14px 16px"><div class="c" id="C"></div></div>
+  <div class="vars">Estados límite</div>
+  <div class="panel" style="padding:14px 16px"><div class="c" id="C2"></div></div>
+  <div class="panel" style="padding:14px 16px;margin-top:10px"><div class="c" id="C3"></div></div>
+</div>
+
+<script>
+/* ---------- La cúpula. Un solo dibujo para los tres diseños ----------
+   estado: 'abierto' | 'cerrado' | 'sindato'.  El color lo pone quien llama
+   (currentColor), porque "cerrado de día" es normal y "cerrado de noche"
+   previsto es malo: el mismo dibujo, distinto color. */
+function cupula(estado, size, gauge){
+  var s = size, op = estado === 'abierto';
+  var relleno = op ? .16 : .11;
+  var g = '<svg width="'+s+'" height="'+(s*0.875)+'" viewBox="0 0 64 56" fill="none">';
+  /* EL ARCO QUE SIGUE A LA PROPIA SILUETA. Radio 28 sobre el casquete de 22:
+     cabe en el mismo viewBox, asi que el anillo de probabilidad NO cuesta ni
+     un pixel de alto -- que es lo que hacia caro injertar el reloj de B. */
+  if (gauge){
+    var L = Math.PI * 28;
+    g += '<path d="M4 46A28 28 0 0 1 60 46" stroke="rgba(255,255,255,.13)" stroke-width="3.4" stroke-linecap="round"/>';
+    if (gauge.pct !== null){
+      g += '<path d="M4 46A28 28 0 0 1 60 46" stroke="'+gauge.color+'" stroke-width="3.4"'+
+           ' stroke-linecap="round" stroke-dasharray="'+L+'"'+
+           ' stroke-dashoffset="'+(L*(1-gauge.pct/100))+'" opacity=".92"/>';
+    }
+  }
+  // suelo
+  g += '<rect x="3" y="46" width="58" height="4.5" rx="2.2" fill="currentColor" opacity=".55"/>';
+  // casquete
+  g += '<path d="M10 46a22 22 0 0 1 44 0z" fill="currentColor" opacity="'+relleno+'"/>';
+  g += '<path d="M10 46a22 22 0 0 1 44 0" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>';
+  if (op){
+    // rendija abierta: hueco oscuro + dos hojas retiradas + cielo dentro
+    g += '<path d="M27 30.5a5 5 0 0 1 10 0V46H27z" fill="#08080a"/>';
+    g += '<path d="M27 30.5a5 5 0 0 1 10 0V46" stroke="currentColor" stroke-width="1.6" opacity=".9"/>';
+    g += '<circle cx="31" cy="35" r="1" fill="#fff" opacity=".9"/>';
+    g += '<circle cx="34.2" cy="40.5" r=".8" fill="#fff" opacity=".65"/>';
+    g += '<circle cx="30" cy="43" r=".7" fill="#fff" opacity=".45"/>';
+    // las hojas corridas, a los lados
+    g += '<path d="M21.5 34.5V46M42.5 34.5V46" stroke="currentColor" stroke-width="1.5" opacity=".45"/>';
+  } else if (estado === 'cerrado'){
+    // costura central cerrada
+    g += '<path d="M32 24v22" stroke="currentColor" stroke-width="1.6" opacity=".5"/>';
+  } else {
+    // sin dato: la cúpula en trazo discontinuo, ni abierta ni cerrada
+    g += '<path d="M32 24v22" stroke="currentColor" stroke-width="1.6" opacity=".35" stroke-dasharray="3 3"/>';
+    g += '<text x="32" y="43" text-anchor="middle" font-size="16" font-weight="800" fill="currentColor" opacity=".8" font-family="Inter,sans-serif">?</text>';
+  }
+  return g + '</svg>';
+}
+
+var CLS = {abierto:'ok', cerrado:'no', neutro:'neu', sindato:'nd'};
+
+/* ---------- A ---------- */
+function colA(rot, estado, color, palabra, det, hoy){
+  return '<div class="col'+(hoy?' hoy':'')+'">'+
+    '<span class="rot">'+rot+'</span>'+
+    '<span class="'+color+'">'+cupula(estado, hoy?74:62)+'</span>'+
+    '<div class="pal '+color+'">'+palabra+'</div>'+
+    '<div class="det">'+det+'</div></div>';
+}
+document.getElementById('A').innerHTML =
+  colA('Ahora · 06:30 UTC','cerrado','neu','Cerrado','<b class="num">0</b> de 18 techos',false)+
+  colA('Esta noche · mar 22','abierto','ok','Abierto','<b class="num">74%</b> · ventana <b class="num">04:00–06:00</b>',true)+
+  colA('Mañana · mié 23','abierto','ok','Abierto','<b class="num">74%</b> · ventana <b class="num">22:00–00:00</b>',false);
+
+document.getElementById('A2').innerHTML =
+  colA('Ahora · 03:10 UTC','abierto','ok','Abierto','<b class="num">14</b> de 18 techos',false)+
+  colA('Esta noche · mar 22','cerrado','no','Cerrado','<b class="num">18%</b> · sin ventana de 2 h',true)+
+  colA('Ahora · sin respuesta','sindato','nd','—','a ciegas desde las <b class="num">21:40</b>',false);
+
+/* ---------- A+B ----------
+   El anillo de B injertado en la simetria de A. Dos formas de dibujarlo:
+   siguiendo la silueta de la cupula (no cuesta alto) o como anillo completo
+   alrededor (cuesta ~50 px y aisla la columna que manda). */
+function anillo(px, pct, color, dash){
+  var r = px/2 - 3, c = 2*Math.PI*r, off = c*(1-(pct||0)/100);
+  return '<svg class="ring" viewBox="0 0 '+px+' '+px+'">'+
+    '<circle cx="'+px/2+'" cy="'+px/2+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,.07)"'+
+      ' stroke-width="4"'+(dash?' stroke-dasharray="4 5"':'')+'/>'+
+    (pct===null?'':'<circle cx="'+px/2+'" cy="'+px/2+'" r="'+r+'" fill="none" stroke="'+color+'"'+
+      ' stroke-width="4" stroke-linecap="round" stroke-dasharray="'+c+'"'+
+      ' stroke-dashoffset="'+off+'" transform="rotate(-90 '+px/2+' '+px/2+')" opacity=".92"/>')+
+    '</svg>';
+}
+var VERDE='#6ec177', ROJO='#d15f5f', GRIS='#7c786f';
+
+/* Columna con el arco pegado a la silueta: mismo alto que la A pelada. */
+function colArco(rot, estado, color, hex, pct, palabra, det, hoy){
+  var dome = hoy ? 82 : 66;
+  var g = (pct === undefined) ? null : {pct: pct, color: hex};
+  return '<div class="col'+(hoy?' hoy':'')+'">'+
+    '<span class="rot">'+rot+'</span>'+
+    '<span class="'+color+'">'+cupula(estado, dome, g)+'</span>'+
+    '<div class="pal '+color+'">'+palabra+'</div>'+
+    '<div class="det">'+det+'</div></div>';
+}
+/* Columna con el anillo completo alrededor, como en B. */
+function colAnillo(rot, estado, color, hex, pct, palabra, det, hoy){
+  var px = hoy ? 108 : 88, dome = hoy ? 68 : 54;
+  return '<div class="col'+(hoy?' hoy':'')+'">'+
+    '<span class="rot">'+rot+'</span>'+
+    '<div class="halo" style="width:'+px+'px;height:'+px+'px">'+
+      anillo(px, pct, hex, estado==='sindato')+
+      '<span class="d '+color+'">'+cupula(estado, dome)+'</span>'+
+    '</div>'+
+    '<div class="pal '+color+'">'+palabra+'</div>'+
+    '<div class="det">'+det+'</div></div>';
+}
+
+/* 1 - arco solo en esta noche */
+document.getElementById('AB1').innerHTML =
+  colArco('Ahora · 06:30 UTC','cerrado','neu',GRIS,undefined,'Cerrado','<b class="num">0</b> de 18 techos',false)+
+  colArco('Esta noche · mar 22','abierto','ok',VERDE,74,'Abierto','<b class="num">74%</b> · ventana <b class="num">04:00–06:00</b>',true)+
+  colArco('Mañana · mié 23','abierto','ok',VERDE,undefined,'Abierto','<b class="num">74%</b> · ventana <b class="num">22:00–00:00</b>',false);
+
+/* 2 - arco en las tres; el de "ahora" son techos abiertos, no probabilidad */
+document.getElementById('AB2').innerHTML =
+  colArco('Ahora · techos abiertos','cerrado','neu',GRIS,0,'Cerrado','<b class="num">0</b> de 18 techos',false)+
+  colArco('Esta noche · mar 22','abierto','ok',VERDE,74,'Abierto','<b class="num">74%</b> · ventana <b class="num">04:00–06:00</b>',true)+
+  colArco('Mañana · mié 23','abierto','ok',VERDE,74,'Abierto','<b class="num">74%</b> · ventana <b class="num">22:00–00:00</b>',false);
+
+/* 3 - anillo completo, el de B */
+document.getElementById('AB3').innerHTML =
+  colAnillo('Ahora · 06:30 UTC','cerrado','neu',GRIS,null,'Cerrado','<b class="num">0</b> de 18 techos',false)+
+  colAnillo('Esta noche · mar 22','abierto','ok',VERDE,74,'Abierto','<b class="num">74%</b> · ventana <b class="num">04:00–06:00</b>',true)+
+  colAnillo('Mañana · mié 23','abierto','ok',VERDE,74,'Abierto','<b class="num">74%</b> · ventana <b class="num">22:00–00:00</b>',false);
+
+/* 4 - estados limite sobre la variante del arco */
+document.getElementById('AB4').innerHTML =
+  colArco('Ahora · techos abiertos','abierto','ok',VERDE,78,'Abierto','<b class="num">14</b> de 18 techos',false)+
+  colArco('Esta noche · mar 22','cerrado','no',ROJO,18,'Cerrado','<b class="num">18%</b> · sin ventana de 2 h',true)+
+  colArco('Ahora · sin respuesta','sindato','nd',GRIS,null,'—','a ciegas desde las <b class="num">21:40</b>',false);
+
+['AB1','AB2','AB3'].forEach(function(id){
+  var e = document.getElementById('alto'+id);
+  if (e) e.textContent = Math.round(document.getElementById(id).getBoundingClientRect().height)+' px';
+});
+
+/* ---------- B ---------- */
+function arco(pct, color){
+  var r = 67, c = 2*Math.PI*r, off = c*(1-pct/100);
+  return '<svg class="ring" viewBox="0 0 148 148">'+
+    '<circle cx="74" cy="74" r="'+r+'" stroke="rgba(255,255,255,.07)" stroke-width="5" fill="none"/>'+
+    (pct===null?'':'<circle cx="74" cy="74" r="'+r+'" stroke="'+color+'" stroke-width="5" fill="none"'+
+      ' stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'"'+
+      ' transform="rotate(-90 74 74)" opacity=".9"/>')+
+    '</svg>';
+}
+function mini(rot, estado, color, w, d){
+  return '<div class="mini"><span class="'+color+'">'+cupula(estado,34)+'</span>'+
+    '<div class="tx"><span class="rot">'+rot+'</span>'+
+    '<div class="w '+color+'">'+w+'</div><div class="d">'+d+'</div></div></div>';
+}
+function panelB(estado, color, colorHex, pct, palabra, vent, minis){
+  return '<div class="hero">'+arco(pct, colorHex)+
+      '<span class="dome '+color+'">'+cupula(estado,104)+'</span>'+
+      (pct===null?'':'<span class="pct num">'+pct+'%</span>')+
+    '</div>'+
+    '<div class="txt"><span class="rot">Previsión de techo · esta noche · mar 22 sep</span>'+
+      '<div class="pal '+color+'">'+palabra+'</div>'+
+      '<div class="vent">'+vent+'</div></div>'+
+    '<div class="side">'+minis+'</div>';
+}
+document.getElementById('B').innerHTML = panelB('abierto','ok','#6ec177',74,'Abierto',
+  'Ventana <b class="num">04:00 – 06:00</b>',
+  mini('Ahora · 06:30 UTC','cerrado','neu','Cerrado <span class="num" style="font-size:.85em;color:var(--tm)">0/18</span>','ningún techo abierto en el observatorio')+
+  mini('Mañana · mié 23','abierto','ok','Abierto','<span class="num">74%</span> · ventana <span class="num">22:00–00:00</span>'));
+
+document.getElementById('B2').innerHTML = panelB('cerrado','no','#d15f5f',18,'Cerrado',
+  'Ninguna ventana de <b>2 h</b> llega al 50 %',
+  mini('Ahora · sin respuesta','sindato','nd','—','a ciegas desde las <span class="num">21:40 UTC</span>')+
+  mini('Mañana · mié 23','abierto','ok','Abierto','<span class="num">61%</span> · ventana <span class="num">01:00–03:00</span>'));
+
+/* ---------- C ---------- */
+function segC(cls, rot, estado, color, w, d, hoy){
+  return '<div class="seg '+cls+(hoy?' hoy':'')+'">'+
+    '<span class="'+color+'" style="flex:0 0 auto">'+cupula(estado, hoy?40:32)+'</span>'+
+    '<div class="tx"><span class="rot">'+rot+'</span>'+
+    '<div class="w '+color+'">'+w+'</div><div class="d">'+d+'</div></div></div>';
+}
+document.getElementById('C').innerHTML =
+  segC('s-neu','Ahora','cerrado','neu','Cerrado <span class="num" style="font-size:.8em;color:var(--tm)">0/18</span>','06:30 UTC')+
+  segC('s-ok','Esta noche · mar 22','abierto','ok','Abierto','<span class="num">74%</span> · ventana <span class="num">04:00–06:00</span>',true)+
+  segC('s-ok','Mañana · mié 23','abierto','ok','Abierto','<span class="num">74%</span> · <span class="num">22:00–00:00</span>');
+
+document.getElementById('C2').innerHTML =
+  segC('s-ok','Ahora','abierto','ok','Abierto <span class="num" style="font-size:.8em;color:var(--tm)">14/18</span>','03:10 UTC')+
+  segC('s-no','Esta noche · mar 22','cerrado','no','Cerrado','<span class="num">18%</span> · sin ventana de 2 h',true)+
+  segC('s-ok','Mañana · mié 23','abierto','ok','Abierto','<span class="num">61%</span> · <span class="num">01:00–03:00</span>');
+
+document.getElementById('C3').innerHTML =
+  segC('s-nd','Ahora · no responde','sindato','nd','—','a ciegas desde las 21:40 UTC')+
+  segC('s-ok','Esta noche · mar 22','abierto','ok','Abierto','<span class="num">93%</span> · ventana <span class="num">21:00–23:00</span>',true)+
+  segC('s-no','Mañana · mié 23','cerrado','no','Cerrado','<span class="num">12%</span> · sin ventana de 2 h');
+</script>
+</body>
+</html>

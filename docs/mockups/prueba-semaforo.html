@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<!-- BANCO DE PRUEBAS DEL SEMAFORO de la cabecera (22-09-2026).
+
+     Intercepta el fetch del JSON publico y le mete los casos limite, que es la
+     unica forma de VER en rojo una casilla que en la vida real sale verde: los
+     techos de Nerpio salen cerrados de dia y la prevision sale abierta casi
+     siempre, asi que una regresion en el estado de caida puede vivir meses en
+     la pagina sin que nadie la note. Aqui se ven los cinco en un minuto.
+
+     VIVE EN EL REPO DEL MOTOR Y NO EN EL DE LA WEB a proposito: la carpeta de
+     la web se publica entera, y esto no es para nadie de fuera. Por eso carga
+     el CSS y el JS por URL absoluta contra el servidor local de la web, y hace
+     falta tener los dos levantados: "mockups" en 8731 (sirve esta carpeta) y
+     "web" en 8766 (sirve `../Pagina Web`), ambos en .claude/launch.json.
+
+       ?caso=normal        lo que haya ahora mismo, sin tocar
+       ?caso=sindato       los techos dejan de responder y hay lectura vieja
+       ?caso=nuncahubo     los techos no han respondido nunca en esta pasada
+       ?caso=cerrada       14/18 abiertos y la noche cerrada al 18%, sin ventana
+       ?caso=sinveredicto  el motor no manda `veredicto_abrir`: sale la cifra
+       ?caso=solouna       el JSON trae una sola noche, sin manana
+       &lang=en            la misma pagina en ingles                          -->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prueba semaforo</title>
+  <link rel="stylesheet" href="http://localhost:8766/index.css">
+  <link rel="stylesheet" href="http://localhost:8766/astroweather.css">
+  <style>body{padding:20px}.aw-section{padding:20px 0 0}</style>
+</head>
+<body>
+  <p id="cual" style="color:#cfab4a;font:700 14px Inter,sans-serif"></p>
+  <section class="aw-section">
+    <div id="astroweather" class="aw-panel" data-lang="es"></div>
+  </section>
+  <script>
+    var CASO = new URLSearchParams(location.search).get('caso') || 'normal';
+    document.getElementById('cual').textContent = 'caso: ' + CASO;
+    document.getElementById('astroweather').setAttribute(
+      'data-lang', new URLSearchParams(location.search).get('lang') === 'en' ? 'en' : 'es');
+
+    var original = window.fetch;
+    window.fetch = function (url, opts) {
+      var u = String(url);
+      if (u.indexOf('ahora.json') >= 0 && CASO !== 'normal') {
+        // El bloque fresco se retira: asi manda el de dentro de noche.json,
+        // que es donde el caso esta amanado.
+        return Promise.resolve({ ok: false, status: 404 });
+      }
+      if (u.indexOf('noche.json') < 0) { return original(url, opts); }
+      return original(url, opts).then(function (r) {
+        return r.json().then(function (d) {
+          var sen = d.sensores || (d.sensores = {});
+          if (CASO === 'sindato') {
+            delete sen.techos_total; delete sen.techos_abiertos;
+            sen.del_archivo = { techos: '2026-09-21T21:40:00+00:00' };
+          } else if (CASO === 'nuncahubo') {
+            delete sen.techos_total; delete sen.techos_abiertos;
+            delete sen.del_archivo;
+          } else if (CASO === 'cerrada') {
+            sen.techos_abiertos = 14; sen.techos_total = 18;
+            d.noches[0].probabilidad_de_abrir = 0.18;
+            d.noches[0].veredicto_abrir.abierto = false;
+            delete d.noches[0].veredicto_abrir.ventana;
+          } else if (CASO === 'sinveredicto') {
+            delete d.noches[0].veredicto_abrir;
+            delete d.noches[1].veredicto_abrir;
+          } else if (CASO === 'solouna') {
+            d.noches = [d.noches[0]];
+          }
+          return { ok: true, status: 200, json: function () { return Promise.resolve(d); } };
+        });
+      });
+    };
+  </script>
+  <script src="http://localhost:8766/astroweather-dome.js"></script>
+  <script src="http://localhost:8766/astroweather-nubes.js"></script>
+  <script src="http://localhost:8766/astroweather.js"></script>
+</body>
+</html>
