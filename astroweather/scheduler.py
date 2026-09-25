@@ -91,12 +91,12 @@ def _job_ensemble():
 def _job_weathernext():
     """WeatherNext 3 de las 00Z y 12Z, las pasadas que gano el examen.
 
-    DONDE CORRE Y POR QUE. El 17-09-2026 Google tiene concedido el acceso a la
-    cuenta de Nino, no al proyecto: la cuenta de servicio del runner entra y
-    recibe "asset not found". Se ha pedido acceso para ella
-    (weathernext@google.com, 17-09-2026) y mientras tanto esto recoge en el
-    escritorio; en el runner no hay credenciales y el trabajo SE SALTA DICIENDOLO,
-    que no es lo mismo que fallar en silencio ni que fallar cada media hora.
+    DONDE CORRE Y POR QUE. Hasta el 25-09-2026 solo la cuenta de Nino tenia
+    acceso y esto recogia en el escritorio. Ese dia Google concedio acceso a la
+    cuenta de servicio `astroweather-runner` (clave en el secreto
+    EE_SERVICE_ACCOUNT_KEY) y el runner recoge aunque el PC este apagado. Una
+    maquina sin credenciales SE SALTA DICIENDOLO, que no es lo mismo que fallar
+    en silencio ni que fallar cada media hora.
 
     Y no vuelve a pedir una pasada que ya esta archivada: el periodo de 12 h y
     la inicializacion mas reciente completa no van sincronizados, asi que sin
@@ -107,12 +107,13 @@ def _job_weathernext():
     if fetch_weathernext.credentials_source() is None:
         logger.info("weathernext  se salta: esta maquina no tiene credenciales "
                     "de Earth Engine (acceso de la cuenta de servicio pedido "
-                    "el 17-09-2026)")
+                    "el 17-09-2026, concedido el 25-09-2026)")
         return 0
 
     import ee
 
-    project = os.getenv("GOOGLE_CLOUD_PROJECT", "astroweather-cabra")
+    # An unset GitHub secret arrives as "", not as missing.
+    project = os.getenv("GOOGLE_CLOUD_PROJECT") or "astroweather-cabra"
     fetch_weathernext.initialize(ee, project)
     ultima = fetch_weathernext.latest_complete_init(
         ee, WEATHERNEXT_HOURS, datetime.now(timezone.utc),

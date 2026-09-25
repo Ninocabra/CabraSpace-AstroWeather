@@ -216,11 +216,10 @@ jobs:
     env:
       ASTROWEATHER_ARCHIVE_REPO: ${{ github.workspace }}/archivo
       ASTROWEATHER_DATA_REPO: ${{ github.workspace }}/datos
-      # WeatherNext 3: vacios hasta que Google conceda acceso a la cuenta de
-      # servicio (pedido el 17-09-2026). Sin ellos el trabajo se salta diciendolo
-      # en el log -- `credentials_source()` no toca la red -- y mientras tanto
-      # recoge el escritorio. NO se ponen en la comprobacion de secretos de
-      # abajo: faltar es el estado normal hoy, no un fallo.
+      # WeatherNext 3: Google concedio acceso a la cuenta de servicio el
+      # 25-09-2026 y la clave esta en EE_SERVICE_ACCOUNT_KEY. Sin ella el trabajo
+      # se salta diciendolo en el log. GOOGLE_CLOUD_PROJECT puede faltar: el
+      # scheduler usa astroweather-cabra por defecto.
       GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
       EE_SERVICE_ACCOUNT_KEY: ${{ secrets.EE_SERVICE_ACCOUNT_KEY }}
       AEMET_API_KEY: ${{ secrets.AEMET_API_KEY }}
