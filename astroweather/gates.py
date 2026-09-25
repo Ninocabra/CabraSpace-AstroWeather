@@ -70,11 +70,16 @@ class SafetyVerdict:
 
 
 def _rain_risk(precipitation: float | None, probability: float | None,
-               observed_rain: bool | None, hours_ahead: float) -> Risk:
+               observed_rain: bool | None, hours_ahead: float,
+               precipitation_model: str | None = None) -> Risk:
     """Rain, weighted by what can actually be known at that horizon."""
     if observed_rain:
         return Risk("lluvia", "blocked", "el sensor local está detectando lluvia")
     if precipitation is not None and precipitation > 0.1:
+        # WeatherNext's millimetres are its raw data, which its terms do not
+        # let us republish: the verdict is ours, the number stays in.
+        if precipitation_model and precipitation_model.startswith("weathernext"):
+            return Risk("lluvia", "blocked", "precipitación prevista (WeatherNext)")
         return Risk("lluvia", "blocked", f"precipitación prevista {precipitation:.1f} mm")
     if probability is not None and probability > PRECIP_PROBABILITY_LIMIT:
         # Far out, a high probability is a warning; close in, it is a decision.
@@ -118,10 +123,12 @@ def evaluate(*, t_utc: datetime, hours_ahead: float,
              precipitation_probability: float | None = None,
              cape: float | None = None,
              observed_rain: bool | None = None,
-             hardware_ok: bool = True) -> SafetyVerdict:
+             hardware_ok: bool = True,
+             precipitation_model: str | None = None) -> SafetyVerdict:
     """Safety verdict for one hour, with the reason attached to every risk."""
     risks = [
-        _rain_risk(precipitation, precipitation_probability, observed_rain, hours_ahead),
+        _rain_risk(precipitation, precipitation_probability, observed_rain, hours_ahead,
+                   precipitation_model),
         _wind_risk(gust),
         _storm_risk(cape, precipitation_probability, hours_ahead),
     ]

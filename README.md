@@ -202,6 +202,16 @@ de éste (`../AstroWeather-Data`), o donde diga `ASTROWEATHER_DATA_REPO`. En una
 máquina que no lo tenga, no publica y no falla. **El raw de terceros no se
 republica**: ver SPEC §7.1.
 
+## Datos de terceros y atribución
+
+**WeatherNext 3 (Google DeepMind)**, accedido a través de **Google Earth Engine**.
+Se usa para la probabilidad de cielo despejado de las noches siguientes a la de
+hoy, para la lluvia de las puertas de seguridad cuando su pasada es la más
+reciente, y en el marcador y la calibración que comparan proveedores. Sus
+valores crudos no se publican (términos de uso, sección 3): solo lo derivado.
+
+> © 2024-6 Google LLC, whose machine learning models were used to create the experimental data made available under the following licence terms https://storage.googleapis.com/weathernext-public/terms-of-use.pdf. This data is intended for experimental modelling only and is not intended, validated, or approved for real world use.
+
 ## Reglas de la casa
 
 - **El raw nunca se sobrescribe.** Cada predicción conserva raw → física → calibrado

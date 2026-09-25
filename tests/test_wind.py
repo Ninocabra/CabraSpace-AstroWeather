@@ -87,7 +87,7 @@ def test_la_correccion_medida_llega_a_la_puerta(monkeypatch):
                         lambda root=None: {"factor": 2.0, "applied": True})
 
     fila = (dt.datetime(2026, 9, 1, 22, tzinfo=dt.timezone.utc), 10.0, 3.0, 6.0,
-            0.0, 0.0, 0.0, 6)
+            0.0, 0.0, 0.0, 6, "ecmwf_ifs")
     monkeypatch.setattr(tonight, "_forecast_rows", lambda *a, **k: [fila])
     tonight.report(dt.datetime(2026, 9, 1, 12, tzinfo=dt.timezone.utc))
 
@@ -111,7 +111,7 @@ def test_sin_pares_suficientes_no_se_corrige_nada(monkeypatch):
     monkeypatch.setattr(tonight, "wind_correction",
                         lambda root=None: {"factor": 1.0, "applied": False})
     fila = (dt.datetime(2026, 9, 1, 22, tzinfo=dt.timezone.utc), 10.0, 3.0, 6.0,
-            0.0, 0.0, 0.0, 6)
+            0.0, 0.0, 0.0, 6, "ecmwf_ifs")
     monkeypatch.setattr(tonight, "_forecast_rows", lambda *a, **k: [fila])
     tonight.report(dt.datetime(2026, 9, 1, 12, tzinfo=dt.timezone.utc))
     assert vistos[0] == pytest.approx(6.0)

@@ -17,6 +17,8 @@ import datetime as dt
 from dataclasses import dataclass
 
 from .roofcalibration import load_calibrator
+from .calibration import (WEATHERNEXT_LEAD_DAYS, WEATHERNEXT_MODEL, Calibrator,
+                          model_path)
 from .ephem import moon_illumination, moon_positions, night_for
 from .verification import wind_correction
 from .gates import (SafetyVerdict, evaluate, opening_probability, opening_window,
@@ -34,6 +36,10 @@ class HourForecast:
     moon_altitude: float
     safety: SafetyVerdict
     calibrated: bool
+    # Which model the cloud (and so the probability) came from. The web needs
+    # it: WeatherNext's raw cloud cannot be republished (its terms of use,
+    # section 3), only what is derived from it.
+    cloud_model: str | None = None
 
     @property
     def limiting(self) -> str:
@@ -58,6 +64,10 @@ class NightReport:
     moon_illumination: float
     dark_hours: float
     calibration_note: str
+    cloud_model: str | None = None
+    # What the probability was calibrated against: "techo" (the real roof) or
+    # "fotometro" (a clear sky). WeatherNext's curve is the photometer one.
+    cloud_truth: str | None = None
 
     @property
     def usable_hours(self) -> float:
@@ -150,7 +160,8 @@ def _safety_rows(connection, site: Site, start: dt.datetime, end: dt.datetime):
                arg_max(precipitation, k),
                arg_max(prob_precip,   k),
                arg_max(cape,          k),
-               arg_max(model,         k) FILTER (WHERE gust10m IS NOT NULL)
+               arg_max(model,         k) FILTER (WHERE gust10m IS NOT NULL),
+               arg_max(model,         k) FILTER (WHERE precipitation IS NOT NULL)
         FROM f
         GROUP BY valid_utc
     """, [site.site_id, start, end]).fetchall()
@@ -195,16 +206,17 @@ def _forecast_rows(site: Site, start: dt.datetime, end: dt.datetime, root=None,
     seguridad = _safety_rows(connection, site, start, end)
     salida = []
     for valid, cloud, lead in nubes:
-        viento, racha, precip, pprec, cape, _modelo = seguridad.get(
-            valid, (None, None, None, None, None, None))
-        salida.append((valid, cloud, viento, racha, precip, pprec, cape, lead))
+        viento, racha, precip, pprec, cape, _modelo, modelo_lluvia = seguridad.get(
+            valid, (None,) * 7)
+        salida.append((valid, cloud, viento, racha, precip, pprec, cape, lead,
+                       modelo_lluvia))
     return salida
 
 
 def safety_source(site: Site, start: dt.datetime, end: dt.datetime, root=None):
-    """De que modelo salio la racha, para poder declararlo. None si no hay."""
-    modelos = {f[5] for f in _safety_rows(connect(root), site, start, end).values()
-               if f[5]}
+    """De que modelos salieron la racha y la lluvia, para poder declararlo."""
+    modelos = {m for f in _safety_rows(connect(root), site, start, end).values()
+               for m in (f[5], f[6]) if m}
     return sorted(modelos)
 
 
@@ -220,7 +232,26 @@ def report(day: dt.datetime | None = None, site: Site = NERPIO, root=None) -> Ni
     # venia del retroanalisis de `ecmwf_ifs025`: dos mallas distintas del mismo
     # proveedor, y una correccion medida sobre la otra.
     wanted = calibrator.trained_on_model if calibrator else None
-    rows = _forecast_rows(site, night.window_start, night.window_end, root, wanted)
+    cloud_model = wanted
+    cloud_truth = getattr(calibrator, "truth", "fotometro") if calibrator else None
+    rows = []
+    # WEATHERNEXT, PARA LAS NOCHES DE DESPUES. Decidido el 25-09-2026 con el
+    # examen del 18-09-2026 delante: calibrado, bate al ECMWF calibrado a 1-5
+    # dias (Brier -0,0069, AUC 0,789 frente a 0,730). Esta noche NO: a dia 0 no
+    # hubo ECMWF del mismo alcance contra el que medirlo, y la pasada mas fresca
+    # de WeatherNext (unas 7 h de retraso) casi siempre cae en dia 0. Su curva
+    # es contra el FOTOMETRO, no contra el techo -- con el techo solo hay ~20
+    # noches -- y la noche lo declara en `cloud_truth`.
+    wn_calibrator = _weathernext_calibrator(night, now, site, root)
+    if wn_calibrator is not None:
+        rows = [r for r in _forecast_rows(site, night.window_start, night.window_end,
+                                          root, WEATHERNEXT_MODEL)
+                if r[7] is not None and int(r[7]) // 24 in WEATHERNEXT_LEAD_DAYS]
+        if rows:
+            calibrator, cloud_model, cloud_truth = (
+                wn_calibrator, WEATHERNEXT_MODEL, "fotometro")
+    if not rows:
+        rows = _forecast_rows(site, night.window_start, night.window_end, root, wanted)
     mismatch = None
     if wanted and not rows:
         rows = _forecast_rows(site, night.window_start, night.window_end, root)
@@ -249,15 +280,20 @@ def report(day: dt.datetime | None = None, site: Site = NERPIO, root=None) -> Ni
     factor = float(correccion.get("factor", 1.0) or 1.0)
 
     hours: list[HourForecast] = []
-    for valid, cloud, wind, gust, precipitation, probability, cape, lead in rows:
+    for (valid, cloud, wind, gust, precipitation, probability, cape, lead,
+         precipitation_model) in rows:
         hours_ahead = max(0.0, (valid - now).total_seconds() / 3600)
         verdict = evaluate(
             t_utc=valid, hours_ahead=hours_ahead,
             gust=(gust * factor if gust is not None else None),
             precipitation=precipitation, precipitation_probability=probability,
-            cape=cape,
+            cape=cape, precipitation_model=precipitation_model,
         )
-        clear = (calibrator.probability(cloud, hours_ahead) if calibrator else None)
+        # WeatherNext's curve was fitted on the run's own lead, not on the
+        # distance from now: that is the covariate it has to be fed.
+        curve_lead = (lead if cloud_model == WEATHERNEXT_MODEL and lead is not None
+                      else hours_ahead)
+        clear = (calibrator.probability(cloud, curve_lead) if calibrator else None)
         hours.append(HourForecast(
             t_utc=valid,
             cloud_total=cloud,
@@ -267,6 +303,7 @@ def report(day: dt.datetime | None = None, site: Site = NERPIO, root=None) -> Ni
             moon_altitude=moon[valid].altitude if valid in moon else 0.0,
             safety=verdict,
             calibrated=calibrator is not None,
+            cloud_model=cloud_model,
         ))
 
     if calibrator is None:
@@ -281,6 +318,9 @@ def report(day: dt.datetime | None = None, site: Site = NERPIO, root=None) -> Ni
         note = (f"probabilidad calibrada con {calibrator.trained_on} pares "
                 f"(BSS sobre climatología: "
                 f"{(1 - calibrator.brier / calibrator.brier_climatology) * 100:+.1f} %)")
+    if cloud_model == WEATHERNEXT_MODEL:
+        note += ("\n  nubes de WeatherNext 3 (Google DeepMind), calibradas contra el "
+                 "fotómetro (cielo despejado), no contra el techo")
     if mismatch:
         # Se dice, no se esconde: una probabilidad calibrada sobre otro modelo
         # sigue siendo mejor que ninguna, pero deja de ser lo que promete.
@@ -295,7 +335,19 @@ def report(day: dt.datetime | None = None, site: Site = NERPIO, root=None) -> Ni
         moon_illumination=moon_illumination(night.dusk_astronomical or night.night),
         dark_hours=night.dark_hours,
         calibration_note=note,
+        cloud_model=cloud_model,
+        cloud_truth=cloud_truth,
     )
+
+
+def _weathernext_calibrator(night, now: dt.datetime, site: Site, root=None):
+    """WeatherNext's own curve for a night after tonight, or None."""
+    if night.night == night_for(now, site).night:
+        return None
+    curve = Calibrator.load(model_path(WEATHERNEXT_MODEL, root))
+    if curve is None or curve.trained_on_model != WEATHERNEXT_MODEL:
+        return None
+    return curve
 
 
 def render(night_report: NightReport) -> str:

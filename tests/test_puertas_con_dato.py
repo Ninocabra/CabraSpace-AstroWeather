@@ -53,7 +53,7 @@ class _Conexion:
 def archivo(monkeypatch):
     """Nube del modelo calibrado; racha y CAPE de OTRO modelo, como en la vida."""
     nubes = [(HORA, 5.0, 12.0)]                       # valid, cloud_total, lead_h
-    seguridad = [(HORA, 1.2, 9.0, 0.0, 5.0, 2500.0, "ecmwf_ifs")]
+    seguridad = [(HORA, 1.2, 9.0, 0.0, 5.0, 2500.0, "ecmwf_ifs", "ecmwf_ifs")]
     monkeypatch.setattr(tonight, "connect",
                         lambda root=None: _Conexion(nubes, seguridad))
 
@@ -61,7 +61,7 @@ def archivo(monkeypatch):
 def test_la_racha_llega_aunque_venga_de_otro_modelo(archivo):
     filas = tonight._forecast_rows(NERPIO, INICIO, FIN, None, "ecmwf_ifs025")
     assert len(filas) == 1
-    valid, nube, viento, racha, precip, pprec, cape, lead = filas[0]
+    valid, nube, viento, racha, precip, pprec, cape, lead, modelo_lluvia = filas[0]
     assert nube == 5.0, "la nube sigue saliendo del modelo calibrado"
     assert racha == 9.0, "la racha tiene que llegar aunque la publique otro modelo"
     assert cape == 2500.0

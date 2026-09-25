@@ -60,9 +60,12 @@ def _hour(hour, serie: dict | None = None, site: Site | None = None) -> dict:
     ausente, filas que faltan -- la hora sale como salia. Esto aniade
     resolucion, no la sustituye.
     """
+    # La nube cruda de WeatherNext NO se publica: sus terminos solo permiten
+    # difundir lo derivado (la probabilidad, el veredicto), no el dato.
+    cruda_publicable = not (getattr(hour, "cloud_model", None) or "").startswith("weathernext")
     salida = {
         "t_utc": hour.t_utc.isoformat(),
-        "nubes_previstas": hour.cloud_total,
+        "nubes_previstas": hour.cloud_total if cruda_publicable else None,
         "p_despejado": (round(hour.clear_probability, 3)
                         if hour.clear_probability is not None else None),
         "p_utilizable": round(hour.usable_probability, 3),
@@ -127,7 +130,31 @@ def _veredicto_abrir(probabilidad: float, ventana=None) -> dict:
     }
 
 
-def _definicion_probabilidad() -> str:
+# LA CITA QUE EXIGE WEATHERNEXT. Sus terminos de uso (seccion 4(b), version
+# del 03-09-2026) piden, al publicar algo derivado de sus datos o resultados
+# obtenidos con ellos, citar el producto de Google por el que se accede y este
+# texto literal. Viaja SIEMPRE en el JSON: el marcador y la curva usan
+# WeatherNext aunque una noche concreta salga del ECMWF.
+WEATHERNEXT_TERMS_URL = "https://storage.googleapis.com/weathernext-public/terms-of-use.pdf"
+WEATHERNEXT_CITATION = (
+    "WeatherNext 3, accedido a través de Google Earth Engine. "
+    "\u00a9 2024-6 Google LLC, whose machine learning models were used to create "
+    "the experimental data made available under the following licence terms "
+    + WEATHERNEXT_TERMS_URL + ". This data is intended for experimental modelling "
+    "only and is not intended, validated, or approved for real world use.")
+
+
+def _atribucion() -> list[dict]:
+    return [{"fuente": "WeatherNext 3 (Google DeepMind), vía Google Earth Engine",
+             "uso": ("probabilidad de cielo despejado de las noches siguientes a la "
+                     "de hoy y, cuando su pasada es la mas reciente, la lluvia de "
+                     "las puertas de seguridad. No se publican sus valores: solo "
+                     "lo derivado de ellos."),
+             "cita": WEATHERNEXT_CITATION,
+             "terminos": WEATHERNEXT_TERMS_URL}]
+
+
+def _definicion_probabilidad(truth: str | None = None) -> str:
     """Que significa EXACTAMENTE el numero, y depende de contra que se calibro.
 
     Con la curva del techo (roofcalibration.py) la probabilidad por hora ES la
@@ -139,7 +166,8 @@ def _definicion_probabilidad() -> str:
              "cero si una puerta de seguridad la bloquea. Para la noche se toma la "
              "hora más floja de la mejor ventana de DOS horas seguidas: una sola "
              "hora buena a las 03 no abre una noche.")
-    if getattr(load_calibrator(), "truth", "fotometro") == "techo":
+    truth = truth or getattr(load_calibrator(), "truth", "fotometro")
+    if truth == "techo":
         return ("Probabilidad de que el techo de Nerpio esté ABIERTO a esa hora "
                 "dada la nube prevista, calibrada contra lo que el observatorio "
                 "hizo de verdad: 31 meses de horas abiertas y las noches de techo "
@@ -262,7 +290,12 @@ def _night(day: dt.datetime, site: Site, root=None, *,
         # Que significa EXACTAMENTE la probabilidad de arriba, dentro del JSON:
         # sin esto, "probabilidad de que la noche sea utilizable" se lee como
         # "probabilidad de que abran el techo", y no es eso.
-        "probabilidad_definicion": _definicion_probabilidad(),
+        "probabilidad_definicion": _definicion_probabilidad(night_report.cloud_truth),
+        # De que modelo sale la nube de ESTA noche y contra que se calibro: a
+        # partir de manana puede ser WeatherNext contra el fotometro, y hoy el
+        # ECMWF contra el techo. Dos noches, dos significados de "probabilidad".
+        "modelo_nubes": night_report.cloud_model,
+        "verdad_terreno": night_report.cloud_truth,
         "mejor_ventana": ({"desde": window[0].isoformat(),
                            "hasta": window[1].isoformat(),
                            "p_media": round(window[2], 3)} if window else None),
@@ -976,6 +1009,7 @@ def build(site: Site = NERPIO, *, nights: int = 2, root=None) -> dict:
             "altitud_m": site.site_elevation,
         },
         "noches": salidas,
+        "atribucion": _atribucion(),
         # Lo que los sensores del sitio dicen AHORA. No es prevision y no se
         # mezcla con ella: va con su antiguedad delante para que la pagina
         # pueda apagar un numero viejo en vez de ensenarlo como si fuera de
