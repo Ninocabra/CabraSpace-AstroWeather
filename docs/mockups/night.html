@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>Noche de Nerpio</title>
+<title>La noche en AstroCamp</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -229,7 +229,7 @@
 
 <div class="app">
   <header>
-    <h1>Noche de Nerpio</h1>
+    <h1>La noche en AstroCamp</h1>
     <span class="night-of" id="nightOf"></span>
     <button class="btn" id="switchNight"></button>
     <span class="site" id="site"></span>
@@ -297,7 +297,7 @@
       </div>
 
       <div class="card">
-        <h2>Ahora mismo en Nerpio</h2>
+        <h2>Ahora mismo en AstroCamp</h2>
         <div class="stat"><span class="k">Temperatura</span><span class="v" id="vT"></span></div>
         <div class="stat"><span class="k">Humedad</span><span class="v" id="vRh"></span></div>
         <div class="stat"><span class="k">Punto de rocío</span><span class="v" id="vDew"></span></div>
@@ -937,7 +937,7 @@ function detailPanel(lane){
     <h3>Hora a hora</h3>
     <p class="note" style="margin:0 0 6px">«Fondo de cielo» es el brillo del cielo
       <em>en la posición del objeto</em>, en magnitudes por segundo de arco al cuadrado:
-      cuanto MÁS alto, más oscuro. 21,7 es el suelo natural de Nerpio; 18 es Luna llena.
+      cuanto MÁS alto, más oscuro. 21,7 es el suelo natural de AstroCamp; 18 es Luna llena.
       Cada magnitud perdida cuesta ×2,5 de exposición para el mismo resultado.</p>
     <table class="hours"><thead><tr><th>hora</th><th>alt</th><th>hacia</th>
       <th>fondo de cielo</th><th>Luna</th><th>nube</th><th>rinde</th>
@@ -1098,7 +1098,7 @@ function renderReadings(){
 
 function fillStatic(){
   document.getElementById('nightOf').textContent =
-    `${DATA.label} · ${DATA.night} · ${DATA.dark_hours} h de oscuridad · hora local de Nerpio`;
+    `${DATA.label} · ${DATA.night} · ${DATA.dark_hours} h de oscuridad · hora local de AstroCamp`;
   document.getElementById('switchNight').textContent =
     'Ver ' + NIGHTS[(ni + 1) % NIGHTS.length].label.toLowerCase();
   document.getElementById('site').textContent = DATA.site.name;
