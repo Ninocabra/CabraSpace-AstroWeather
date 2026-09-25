@@ -39,11 +39,6 @@ CODIGO = RAIZ / "astroweather"
 FUERA = {
     "apscheduler": "el planificador de proceso vivo; el colector no planifica",
     "photutils": "solo el pipeline de FWHM, que corre a mano sobre FITS en disco",
-    "ee": "earthengine-api, solo fetch_weathernext. El trabajo `weathernext` SI "
-          "esta en JOBS desde el 17-09-2026, pero corre en el escritorio: Google "
-          "concedio WeatherNext a la cuenta de Nino y no a la cuenta de servicio "
-          "del runner, que recibe 'asset not found'. Acceso para ella PEDIDO el "
-          "17-09-2026; cuando llegue, se declara aqui y se quita de FUERA",
 }
 
 
@@ -69,7 +64,7 @@ def _declarados() -> set[str]:
 def _distribucion(modulo: str) -> str:
     """El nombre con el que se instala el modulo, normalizado."""
     normal = modulo.lower().replace("-", "_")
-    return ALIAS.get(normal, normal)
+    return ALIAS.get(normal, normal).replace("-", "_")
 
 
 def _importados() -> dict[str, set[str]]:

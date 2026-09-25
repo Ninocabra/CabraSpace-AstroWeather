@@ -7,15 +7,6 @@
 #                planifica: mira que esta vencido y lo hace (`colector.py`).
 #   photutils    solo lo usa el pipeline de FWHM, que corre a mano sobre FITS
 #                que ya estan en disco y por eso esta fuera del scheduler.
-#   ee           earthengine-api, que solo importa `fetch_weathernext`
-#                (dentro de `run`, no arriba). Gano el examen del 17-09-2026 y
-#                el trabajo `weathernext` ya esta en JOBS, pero AQUI NO CORRE:
-#                Google concedio el acceso a la cuenta de Nino, no a la cuenta
-#                de servicio, que entra y recibe "asset not found". Sin
-#                credenciales el trabajo se salta diciendolo (scheduler.py).
-#                Acceso para la cuenta de servicio PEDIDO el 17-09-2026 a
-#                weathernext@google.com; cuando llegue, se declara aqui, se
-#                quita de FUERA y el workflow pasa EE_SERVICE_ACCOUNT_KEY.
 #
 # Las versiones van fijadas por MINOR (`~=`) y son las que corren en el
 # escritorio: sin fijar, una version nueva de astropy o de numpy cambia numeros
@@ -24,6 +15,10 @@
 astropy~=8.0
 cdsapi~=0.7.7
 duckdb~=1.5.5
+# WeatherNext 3 (`fetch_weathernext`). Fuera del colector del 17 al 25-09-2026:
+# Google solo habia dado acceso a la cuenta de Nino. El 25-09-2026 lo concedio a
+# la cuenta de servicio y el trabajo corre aqui con EE_SERVICE_ACCOUNT_KEY.
+earthengine-api~=1.7.43
 # Lo que lee el NetCDF de CAMS dentro del zip (`fetch_aerosol.dust_rows`).
 # Estuvo sin declarar del 27-08 al 01-09-2026 y costo SEIS DIAS sin
 # especies de aerosol: el escritorio lo tenia instalado, el runner no, y
