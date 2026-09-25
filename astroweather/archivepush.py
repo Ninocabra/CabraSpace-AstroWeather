@@ -65,7 +65,7 @@ BUNDLED = ("astrocamp_cloudhtml", "astrocamp_allsky")
 SKIPPED = {
     "tess_stars289": "37 MB recuperables con `python -m astroweather.workers."
                      "fetch_tess`, y sus valores ya viajan en measurements/",
-    # Decidido por Nino el 17-09-2026: de WeatherNext sube solo lo canonico.
+    # Decidido el 17-09-2026: de WeatherNext sube solo lo canonico.
     "weathernext_ee": "39 MB del backfill ene-sep 2026 recuperables con `python -m "
                       "astroweather.workers.fetch_weathernext --init-time ...` mientras "
                       "Earth Engine los sirva; sus nubes ya viajan en forecasts/, y si "
@@ -73,7 +73,7 @@ SKIPPED = {
 }
 
 # Canonico que no sube pasada a pasada sino UN FICHERO POR MES CERRADO
-# (decidido por Nino el 17-09-2026). WeatherNext escribe 864 filas por pasada
+# (decidido el 17-09-2026). WeatherNext escribe 864 filas por pasada
 # con decimales de sobra: 50 kB sueltos, 25,6 MB el backfill de ene-sep 2026.
 # Redondeado en el worker y juntado por mes, marzo pasa de 3.043 kB a 443 kB y
 # el backfill a 3,6 MB, con el AUC del examen igual hasta el cuarto decimal.
@@ -124,7 +124,7 @@ def repo_path(repo: Path | None = None) -> Path | None:
 # Sin ventana de consola. `pythonw.exe` no tiene consola, asi que Windows le
 # CREA una a cada proceso de consola que arranque: con el scheduler local en
 # marcha, cada pasada abria un parpadeo de ventanas de git cada diez minutos, y
-# el 31-08-2026 acabo siendo lo primero que Nino pregunto al ver la pantalla.
+# el 31-08-2026 acabo siendo lo primero que se pregunto al ver la pantalla.
 # `getattr` y no `subprocess.CREATE_NO_WINDOW` a secas: la bandera no existe
 # fuera de Windows, y esto corre tambien en el runner de Actions, que es Linux.
 SIN_VENTANA = getattr(subprocess, "CREATE_NO_WINDOW", 0)

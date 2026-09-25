@@ -338,7 +338,7 @@ PROVEEDORES → RAW ARCHIVE → NORMALIZACIÓN → QC → MODELOS FÍSICOS → C
 
 1. ✅ Esquema §4.1 versionado + raw archive. 2. ✅ Workers base con invariantes §3.2: `fetch_ensemble` (**miembros EPS desde la primera ejecución**) y `fetch_forecast` (híbrido 9 km + perfiles 4 modelos). 3. Backfill determinista (Previous Runs). 4. `fetch_tess` (histórico ~7 años → Parquet) + scraper cloud.html. 5. **Pipeline FWHM** (FITS → estrellas → FWHM robusta + excentricidad → plate-solve → cenit/λ → QC → Parquet, con `setup_id`) — cada noche sin él es irrecuperable. 6. Panel de verificación mínimo. 7. Verificaciones pendientes: ✅ AEMET (hecha: sin histórico horario, con estación 7067Y a 11,5 km), credenciales BDRC, campo exacto del CloudWatcher en cloud.html, semántica de capas de nubes por proveedor contra allsky.
 
-**Deuda con fecha: la clave de AEMET caduca el 2026-12-05** — regenerar en opendata.aemet.es y avisar a Nino el **2026-11-21**.
+**Deuda con fecha: la clave de AEMET caduca el 2026-12-05** — regenerar en opendata.aemet.es; aviso el **2026-11-21**.
 
 ## 6.2 Rodajas (cada una con ficha de fuente + backup probado apagando la primaria + lane visual + enchufe al aprendizaje + tests; DoD: pintado con datos reales + backup demostrado + verificación en el panel)
 

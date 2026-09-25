@@ -4,7 +4,7 @@
 
 > **SUSTITUIDO (27-08-2026): la especificacion vigente es `astroweather_cabraspace_v8_SPEC.md` (+ `CHANGELOG.md`). Este fichero queda como archivo historico — contiene texto normativo obsoleto detectado en auditoria; NO implementar desde aqui.**
 >
-> **v7 — DOCUMENTO MAESTRO para auditoría cruzada (27-08-2026):** consolida la especificación v6 (íntegra, capítulos 1–8) con el **plan de implementación (§9)** acordado con Nino: catálogo de parámetros de cara al usuario, desarrollo por **rodajas verticales** sobre un **tronco común de datos** (Fase 0), el trío *fuente fiable + backup + aprendizaje* por parámetro, la especificación del **sistema visual** (lienzo nocturno sobre la orografía de AstroCamp), la **predicción de apertura del techo**, y la regla *"se muestra la noche, se archiva el día"*. Añade la Guía para el auditor externo (§0). **Este documento es la base de todo lo demás: se somete a auditoría cruzada (Gemini + ChatGPT) y se cierran las objeciones ANTES de escribir código.**
+> **v7 — DOCUMENTO MAESTRO para auditoría cruzada (27-08-2026):** consolida la especificación v6 (íntegra, capítulos 1–8) con el **plan de implementación (§9)** acordado: catálogo de parámetros de cara al usuario, desarrollo por **rodajas verticales** sobre un **tronco común de datos** (Fase 0), el trío *fuente fiable + backup + aprendizaje* por parámetro, la especificación del **sistema visual** (lienzo nocturno sobre la orografía de AstroCamp), la **predicción de apertura del techo**, y la regla *"se muestra la noche, se archiva el día"*. Añade la Guía para el auditor externo (§0). **Este documento es la base de todo lo demás: se somete a auditoría cruzada (Gemini + ChatGPT) y se cierran las objeciones ANTES de escribir código.**
 >
 > **v6 — rediseño de producto tras auditoría externa cruzada (ChatGPT, 27-08-2026), contrastada y verificada empíricamente ANTES de aplicar (las afirmaciones de la auditoría se comprobaron contra las APIs reales; dos se confirmaron, una se corrigió):**
 >
@@ -1244,7 +1244,7 @@ Cada parámetro del catálogo se implementa con estos cinco pasos, en este orden
 
 ## 9.5 El sistema visual: lienzo nocturno sobre la orografía de AstroCamp
 
-Concepto (de Nino): **profundo pero muy visual** — nada de tablas como primera cara. Especificación:
+Concepto: **profundo pero muy visual** — nada de tablas como primera cara. Especificación:
 
 - **El lienzo ES la noche**: eje X de ocaso−1h a orto+1h (§9.7). Abajo, la **silueta real de la sierra** vista desde AstroCamp (generable desde el DEM MDT05/SRTM con el horizonte de 720 bins de §1.3.4 — la misma máscara sirve para el motor de targets y para el dibujo).
 - **El cielo del lienzo se pinta con mag_sky** (de negro profundo a gris azulado) y sobre él el **arco real de la Luna** con su % de iluminación.
@@ -1269,7 +1269,7 @@ Producto: «¿Se abrirá el techo esta noche?» con probabilidad. Composición: 
 
 1. **Repo `CabraSpace-AstroWeather`** separado (el motor+API; la web CabraSpace solo consume `GET /api/v1/…` — la frontera del repo calca la frontera de la arquitectura §4). La página que sustituye a Astrofotografía → Astro Forecast vive en CabraSpace-Web y no se fusiona hasta que la API sirva en real (sin ventana rota).
 2. **`CATALOGO_PARAMETROS.md`** — la tabla §9.1 extendida a documento vivo (una sección por parámetro con su ficha de fuente).
-3. **Mockup SVG** del lienzo nocturno, tres estados (§9.5) → se pacta el visual con Nino.
+3. **Mockup SVG** del lienzo nocturno, tres estados (§9.5) → se pacta el visual.
 4. **Fase 0** completa (§9.2) — desde ese día, todo se archiva.
 5. **Rodaja 1 (Noche+Luna)** y sucesivas por el orden de §9.4, cada una con su DoD.
 

@@ -67,7 +67,7 @@ def test_the_photometer_raw_is_the_one_thing_left_behind(datos, repo):
 
 
 def test_weathernext_raw_stays_home_and_its_rows_travel(datos, repo):
-    """Nino, 17-09-2026: de WeatherNext sube solo lo canonico."""
+    """17-09-2026: de WeatherNext sube solo lo canonico."""
     archivepush.collect(datos, repo, today="20260829")
 
     assert not (repo / "raw" / "site=nerpio" / "source=weathernext_ee").exists()
@@ -141,7 +141,7 @@ def _pasada(raiz, mes, stamp, horas, tag="weathernext3"):
 
 
 def test_weathernext_runs_travel_as_one_file_per_closed_month(tmp_path, repo):
-    """Nino, 17-09-2026: sueltas en este disco, un fichero por mes cerrado."""
+    """17-09-2026: sueltas en este disco, un fichero por mes cerrado."""
     import pyarrow.parquet as pq
     raiz = tmp_path / "data"
     _pasada(raiz, 8, 0, 6)

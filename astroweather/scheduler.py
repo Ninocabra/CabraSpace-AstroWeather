@@ -91,7 +91,7 @@ def _job_ensemble():
 def _job_weathernext():
     """WeatherNext 3 de las 00Z y 12Z, las pasadas que gano el examen.
 
-    DONDE CORRE Y POR QUE. Hasta el 25-09-2026 solo la cuenta de Nino tenia
+    DONDE CORRE Y POR QUE. Hasta el 25-09-2026 solo una cuenta de usuario tenia
     acceso y esto recogia en el escritorio. Ese dia Google concedio acceso a la
     cuenta de servicio `astroweather-runner` (clave en el secreto
     EE_SERVICE_ACCOUNT_KEY) y el runner recoge aunque el PC este apagado. Una
@@ -299,7 +299,7 @@ def _job_credentials():
             logger.error("CADUCADA: %s vencio el %s. Renovar y actualizar .env",
                          name, expiry)
         elif remaining <= WARN_DAYS_BEFORE:
-            logger.warning("AVISO A NINO: %s caduca el %s (quedan %d dias). "
+            logger.warning("AVISO: %s caduca el %s (quedan %d dias). "
                            "Renovar en opendata.aemet.es y actualizar .env",
                            name, expiry, remaining)
         else:

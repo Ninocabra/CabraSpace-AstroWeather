@@ -307,7 +307,7 @@ def select_complete_init(
 
 # Where the credentials come from, in order. A service account is what the
 # ephemeral runner would need, but on 17-09-2026 Google had granted WeatherNext
-# to Nino's user account only: `astroweather-runner@astroweather-cabra` signs in
+# to a personal user account only: `astroweather-runner@astroweather-cabra` signs in
 # and then gets "asset not found (does not exist or caller does not have
 # access)". Access for it is REQUESTED (weathernext@google.com, 17-09-2026);
 # until it arrives this job runs on the desktop with the user credentials that

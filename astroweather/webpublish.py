@@ -61,7 +61,7 @@ def _significant(payload: dict) -> str:
 # Sin ventana de consola. `pythonw.exe` no tiene consola, asi que Windows le
 # CREA una a cada proceso de consola que arranque: con el scheduler local en
 # marcha, cada pasada abria un parpadeo de ventanas de git cada diez minutos, y
-# el 31-08-2026 acabo siendo lo primero que Nino pregunto al ver la pantalla.
+# el 31-08-2026 acabo siendo lo primero que se pregunto al ver la pantalla.
 # `getattr` y no `subprocess.CREATE_NO_WINDOW` a secas: la bandera no existe
 # fuera de Windows, y esto corre tambien en el runner de Actions, que es Linux.
 SIN_VENTANA = getattr(subprocess, "CREATE_NO_WINDOW", 0)

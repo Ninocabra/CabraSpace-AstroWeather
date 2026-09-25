@@ -89,7 +89,7 @@ def test_the_warning_arrives_with_time_to_act(monkeypatch, caplog):
     monkeypatch.setattr(scheduler, "date", Soon)
     with caplog.at_level("WARNING"):
         scheduler._job_credentials()
-    assert any("AVISO A NINO" in record.message for record in caplog.records)
+    assert any("AVISO: " in record.message for record in caplog.records)
 
 
 def test_an_expired_key_is_an_error_not_a_warning(monkeypatch, caplog):

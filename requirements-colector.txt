@@ -16,7 +16,7 @@ astropy~=8.0
 cdsapi~=0.7.7
 duckdb~=1.5.5
 # WeatherNext 3 (`fetch_weathernext`). Fuera del colector del 17 al 25-09-2026:
-# Google solo habia dado acceso a la cuenta de Nino. El 25-09-2026 lo concedio a
+# Google solo habia dado acceso a una cuenta de usuario. El 25-09-2026 lo concedio a
 # la cuenta de servicio y el trabajo corre aqui con EE_SERVICE_ACCOUNT_KEY.
 earthengine-api~=1.7.43
 # Lo que lee el NetCDF de CAMS dentro del zip (`fetch_aerosol.dust_rows`).

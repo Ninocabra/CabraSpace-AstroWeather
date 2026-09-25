@@ -1,6 +1,6 @@
 """Which forecast actually gets this sky right, scored against what we measured.
 
-The question is Nino's: with several providers predicting the same night, which
+The question: with several providers predicting the same night, which
 one matches the sensors? Nothing here is new physics; it is bookkeeping that has
 to be started EARLY, because a scoreboard can only score what was archived while
 it was running.

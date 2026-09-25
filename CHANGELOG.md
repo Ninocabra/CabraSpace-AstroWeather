@@ -57,7 +57,7 @@ Sustituido por una prueba de cobertura sobre 60 realizaciones.
 
 ## 08-09-2026 — El PM2.5 de AstroCamp, leido de un PNG
 
-Nino pregunto si el numero de particulas en suspension de la pagina de
+La pregunta era si el numero de particulas en suspension de la pagina de
 AstroCamp tiene que ver con la calima. **Medido sobre nuestro archivo** (22.752
 horas, feb-2024 -> sep-2026): correlacionados pero no lo mismo. PM2.5 contra
 AOD total r = +0,67; contra el polvo en superficie r = +0,84. En las colas se
@@ -322,7 +322,7 @@ sin el filtro, una hora de fotómetro limpio sale etiquetada como nublada.
 
 ## 30-08-2026 — «Cielo más oscuro» publicaba el instante más brillante de la noche
 
-**Cómo salió:** Nino preguntó por qué el panel daba **17,14** para esta noche
+**Cómo salió:** la pregunta fue por qué el panel daba **17,14** para esta noche
 —sin nubes— cuando la noche anterior el fotómetro había medido **20** con la Luna
 *más* llena. No era una contradicción entre el modelo y la medida: era un signo.
 
@@ -340,7 +340,7 @@ publicaba era el malo.**
 recién salida, y bajó a 18,46 a las 23:55 con la Luna a 29°. El modelo la seguía
 con **+0,36 mag** de desvío en la parte oscura. Para esta noche (Luna 92,2 %) el
 modelo predice la misma forma: **20,19** al cerrar el crepúsculo y **17,05** en
-la culminación lunar. El «20» de Nino era el MEJOR momento de anoche y el «17»
+la culminación lunar. El «20» medido era el MEJOR momento de anoche y el «17»
 del panel el PEOR de hoy — la misma noche, dos extremos, y el rótulo decía que
 era el mismo tipo de número. (No hay medida del fondo de la madrugada del 30
 porque el fotómetro deja de reportar entre las 00:01 y las 05:40 locales.)

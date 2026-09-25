@@ -569,7 +569,7 @@ def test_run_refuses_incomplete_initialization(
 
 
 def test_canonical_rows_are_rounded_to_published_precision(ee_region, retrieved_at):
-    """The model's float noise does not compress: 0.0772 % is stored as 0.1."""
+    """Float noise does not compress: 0.0812 % is stored as 0.1 (synthetic fixture)."""
     rows = _rows(records_from_region(ee_region, NERPIO), NERPIO, retrieved_at)
     lead_one = next(r for r in rows if r["model"] == "weathernext3" and r["lead_h"] == 1)
     assert lead_one["cloud_total"] == 0.1

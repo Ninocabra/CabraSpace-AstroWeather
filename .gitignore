@@ -39,3 +39,6 @@ venv/
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Coordinacion local con Gemini (rutas de este PC): no se publica
+coop/

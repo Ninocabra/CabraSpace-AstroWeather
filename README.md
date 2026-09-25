@@ -215,4 +215,4 @@ republica**: ver SPEC §7.1.
 ## Secretos y caducidades
 
 `.env` (fuera del repo) guarda las claves. **La clave de AEMET caduca el 2026-12-05**;
-regenerar en opendata.aemet.es. Aviso a Nino: **2026-11-21**.
+regenerar en opendata.aemet.es. Aviso: **2026-11-21**.
