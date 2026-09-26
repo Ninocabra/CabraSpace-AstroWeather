@@ -168,7 +168,7 @@ def _definicion_probabilidad(truth: str | None = None) -> str:
              "hora buena a las 03 no abre una noche.")
     truth = truth or getattr(load_calibrator(), "truth", "fotometro")
     if truth == "techo":
-        return ("Probabilidad de que el techo de Nerpio esté ABIERTO a esa hora "
+        return ("Probabilidad de que el techo de AstroCamp esté ABIERTO a esa hora "
                 "dada la nube prevista, calibrada contra lo que el observatorio "
                 "hizo de verdad: 31 meses de horas abiertas y las noches de techo "
                 "medidas minuto a minuto. Lleva dentro sus decisiones (abren 30-60 "

@@ -210,7 +210,7 @@ def test_stale_readings_are_labelled_not_hidden():
 
 def test_headline_is_one_spanish_sentence_with_the_key_numbers():
     text = snapshot().headline
-    assert text.startswith("Nerpio ahora:")
+    assert text.startswith("AstroCamp ahora:")
     assert text.endswith(".")
     assert "\n" not in text
     for fragment in ("13.0 °C", "67% HR", "margen de rocío", "cielo IR",
@@ -224,7 +224,7 @@ def test_headline_degrades_instead_of_crashing_on_an_empty_page():
     assert now.headline.startswith(
         "Sin datos utilizables de la página del observatorio."
     )
-    assert "Nerpio ahora" not in now.headline
+    assert "AstroCamp ahora" not in now.headline
     assert "Descarga incompleta" in now.headline
     assert now.age is None and now.age_minutes is None
     assert now.meteo_fresh is False and now.sky_fresh is False

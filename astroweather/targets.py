@@ -286,7 +286,7 @@ CATALOGUE = [
     Target("NGC 7635 (Burbuja)", 350.2013, 61.2017, "nebula", 0.0, "narrowband", "",
            aliases=("Bubble Nebula", "Caldwell 11",)),
     Target("NGC 7293 (Helix)", 337.4106, -20.8372, "planetary", 0.5, "narrowband",
-           "baja desde Nerpio: mira la altura",
+           "baja desde AstroCamp: mira la altura",
            aliases=("Helix Nebula", "Ojo de Dios", "Caldwell 63",)),
     Target("NGC 2237 (Roseta)", 97.6504, 4.9807, "nebula", 0.0, "narrowband", "",
            aliases=("Rosette Nebula", "Caldwell 49",)),

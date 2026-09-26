@@ -293,7 +293,7 @@ class SiteNow:
             text = "Sin datos utilizables de la página del observatorio."
             return text + " " + self.missing_note + "." if self.missing_note else text
 
-        text = "Nerpio ahora: " + ", ".join(caveats + values) + "."
+        text = "AstroCamp ahora: " + ", ".join(caveats + values) + "."
         warning = self.dew_warning
         return text + " " + warning if warning else text
 
