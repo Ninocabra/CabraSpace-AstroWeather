@@ -138,8 +138,8 @@ def test_every_row_is_always_present():
     esta decidiendo un plan y necesita ver tambien lo que si puede hacer."""
     for condiciones in (LLENA, NUEVA):
         salida = evaluate(Conditions(**condiciones))
-        assert len(salida["adquisicion"]) == 8      # + infrarrojo, 29-08-2026
-        assert len(salida["objetos"]) == 7      # + planetas y Luna, 29-08-2026
+        assert len(salida["adquisicion"]) == 9      # + fotometria, 26-09-2026
+        assert len(salida["objetos"]) == 9      # + transitos y variables, 26-09-2026
 
 
 def test_infrared_is_green_exactly_when_there_is_something_to_get_through():
@@ -180,3 +180,50 @@ def test_the_headline_lists_every_green_not_a_sample():
 
     for etiqueta in verdes:
         assert etiqueta.lower() in salida["resumen"].lower(), etiqueta
+
+
+def _fila(clave, **kw):
+    salida = evaluate(Conditions(**kw))
+    return next(f for f in salida["adquisicion"] + salida["objetos"]
+                if f["clave"] == clave)
+
+
+def test_photometry_asks_for_a_stable_sky_not_a_dark_one():
+    """La Luna llena tumba la banda ancha pero NO la fotometria de estrellas
+    brillantes: se mide contra comparativas del mismo campo. Lo que si la
+    tumba son las nubes a ratos, que no atenuan igual a todas."""
+    assert _fila("rgb", **LLENA)["luz"] == ROJO
+    assert _fila("fotometria", **LLENA)["luz"] == AMBAR
+    assert _fila("fotometria", **NUEVA)["luz"] == VERDE
+    assert _fila("fotometria", **{**NUEVA, "open_probability": 0.4})["luz"] == ROJO
+
+
+def test_dust_allows_differential_but_not_absolute_photometry():
+    fila = _fila("fotometria", **{**NUEVA, "dust_alert": True, "k_total": 0.40})
+    assert fila["luz"] == AMBAR
+    assert "absoluta" in fila["resumen"]
+
+
+def test_poor_seeing_warns_about_scintillation_on_bright_stars():
+    fila = _fila("fotometria", **{**NUEVA, "seeing_tercile": "desfavorable"})
+    assert fila["luz"] == AMBAR
+    assert "centelleo" in fila["resumen"]
+
+
+def test_a_transit_needs_it_whole():
+    """Un hueco en la entrada o la salida deja el ajuste sin atar; una noche
+    corta puede no tener sitio para tránsito y linea base."""
+    assert _fila("transitos", **NUEVA)["luz"] == VERDE
+    assert _fila("transitos", **{**NUEVA, "open_probability": 0.4})["luz"] == ROJO
+    assert _fila("transitos", **{**NUEVA, "open_probability": 0.55})["luz"] == AMBAR
+    assert _fila("transitos", **{**NUEVA, "dark_hours": 3.5})["luz"] == AMBAR
+    # La Luna no cambia el brillo de una anfitriona brillante.
+    assert _fila("transitos", **LLENA)["luz"] == VERDE
+
+
+def test_slow_variables_survive_a_broken_night_and_fast_ones_do_not():
+    fila = _fila("variables", **{**NUEVA, "open_probability": 0.4})
+    assert fila["luz"] == AMBAR
+    assert "lentas" in fila["resumen"]
+    assert _fila("variables", **NUEVA)["luz"] == VERDE
+    assert _fila("variables", **LLENA)["resumen"] == "las débiles no"

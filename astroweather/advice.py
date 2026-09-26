@@ -13,6 +13,9 @@ pagina saca al pasar el cursor.
 * **Adquisicion**: RGB, luminancia, Halfa, OIII, SII, dual-band, planetaria.
 * **Objetos**: galaxias, nebulosas de emision, de reflexion, planetarias,
   cumulos, e IFN y halos.
+* **Fotometria** (26-09-2026): una fila de tecnica y dos de objeto --
+  transitos de exoplanetas y estrellas variables --, porque quien mide
+  brillos no pregunta por el fondo oscuro sino por un cielo ESTABLE.
 
 Las dos filas se leen cruzadas a proposito: con Luna llena el Halfa esta verde
 y el OIII rojo, asi que "nebulosas de emision" sale en ambar -- se pueden, pero
@@ -147,6 +150,8 @@ ETIQUETAS_EN = {
     "reflexion": "Reflection nebulae", "planetarias": "Planetary nebulae",
     "cumulos": "Clusters", "planetas": "Planets & Moon",
     "ifn": "IFN, haloes & tidal tails",
+    "fotometria": "Photometry", "transitos": "Exoplanet transits",
+    "variables": "Variable stars",
     "rocio": "Dew", "viento": "Wind", "nubes": "Cloud",
     "noche_corta": "Short night",
 }
@@ -573,6 +578,110 @@ def _planetaria(c: Conditions) -> dict:
                  technique.""")
 
 
+def _fotometria(c: Conditions) -> dict:
+    """Fotometria diferencial: medir brillos, no hacer una imagen bonita.
+
+    Lo que la decide no es lo que decide la astrofotografia. El fondo de cielo
+    importa poco -- se mide contra estrellas del MISMO campo, asi que la
+    extincion comun se cancela --; lo que la rompe es lo que NO es comun a la
+    estrella y a sus comparativas: nubes que pasan, una extincion que cambia
+    con el color, y en estrellas brillantes el centelleo, que sale de la
+    turbulencia en ALTURA (Young 1967; Osborn et al. 2015) -- la misma que mira
+    nuestro predictor de seeing a 200 hPa. El seeing de suelo, en cambio, se
+    esquiva desenfocando.
+    """
+    if c.open_probability is not None and c.open_probability < 0.5:
+        pct = f"{c.open_probability * 100:.0f}"
+        return _fila("fotometria", "Fotometría", ROJO, "nubes a ratos",
+                     f"""Solo un {pct} % de que la noche sea utilizable. Una nube
+                     que pasa no atenúa igual la estrella y sus comparativas, y eso
+                     no lo cancela la fotometría diferencial: mete escalones y
+                     huecos en la curva. Para una serie continua no es la noche.""",
+                     en_resumen="intermittent cloud",
+                     en_detalle=f"""Only a {pct} % chance the night is usable. A
+                     passing cloud does not dim the target and its comparison stars
+                     equally, and differential photometry cannot cancel that: it puts
+                     steps and gaps in the light curve. For a continuous series this
+                     is not the one.""")
+    if c.dust_alert or (c.k_total is not None and c.k_total > 0.25):
+        return _fila("fotometria", "Fotometría", AMBAR, "diferencial sí, absoluta no",
+                     f"""Con k={c.k_txt()} la extinción es alta y depende del color:
+                     una comparativa más azul que tu estrella se apaga más al bajar,
+                     y eso dibuja una tendencia con la masa de aire que no es de la
+                     estrella. Elige comparativas de color parecido y cerca en el
+                     campo, corrige la tendencia contra la masa de aire y no saques
+                     coeficientes de transformación ni fotometría absoluta esta
+                     noche. Por debajo de {ALT_MIN_BUENA:.0f}° el efecto se
+                     dispara.""",
+                     en_resumen="differential yes, absolute no",
+                     en_detalle=f"""At k={c.k_txt()} extinction is high and colour
+                     dependent: a comparison star bluer than your target fades more as
+                     it sinks, and that draws a trend with air mass that does not
+                     belong to the star. Pick comparison stars of similar colour close
+                     in the field, detrend against air mass, and do not derive
+                     transformation coefficients or absolute photometry on this sky.
+                     Below {ALT_MIN_BUENA:.0f}° the effect runs away.""")
+    if c.humidity is not None and c.humidity >= RH_HIGROSCOPICA:
+        return _fila("fotometria", "Fotometría", AMBAR, "la extinción no se estará quieta",
+                     f"""Con {c.humidity:.0f} % de humedad el aerosol crece con el
+                     agua y la extinción cambia a lo largo de la noche. La diferencial
+                     lo aguanta si las comparativas son de color parecido; lo que no
+                     vale es una noche con extinción constante, que es lo que
+                     suponen la fotometría absoluta y las transformaciones.""",
+                     en_resumen="extinction will not keep still",
+                     en_detalle=f"""At {c.humidity:.0f} % humidity the aerosol grows
+                     with water and extinction drifts through the night. Differential
+                     photometry copes if the comparison stars are of similar colour;
+                     what does not hold is constant extinction, which is what absolute
+                     photometry and transformations assume.""")
+    if c.luna_manda and c.moon_illumination >= MOON_MID:
+        return _fila("fotometria", "Fotometría", AMBAR, "las brillantes sí, las débiles no",
+                     f"""La Luna al {c.luna_pct} % no cambia el brillo de la
+                     estrella, pero sube el fondo y su ruido: en estrellas brillantes
+                     da igual, en las débiles el error crece. Además deja un gradiente
+                     en el campo: mantén el campo a más de
+                     {MOON_SEP_MIN:.0f}° del disco y usa un anillo de cielo
+                     ajustado alrededor de cada estrella.""",
+                     en_resumen="bright stars yes, faint ones no",
+                     en_detalle=f"""The Moon at {c.luna_pct} % does not change the
+                     star's brightness, but it raises the background and its noise:
+                     irrelevant on bright stars, the error grows on faint ones. It
+                     also lays a gradient over the field: keep it more than
+                     {MOON_SEP_MIN:.0f}° from the disc and use a tight sky annulus
+                     around each star.""")
+    if c.seeing_tercile == "desfavorable":
+        return _fila("fotometria", "Fotometría", AMBAR, "centelleo alto en las brillantes",
+                     """El viento en altura que empeora el seeing es también el que
+                     agita el centelleo, y en estrellas brillantes el centelleo suele
+                     ser el ruido que manda. Baja como D^-2/3 con la apertura y como
+                     t^-1/2 con la exposición, y sube como la masa de aire elevada a
+                     1,75: desenfoca para alargar las tomas sin saturar y no midas
+                     bajo. Es un indicio, no una medida: nadie prevé aquí el
+                     centelleo directamente.""",
+                     en_resumen="high scintillation on bright stars",
+                     en_detalle="""The upper-level wind that spoils the seeing is also
+                     what stirs scintillation, and on bright stars scintillation is
+                     often the dominant noise. It falls as D^-2/3 with aperture and as
+                     t^-1/2 with exposure, and rises as air mass to the power 1.75:
+                     defocus to lengthen the exposures without saturating, and do not
+                     measure low. It is a hint, not a measurement: nothing here
+                     forecasts scintillation directly.""")
+    return _fila("fotometria", "Fotometría", VERDE, "adelante",
+                 f"""Sin nubes a ratos, sin calima ({'k=' + c.k_txt() if c.k_total
+                 is not None else 'k sin dato'}) y sin Luna que mande
+                 ({c.luna_pct} %). La fotometría no necesita cielo oscuro sino
+                 estable, y esta noche lo parece. Lo de siempre: comparativas de
+                 color parecido, la estrella en los mismos píxeles toda la noche y
+                 nada por debajo de {ALT_MIN_BUENA:.0f}°.""",
+                 en_resumen="go ahead",
+                 en_detalle=f"""No intermittent cloud, no dust ({'k=' + c.k_txt() if
+                 c.k_total is not None else 'k unknown'}) and no Moon in charge
+                 ({c.luna_pct} %). Photometry does not need a dark sky but a stable
+                 one, and this looks like it. The usual: comparison stars of similar
+                 colour, the star on the same pixels all session long, and nothing
+                 below {ALT_MIN_BUENA:.0f}°.""")
+
+
 # ================================================================ OBJETOS ==
 def _familia(c: Conditions, clave, etiqueta, gate_clave, *,
              extra="", extra_en="") -> dict:
@@ -790,6 +899,148 @@ def _planetarias_obj(c: Conditions) -> dict:
                  many of them keep their signal.""")
 
 
+def _transitos(c: Conditions) -> dict:
+    """Transitos de exoplanetas: una caida de pocas milesimas que hay que ver
+    ENTERA, con linea base antes y despues. Lo que la mata es un hueco, no el
+    fondo: las estrellas anfitrionas que se miden desde aficionado son
+    brillantes y la Luna les cambia poco."""
+    if c.open_probability is not None and c.open_probability < 0.6:
+        pct = f"{c.open_probability * 100:.0f}"
+        luz = ROJO if c.open_probability < 0.5 else AMBAR
+        return _fila("transitos", "Tránsitos de exoplanetas", luz,
+                     "un hueco y no hay ajuste",
+                     f"""Solo un {pct} % de que la noche sea utilizable. Un tránsito
+                     se ajusta por la entrada y la salida: si una nube se come una de
+                     las dos, la profundidad y la hora central quedan sin atar, y
+                     sin línea base a los dos lados no hay referencia. Si aun así
+                     sales, que sea con un tránsito corto y bien centrado en la
+                     noche.""",
+                     en_resumen="one gap and there is no fit",
+                     en_detalle=f"""Only a {pct} % chance the night is usable. A
+                     transit is fitted on its ingress and egress: if a cloud eats one
+                     of them, depth and mid-time are left unconstrained, and without
+                     baseline on both sides there is no reference. If you go out
+                     anyway, pick a short transit well centred in the dark hours.""")
+    if c.dark_hours and c.dark_hours < 5:
+        return _fila("transitos", "Tránsitos de exoplanetas", AMBAR,
+                     "comprueba que cabe entero",
+                     f"""Solo {c.dark_hours:.1f} h de oscuridad astronómica. Antes de
+                     montar, comprueba que el tránsito ENTERO, con línea base antes y
+                     después, cae dentro y con la estrella por encima de
+                     {ALT_MIN_BUENA:.0f}°. Medio tránsito sirve de poco.""",
+                     en_resumen="check it fits whole",
+                     en_detalle=f"""Only {c.dark_hours:.1f} h of astronomical darkness.
+                     Before setting up, check that the WHOLE transit, with baseline
+                     before and after, falls inside it with the star above
+                     {ALT_MIN_BUENA:.0f}°. Half a transit is of little use.""")
+    if c.dust_alert or (c.k_total is not None and c.k_total > 0.25):
+        return _fila("transitos", "Tránsitos de exoplanetas", AMBAR,
+                     "la extinción se mete en la curva",
+                     f"""Con k={c.k_txt()} la diferencia de color entre la estrella y
+                     sus comparativas se convierte en una pendiente con la masa de
+                     aire, y una pendiente mal quitada cambia la profundidad. Mejor un
+                     tránsito que pase cerca del meridiano, comparativas de color
+                     parecido y la masa de aire como regresor en el ajuste.""",
+                     en_resumen="extinction leaks into the curve",
+                     en_detalle=f"""At k={c.k_txt()} the colour difference between the
+                     star and its comparison stars turns into a slope with air mass,
+                     and a badly removed slope changes the depth. Prefer a transit
+                     that crosses near the meridian, comparison stars of similar
+                     colour, and air mass as a regressor in the fit.""")
+    if c.seeing_tercile == "desfavorable":
+        return _fila("transitos", "Tránsitos de exoplanetas", AMBAR,
+                     "desenfoca y alarga",
+                     f"""Las anfitrionas son brillantes, y con el viento en altura de
+                     esta noche el centelleo puede ser el ruido que manda. Desenfoca
+                     para alargar las tomas sin saturar y evita la parte baja del
+                     tránsito: el centelleo crece como la masa de aire elevada a
+                     1,75. Por debajo de {ALT_MIN_BUENA:.0f}°, mejor no.""",
+                     en_resumen="defocus and lengthen",
+                     en_detalle=f"""Host stars are bright, and with tonight's
+                     upper-level wind scintillation may be the dominant noise. Defocus
+                     to lengthen the exposures without saturating and avoid the low
+                     part of the transit: scintillation grows as air mass to the power
+                     1.75. Below {ALT_MIN_BUENA:.0f}°, better not.""")
+    luna = (f"La Luna al {c.luna_pct} % apenas cambia nada en estrellas tan "
+            f"brillantes; solo aléjate {MOON_SEP_MIN:.0f}° del disco por el "
+            f"gradiente." if c.luna_manda else
+            f"La Luna no molesta ({c.luna_pct} %).")
+    luna_en = (f"The Moon at {c.luna_pct} % changes almost nothing on stars this "
+               f"bright; just stay {MOON_SEP_MIN:.0f}° from the disc because of "
+               f"the gradient." if c.luna_manda else
+               f"The Moon is not a problem ({c.luna_pct} %).")
+    return _fila("transitos", "Tránsitos de exoplanetas", VERDE, "noche para una curva",
+                 f"""Cielo estable y {c.dark_hours:.1f} h de oscuridad. {luna}
+                 Encuadra con la estrella siempre en los mismos píxeles (el flat
+                 nunca es perfecto), línea base antes y después, y la estrella por
+                 encima de {ALT_MIN_BUENA:.0f}° durante todo el evento.""",
+                 en_resumen="a night for a light curve",
+                 en_detalle=f"""Stable sky and {c.dark_hours:.1f} h of darkness.
+                 {luna_en} Frame it with the star on the same pixels throughout (the
+                 flat is never perfect), baseline before and after, and the star
+                 above {ALT_MIN_BUENA:.0f}° for the whole event.""")
+
+
+def _variables(c: Conditions) -> dict:
+    """Estrellas variables: dos oficios con la misma camara.
+
+    Las LENTAS (Miras, semirregulares) piden un punto por noche, asi que una
+    noche mala a ratos les basta. Las RAPIDAS (eclipsantes, RR Lyrae, delta
+    Scuti, cataclismicas) piden series continuas y sufren lo mismo que un
+    transito. Y las debiles -- una Mira cerca del minimo, una cataclismica en
+    quietud -- son las unicas a las que la Luna les hace dano de verdad.
+    """
+    if c.open_probability is not None and c.open_probability < 0.6:
+        pct = f"{c.open_probability * 100:.0f}"
+        return _fila("variables", "Estrellas variables", AMBAR, "solo las lentas",
+                     f"""Con un {pct} % de que la noche sea utilizable, una serie
+                     de una eclipsante o una RR Lyrae saldrá a trozos. Pero a una
+                     Mira o una semirregular le basta un punto por noche: aprovecha
+                     un claro para medir las lentas.""",
+                     en_resumen="slow ones only",
+                     en_detalle=f"""With a {pct} % chance the night is usable, a
+                     series on an eclipsing binary or an RR Lyrae will come out in
+                     pieces. But a Mira or a semiregular needs one point per night:
+                     use a clear spell to measure the slow ones.""")
+    if c.luna_manda and c.moon_illumination >= MOON_MID:
+        return _fila("variables", "Estrellas variables", AMBAR, "las débiles no",
+                     f"""Con la Luna al {c.luna_pct} % el fondo en {c.cielo()}
+                     mag/arcsec² sube el error de las estrellas débiles: una Mira
+                     cerca de su mínimo o una cataclísmica en quietud salen con
+                     barras enormes. Las brillantes y las series de eclipsantes
+                     van bien; mantente a más de {MOON_SEP_MIN:.0f}° del disco.""",
+                     en_resumen="not the faint ones",
+                     en_detalle=f"""With the Moon at {c.luna_pct} % the background at
+                     {c.cielo()} mag/arcsec² inflates the error on faint stars: a Mira
+                     near minimum or a cataclysmic variable in quiescence comes out
+                     with huge error bars. Bright stars and eclipsing-binary series are
+                     fine; stay more than {MOON_SEP_MIN:.0f}° from the disc.""")
+    if c.dust_alert or (c.k_total is not None and c.k_total > 0.25):
+        return _fila("variables", "Estrellas variables", AMBAR, "cuidado con el color",
+                     f"""Con k={c.k_txt()} cada filtro pierde distinto. Para una
+                     serie diferencial da igual si las comparativas son de color
+                     parecido; para reportar en sistema estándar (lo que pide la
+                     AAVSO) no uses coeficientes de transformación sacados esta
+                     noche, ni esta noche para sacarlos.""",
+                     en_resumen="mind the colour",
+                     en_detalle=f"""At k={c.k_txt()} each filter loses a different
+                     amount. For a differential series it does not matter if the
+                     comparison stars are of similar colour; to report in a standard
+                     system (as the AAVSO asks) do not use transformation coefficients
+                     derived on this sky, nor use this sky to derive them.""")
+    return _fila("variables", "Estrellas variables", VERDE, "series largas",
+                 f"""Cielo estable y {c.dark_hours:.1f} h de oscuridad: es la noche
+                 de las series continuas — mínimos de eclipsantes, máximos de RR
+                 Lyrae, delta Scuti — y de las débiles. Por encima de
+                 {ALT_MIN_BUENA:.0f}° y con comparativas de la carta AAVSO.""",
+                 en_resumen="long series",
+                 en_detalle=f"""Stable sky and {c.dark_hours:.1f} h of darkness: this
+                 is the one for continuous series — eclipsing-binary minima, RR Lyrae
+                 maxima, delta Scuti — and for the faint ones. Above
+                 {ALT_MIN_BUENA:.0f}° and with comparison stars from the AAVSO
+                 chart.""")
+
+
 # ============================================================== EVALUACION ==
 def evaluate(conditions: Conditions) -> dict:
     """Las dos filas de semaforos. Siempre TODAS, verdes incluidas.
@@ -803,7 +1054,7 @@ def evaluate(conditions: Conditions) -> dict:
         _banda_ancha(c, "rgb", "RGB / color", SKY_GATE["normal"]),
         _banda_ancha(c, "luminancia", "Luminancia", SKY_GATE["bajo_contraste"]),
         _halfa(c), _oiii(c), _sii(c), _dual(c), _infrarrojo(c),
-        _planetaria(c),
+        _planetaria(c), _fotometria(c),
     ]
     objetos = [
         _familia(c, "galaxias", "Galaxias", "normal"),
@@ -819,6 +1070,8 @@ def evaluate(conditions: Conditions) -> dict:
         _cumulos(c),
         _planetas(c),
         _ifn(c),
+        _transitos(c),
+        _variables(c),
     ]
     return {"adquisicion": adquisicion, "objetos": objetos,
             "avisos": _avisos(c), "limitante": limitante(c),
@@ -875,6 +1128,30 @@ REFERENCIAS = [
                 "predictor and correlates with worsening seeing; but the ground "
                 "layer dominates and is not measured here.",
      "usado_en": ["planetaria", "planetarias", "ir"]},
+    {"tema": "Centelleo",
+     "dice": "En estrellas brillantes el centelleo suele ser el ruido que manda. "
+             "Sale de la turbulencia en altura y escala como D^-2/3 · X^1,75 · "
+             "t^-1/2 (Young 1967; Osborn et al. 2015, que miden que esa fórmula "
+             "se queda corta a menudo). Desenfocar permite alargar t sin saturar.",
+     "tema_en": "Scintillation",
+     "dice_en": "On bright stars scintillation is often the dominant noise. It "
+                "comes from high-altitude turbulence and scales as D^-2/3 · X^1.75 "
+                "· t^-1/2 (Young 1967; Osborn et al. 2015, who find that formula "
+                "often underestimates it). Defocusing lets t grow without "
+                "saturating.",
+     "usado_en": ["fotometria", "transitos"]},
+    {"tema": "Fotometría diferencial y color",
+     "dice": "La extinción común se cancela contra comparativas del mismo campo, "
+             "pero no la que depende del color: por eso la AAVSO pide "
+             "comparativas de color parecido y cercanas, y transformar al "
+             "sistema estándar con coeficientes de una noche estable.",
+     "tema_en": "Differential photometry and colour",
+     "dice_en": "Common extinction cancels against comparison stars in the same "
+                "field, but colour-dependent extinction does not: hence the AAVSO "
+                "asks for nearby comparison stars of similar colour, and for "
+                "transformation to the standard system with coefficients from a "
+                "stable night.",
+     "usado_en": ["fotometria", "transitos", "variables"]},
     {"tema": "Altura y masa de aire",
      "dice": "A 30° se cruzan ~2 masas de aire y queda cerca del 81 % del flujo "
              "cenital; por debajo de 30-35° la dispersión atmosférica empieza a "
@@ -883,7 +1160,8 @@ REFERENCIAS = [
      "dice_en": "At 30° you cross ~2 air masses and keep about 81 % of the zenith "
                 "flux; below 30-35° atmospheric dispersion starts to colour the "
                 "edges of stars.",
-     "usado_en": ["galaxias", "emision", "reflexion", "cumulos", "ifn"]},
+     "usado_en": ["galaxias", "emision", "reflexion", "cumulos", "ifn",
+                  "fotometria", "transitos", "variables"]},
     {"tema": "Rocío",
      "dice": "Condensa cuando la óptica ALCANZA el punto de rocío; la práctica es "
              "mantener las superficies unos grados por encima. El margen que "

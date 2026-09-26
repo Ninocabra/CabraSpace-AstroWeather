@@ -47,6 +47,10 @@ def test_ninguna_fila_sale_sin_ingles(c):
         assert fila["etiqueta_en"], fila["clave"]
         assert fila["resumen_en"], fila["clave"]
         assert fila["detalle_en"], fila["clave"]
+        # Sin entrada en ETIQUETAS_EN la etiqueta cae al castellano y el
+        # test de arriba no lo ve (26-09-2026: "tránsitos de exoplanetas").
+        if fila["clave"] not in ("ha", "oiii", "sii", "dual"):
+            assert fila["etiqueta_en"] != fila["etiqueta"], fila["clave"]
 
 
 @pytest.mark.parametrize("c", CASOS[:64])
