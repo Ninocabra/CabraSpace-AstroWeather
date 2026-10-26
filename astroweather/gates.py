@@ -152,7 +152,8 @@ def probability_usable(clear_probability: float, verdict: SafetyVerdict) -> floa
 
 
 def opening_window(usable_hours: list[float], minimum_hours: float = 2.0,
-                   step_hours: float = 1.0) -> tuple[int, int, float] | None:
+                   step_hours: float = 1.0,
+                   weights: list[float] | None = None) -> tuple[int, int, float] | None:
     """The best window of at least `minimum_hours`: (first, last, floor).
 
     The floor is the WEAKER hour of the window, on purpose. Adjacent hours
@@ -161,9 +162,24 @@ def opening_window(usable_hours: list[float], minimum_hours: float = 2.0,
     taking the best hour alone was the failure this replaces: 74 published
     verdicts, zero "Cerrado", because any night with one clear hour at 03 UTC
     scored as that hour (measured 2026-09-04 against the roof record).
+
+    `weights` (M6, 26-10-2026) says which slots may be part of the window: only
+    those with weight > 0, i.e. the ones inside the astronomical night
+    (`ephem.dark_slot_weights`). The grid runs from sunset-1 h to sunrise+1 h,
+    but the roof curve is trained on dark hours only, so a window that reaches
+    into twilight rests on an extrapolation: 13 + 26 published windows ended
+    after sunrise, and the 28-09 false alarm leaned on a 06-08 UTC one. The
+    indices returned are still those of the full list.
     """
     if not usable_hours:
         return None
+    if weights is not None:
+        eligible = [i for i, w in enumerate(weights) if w > 0]
+        if not eligible:
+            return None
+        found = opening_window([usable_hours[i] for i in eligible], minimum_hours,
+                               step_hours)
+        return (eligible[found[0]], eligible[found[1]], found[2])
     slots = max(1, int(round(minimum_hours / step_hours)))
     if len(usable_hours) < slots:
         return (0, len(usable_hours) - 1, float(min(usable_hours)))
@@ -176,7 +192,8 @@ def opening_window(usable_hours: list[float], minimum_hours: float = 2.0,
 
 
 def opening_probability(usable_hours: list[float], climatology: float | None = None,
-                        minimum_hours: float = 2.0, step_hours: float = 1.0) -> float:
+                        minimum_hours: float = 2.0, step_hours: float = 1.0,
+                        weights: list[float] | None = None) -> float:
     """Chance the night offers at least `minimum_hours` in a row worth opening.
 
     It is the floor of the best window (see `opening_window`), so a night is
@@ -189,7 +206,7 @@ def opening_probability(usable_hours: list[float], climatology: float | None = N
     multiplier on an already calibrated probability -- that would count the
     same base rate twice.
     """
-    window = opening_window(usable_hours, minimum_hours, step_hours)
+    window = opening_window(usable_hours, minimum_hours, step_hours, weights)
     if window is None:
         return climatology if climatology is not None else 0.0
     return window[2]

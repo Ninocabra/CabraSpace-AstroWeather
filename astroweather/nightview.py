@@ -30,7 +30,8 @@ from dataclasses import dataclass
 from zoneinfo import ZoneInfo
 
 from .dome import fetch_cloud_grid, project_clouds
-from .ephem import moon_illumination, moon_phase_angle, moon_positions, night_for, sun_positions
+from .ephem import (ASTRONOMICAL, moon_illumination, moon_phase_angle, moon_positions,
+                    night_for, sun_positions)
 from .extinction import evaluate as evaluate_transparency
 from .seeing import integrate
 from .site import NERPIO, Site
@@ -278,9 +279,10 @@ def _techo_del_veredicto(day: dt.datetime, site: Site) -> dict | None:
             "sentence": frase,
             "window": ([ventana[0].isoformat(), ventana[1].isoformat()]
                        if ventana else None),
-            # Suma de la probabilidad utilizable de la ventana de producto
-            # (ocaso -1 h a orto +1 h): el mismo `horas_utilizables_esperadas`
-            # del JSON, crepusculo incluido.
+            # Suma de la probabilidad utilizable DENTRO de la noche astronomica
+            # (M6, 26-10-2026): el mismo `horas_utilizables_esperadas` del JSON.
+            # `hourly` de abajo sigue siendo toda la rejilla (ocaso -1 h a orto
+            # +1 h), que es lo que se pinta.
             "expected_hours": round(float(informe.usable_hours), 1),
             "typical_hours": tipicas,
             "range_hours": [baja, alta] if tipicas is not None else None,
@@ -368,8 +370,13 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO, *,
             **_site_weather(payload, cloud_index),
         })
 
+    # M6 (26-10-2026): la E[Q] de la cupula tambien cuenta solo la noche
+    # astronomica (Sol < -18 grados, el mismo umbral que `frames[i]["dark"]` y
+    # que la curva del techo): el `usable` constante de 0,8 no es una medida,
+    # pero extenderlo al crepusculo sumaba horas que el veredicto ya no promete.
     results = evaluate_night(CATALOGUE, times,
-                             usable_probability=[usable] * len(times),
+                             usable_probability=[usable if s.altitude < ASTRONOMICAL
+                                                 else 0.0 for s in suns],
                              turbulence=turbulence, aod_total=aod_total,
                              aod_dust=aod_dust, serie=serie, site=site)
     moon_altitudes = [f["moon_alt"] for f in frames]

@@ -14,6 +14,17 @@ import pytest
 
 from astroweather import scheduler
 
+# SIN RED NO HAY IERS, Y SIN IERS ASTROPY SE NIEGA A DAR LA ALTURA DEL SOL. El
+# 26-10-2026 los servidores del IERS devolvian 400 / conexion cortada y 11 tests
+# de `test_webexport.py` caian en rojo con el codigo de HEAD sin tocar: fallaba
+# la descarga, no el codigo. UT1-UTC < 0,9 s mueve las alturas < 0,004 grados,
+# irrelevante para etiquetar horas (mismo razonamiento que
+# `hindcast._astropy_offline`). Un test no debe depender de la red.
+from astropy.utils import iers as _iers
+
+_iers.conf.auto_download = False
+_iers.conf.auto_max_age = None
+
 
 @pytest.fixture(autouse=True)
 def _log_de_tests_aparte(tmp_path, monkeypatch):

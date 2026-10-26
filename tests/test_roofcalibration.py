@@ -72,18 +72,87 @@ def test_con_pocas_noches_el_cruce_es_mensual_y_se_declara():
 
 
 def test_la_nota_de_las_60_noches_cambia_el_metodo_sola():
-    """El dia que haya 60 noches nadie tiene que acordarse: fit() lo decide."""
-    model = R.fit(_months(), _hours(60), rounds=40)
-    assert model.method == "horario"
+    """El dia que haya NIGHTS_FOR_HOURLY_REFIT noches (60 hasta el 26-10-2026,
+    20 desde M1) nadie tiene que acordarse: fit() lo decide. El metodo ya no se
+    llama "horario" a secas: dice tambien de que horas y de que nube sale."""
+    model = R.fit(_months(), _hours(max(60, R.NIGHTS_FOR_HOURLY_REFIT)), rounds=40)
+    assert model.method == R.METHOD_HOURLY
+    assert model.method.startswith("horario")
     assert model.nights_missing == 0
     # Y el ajuste horario recupera la curva con la que se generaron las horas.
     assert model.crossing == pytest.approx(0.30, abs=0.08)
     assert -9.0 < model.cloud_weight < -3.5
+    assert model.slope_low <= model.cloud_weight <= model.slope_high
 
 
 def test_el_umbral_de_noches_es_un_parametro_y_no_un_numero_suelto():
-    assert R.fit(_months(), _hours(10), nights_target=10, rounds=20).method == "horario"
-    assert R.fit(_months(), _hours(10), nights_target=11, rounds=20).method != "horario"
+    assert R.fit(_months(), _hours(10), nights_target=10, rounds=20).method == R.METHOD_HOURLY
+    assert R.fit(_months(), _hours(10), nights_target=11, rounds=20).method == R.METHOD_MONTHLY
+
+
+def test_con_el_cruce_mensual_la_curva_no_puede_pasar_del_techo_y_la_horaria_si():
+    """El defecto de M1 (26-10-2026): con el cruce fijado por los meses, P con
+    0 % de nube queda en sigmoid(-pendiente * cruce), 0,72 con la curva real,
+    aunque las horas digan que con cielo limpio el techo abre el 96-98 %. Horas
+    sinteticas con P(0 %) = 0,95: el metodo mensual NO puede verlo (control en
+    rojo) y el horario lo recupera."""
+    hours = _hours(40, slope=-4.0, crossing=0.74)       # sigmoid(4 * 0,74) = 0,95
+    monthly = R.fit(_months(), hours, nights_target=10 ** 6, rounds=20)
+    hourly = R.fit(_months(), hours, nights_target=20, rounds=20)
+    assert monthly.probability(0) < 0.85
+    assert hourly.probability(0) == pytest.approx(0.95, abs=0.04)
+
+
+def test_una_pendiente_horaria_sin_sentido_fisico_cae_al_metodo_anterior():
+    """Mas nube, mas techo abierto: con noches de sobra, el ajuste libre puede
+    salir asi si las horas no tienen noches cubiertas. Manda el mensual."""
+    model = R.fit(_months(), _hours(30, slope=+3.0), nights_target=20, rounds=10)
+    assert model.method == R.METHOD_MONTHLY
+    assert model.cloud_weight < 0
+
+
+def _write_archive(root, measurements, forecasts):
+    from astroweather.archive import write_canonical
+    for row in measurements:
+        write_canonical([row], dataset="measurements", site_id="nerpio", root=root)
+    for row in forecasts:
+        write_canonical([row], dataset="forecasts", site_id="nerpio", root=root)
+
+
+def test_las_horas_son_de_noche_astronomica_y_la_nube_la_del_corte(tmp_path):
+    """Las dos fugas de `hourly_pairs` hasta el 26-10-2026, en un archivo de
+    juguete. Noche del 20-09: la hora de las 18 UTC es crepusculo civil (Sol a
+    unos -3 grados a las 18:30) y la de las 22, noche cerrada. Para las 22 hay
+    dos recogidas con la MISMA etiqueta de pasada (el dia a las 00Z): la de las
+    10 UTC dice 80 % y la de las 23 UTC, ya de noche, 5 %. Al corte de las 15
+    UTC solo existia la primera. El instrumento anterior (18-05 UTC y vista
+    deduplicada) cae en las dos trampas: es el control en rojo."""
+    from astroweather.hindcast import _legacy_roof_pairs
+    from astroweather.queries import connect
+
+    def roof(t, opened):
+        return {"site_id": "nerpio", "t_utc": t, "instrument_id": "astrocamp_roofs",
+                "quality_flags": f"open={opened}/3", "retrieved_at": t}
+
+    def cloud(valid, value, retrieved):
+        return {"site_id": "nerpio", "model": R.BACKFILL_MODEL,
+                "run_utc": dt.datetime(2026, 9, 20, tzinfo=UTC), "valid_utc": valid,
+                "lead_h": 0, "member": None, "cloud_total": value, "retrieved_at": retrieved}
+
+    dusk = dt.datetime(2026, 9, 20, 18, tzinfo=UTC)
+    night = dt.datetime(2026, 9, 20, 22, tzinfo=UTC)
+    _write_archive(
+        tmp_path,
+        [roof(dusk + dt.timedelta(minutes=10), 0), roof(dusk + dt.timedelta(minutes=40), 0),
+         roof(night + dt.timedelta(minutes=10), 1), roof(night + dt.timedelta(minutes=40), 1)],
+        [cloud(dusk, 30.0, dt.datetime(2026, 9, 20, 10, tzinfo=UTC)),
+         cloud(night, 80.0, dt.datetime(2026, 9, 20, 10, tzinfo=UTC)),
+         cloud(night, 5.0, dt.datetime(2026, 9, 20, 23, tzinfo=UTC))])
+    pairs = R.hourly_pairs(tmp_path)
+    assert [(h, c, o) for h, c, o in pairs] == [(night, 80.0, 1.0)]
+    legacy = {h: c for h, c, _ in _legacy_roof_pairs(connect(tmp_path))}
+    assert legacy[night] == 5.0                  # la recogida de las 23 UTC
+    assert dusk in legacy                        # y el crepusculo dentro
 
 
 def test_la_curva_del_techo_mejora_a_la_climatologia_mensual():

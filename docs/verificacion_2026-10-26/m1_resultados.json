@@ -1,0 +1,4954 @@
+{
+ "generated": "2026-10-26T18:37:20+00:00",
+ "archive_head": "7eff6f5d 2026-10-26T14:15:49Z",
+ "data_head": "278a50f 2026-10-26T14:15:35Z",
+ "resamples": 2000,
+ "threshold": 20,
+ "dark_sun_altitude": -18.0,
+ "pairs": {
+  "nuevo": {
+   "hours": 266,
+   "nights": 55
+  },
+  "anterior": {
+   "hours": 367,
+   "nights": 55
+  },
+  "sol<-6": {
+   "hours": 329,
+   "nights": 55
+  },
+  "months": 31,
+  "asof_vs_view": {
+   "n": 266,
+   "equal": 0.41729323308270677,
+   "median_abs": 2.5
+  },
+  "legacy_by_sun": [
+   [
+    -90,
+    -18,
+    266,
+    0.7324561403508771
+   ],
+   [
+    -18,
+    -12,
+    42,
+    0.8333333333333334
+   ],
+   [
+    -12,
+    -6,
+    21,
+    0.5238095238095238
+   ],
+   [
+    -6,
+    0,
+    32,
+    0.59375
+   ],
+   [
+    0,
+    90,
+    6,
+    0.09722222222222221
+   ]
+  ]
+ },
+ "fitted": {
+  "nueva (produccion)": {
+   "2026-09-04": [
+    1.0532305889772327,
+    -3.510768629924108,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-05": [
+    0.799249557488524,
+    -2.664165191628413,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-06": [
+    0.47189805955715686,
+    -1.5729935318571893,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-07": [
+    0.6731801698475707,
+    -2.243933899491902,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-08": [
+    0.8623466640035381,
+    -2.874488880011793,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-09": [
+    0.8147980058002595,
+    -2.7159933526675313,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-10": [
+    0.8260854434194521,
+    -2.7536181447315067,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-11": [
+    0.8139182490599121,
+    -2.7130608301997063,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-12": [
+    0.9409247878154972,
+    -3.13641595938499,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-13": [
+    1.0614447755973055,
+    -3.538149251991018,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-14": [
+    1.1705459320433067,
+    -3.9018197734776883,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-15": [
+    1.2699701030654622,
+    -4.233233676884874,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-16": [
+    1.3609315712705057,
+    -4.536438570901685,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-17": [
+    1.3204259540923224,
+    -4.401419846974408,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-18": [
+    1.1008155781134277,
+    -3.6693852603780917,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-19": [
+    2.0531225334470813,
+    -2.664887808679196,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-20": [
+    1.8447649592257123,
+    -2.760616344729651,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-21": [
+    1.9211620161484524,
+    -2.8787927667175586,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-22": [
+    1.9693926477933028,
+    -2.76194601112322,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-23": [
+    2.039088279971252,
+    -2.8574803817580157,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-24": [
+    2.1099048881847926,
+    -2.966572581568979,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-25": [
+    2.1819043982968203,
+    -3.0300272077261656,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-26": [
+    2.2538844288561313,
+    -3.029786769906032,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-27": [
+    2.1023015748239793,
+    -1.94382499833049,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-28": [
+    2.1715299655497855,
+    -2.598082766885181,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-29": [
+    2.098409384982249,
+    -2.810777712948779,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-30": [
+    2.098409384982249,
+    -2.810777712948779,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-01": [
+    2.098409384982249,
+    -2.810777712948779,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-02": [
+    2.1035733483452423,
+    -2.849859295688625,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-03": [
+    2.1048577067752197,
+    -2.8851708099769002,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-04": [
+    2.0910004933113857,
+    -2.896763167856137,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-05": [
+    2.086153636989693,
+    -2.9229605088088197,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-06": [
+    2.0760177027165545,
+    -2.9401778409821944,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-07": [
+    2.079715172889655,
+    -2.9751334247388597,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-08": [
+    2.0721630855300064,
+    -2.995681816853578,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-09": [
+    2.0802491671568775,
+    -3.002457128827979,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-10": [
+    2.086737771936119,
+    -3.0111826524423737,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-11": [
+    2.0940309334220153,
+    -3.0195585049884994,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-12": [
+    2.1021112151445998,
+    -3.0245089594201984,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-13": [
+    2.108716759447752,
+    -3.0331157992032765,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-14": [
+    2.1154654877152588,
+    -3.0416890647945776,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-15": [
+    2.1234450356891426,
+    -3.045162817045755,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-16": [
+    2.121664494461219,
+    -3.003864662921078,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-17": [
+    2.1252236653062346,
+    -3.0376424893285767,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-18": [
+    2.130824500876872,
+    -3.0704422611136657,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-19": [
+    2.136459558883047,
+    -3.1018633738917973,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-20": [
+    2.111337755245101,
+    -3.0887717993574784,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-21": [
+    2.1007311677919507,
+    -3.1020257264411466,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-22": [
+    2.1069322079872657,
+    -3.110421703698494,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-23": [
+    2.113089218012248,
+    -3.118758466739478,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-24": [
+    2.1192455079455303,
+    -3.1270739082949373,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-25": [
+    2.0982148866438113,
+    -3.12101952721925,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ]
+  },
+  "anterior reajustada": {
+   "2026-09-03": [
+    0.7736895188827693,
+    -2.578965062942564,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-04": [
+    1.1222377029497328,
+    -3.7407923431657757,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-05": [
+    0.7027489535965246,
+    -2.342496511988415,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-06": [
+    0.28214683804780155,
+    -0.9404894601593383,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-07": [
+    0.4359790588512018,
+    -1.4532635295040057,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-08": [
+    0.5873392254855916,
+    -1.957797418285305,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-09": [
+    0.4465834084791972,
+    -1.4886113615973238,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-10": [
+    0.4524910039859218,
+    -1.508303346619739,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-11": [
+    0.45373787407904737,
+    -1.512459580263491,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-12": [
+    0.5635568892519572,
+    -1.8785229641731906,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-13": [
+    0.654876882488084,
+    -2.1829229416269462,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-14": [
+    0.7521423592481438,
+    -2.5071411974938123,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-15": [
+    0.8427094607378475,
+    -2.8090315357928244,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-16": [
+    0.9226432242158934,
+    -3.0754774140529775,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-17": [
+    0.9503302107004508,
+    -3.1677673690015022,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-18": [
+    0.9316928143805464,
+    -3.105642714601821,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-19": [
+    0.9851320615394192,
+    -3.28377353846473,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-20": [
+    0.9728072088562543,
+    -3.242690696187514,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-21": [
+    1.0315168907518137,
+    -3.4383896358393784,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-22": [
+    1.0374227111846346,
+    -3.4580757039487815,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-23": [
+    1.0801096098715954,
+    -3.6003653662386506,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-24": [
+    1.1426920110008782,
+    -3.808973370002927,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-25": [
+    1.1992432793049606,
+    -3.9974775976832015,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-26": [
+    1.1609568801254413,
+    -3.8698562670848036,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-27": [
+    0.8254422939973679,
+    -2.751474313324559,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-28": [
+    0.8758253156853403,
+    -2.919417718951134,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-29": [
+    0.8958652429053275,
+    -2.9862174763510914,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-30": [
+    0.8958652429053275,
+    -2.9862174763510914,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-01": [
+    0.8958652429053275,
+    -2.9862174763510914,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-02": [
+    0.9001522415630132,
+    -3.0005074718767104,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-03": [
+    0.9039865140219409,
+    -3.013288380073136,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-04": [
+    0.9053599045983882,
+    -3.0178663486612938,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-05": [
+    0.9096202567963407,
+    -3.0320675226544687,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-06": [
+    0.9135375720729597,
+    -3.0451252402431987,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-07": [
+    0.9181112464115907,
+    -3.0603708213719685,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-08": [
+    0.9222883734105503,
+    -3.074294578035167,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-09": [
+    0.9238559228273344,
+    -3.079519742757781,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-10": [
+    0.9323899644385594,
+    -3.107966548128531,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-11": [
+    0.9365360040138793,
+    -3.121786680046264,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-12": [
+    0.9401403655918353,
+    -3.1338012186394506,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-13": [
+    0.9438363401106892,
+    -3.1461211337022967,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-14": [
+    0.9479629208991169,
+    -3.159876402997056,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-15": [
+    0.932849233931433,
+    -3.1094974464381098,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-16": [
+    0.904413418721912,
+    -3.0147113957397065,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-17": [
+    0.9104690690127135,
+    -3.0348968967090446,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-18": [
+    0.9177651142155797,
+    -3.0592170473852653,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-19": [
+    0.9212583014977332,
+    -3.0708610049924436,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-20": [
+    0.923422149284757,
+    -3.0780738309491893,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-21": [
+    0.9293405849080626,
+    -3.0978019496935416,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-22": [
+    0.9373846540723996,
+    -3.124615513574665,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-23": [
+    0.9413910069136245,
+    -3.1379700230454146,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-24": [
+    0.9476230611364487,
+    -3.158743537121495,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-25": [
+    0.9511701502789163,
+    -3.170567167596387,
+    "cruce mensual + pendiente horaria"
+   ]
+  },
+  "anterior con horas limpias": {
+   "2026-09-04": [
+    1.0532305889772327,
+    -3.510768629924108,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-05": [
+    0.799249557488524,
+    -2.664165191628413,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-06": [
+    0.47189805955715686,
+    -1.5729935318571893,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-07": [
+    0.6731801698475707,
+    -2.243933899491902,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-08": [
+    0.8623466640035381,
+    -2.874488880011793,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-09": [
+    0.8147980058002595,
+    -2.7159933526675313,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-10": [
+    0.8260854434194521,
+    -2.7536181447315067,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-11": [
+    0.8139182490599121,
+    -2.7130608301997063,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-12": [
+    0.9409247878154972,
+    -3.13641595938499,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-13": [
+    1.0614447755973055,
+    -3.538149251991018,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-14": [
+    1.1705459320433067,
+    -3.9018197734776883,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-15": [
+    1.2699701030654622,
+    -4.233233676884874,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-16": [
+    1.3609315712705057,
+    -4.536438570901685,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-17": [
+    1.3204259540923224,
+    -4.401419846974408,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-18": [
+    1.1008155781134277,
+    -3.6693852603780917,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-19": [
+    1.072885499777552,
+    -3.5762849992585064,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-20": [
+    1.064575219704111,
+    -3.548584065680369,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-21": [
+    1.1360294100926334,
+    -3.7867647003087774,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-22": [
+    1.0871033073333696,
+    -3.6236776911112316,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-23": [
+    1.147245732453099,
+    -3.8241524415103294,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-24": [
+    1.2165331365688614,
+    -4.055110455229538,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-25": [
+    1.2600077589780594,
+    -4.200025863260198,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-26": [
+    1.2631514226048752,
+    -4.2105047420162505,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-27": [
+    0.7556604172384574,
+    -2.5188680574615243,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-28": [
+    0.8220479032384137,
+    -2.740159677461379,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-29": [
+    0.849953745521755,
+    -2.833179151739183,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-30": [
+    0.849953745521755,
+    -2.833179151739183,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-01": [
+    0.849953745521755,
+    -2.833179151739183,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-02": [
+    0.8554376980882916,
+    -2.8514589936276384,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-03": [
+    0.861304455520342,
+    -2.871014851734473,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-04": [
+    0.8655247444335153,
+    -2.8850824814450506,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-05": [
+    0.8711344836785287,
+    -2.903781612261762,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-06": [
+    0.8759706686681207,
+    -2.919902228893735,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-07": [
+    0.8814445850443727,
+    -2.9381486168145754,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-08": [
+    0.8866054412769654,
+    -2.9553514709232176,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-09": [
+    0.8885063978077175,
+    -2.961687992692391,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-10": [
+    0.8937962504005125,
+    -2.9793208346683744,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-11": [
+    0.8979688268476402,
+    -2.993229422825467,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-12": [
+    0.8982680467880502,
+    -2.9942268226268336,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-13": [
+    0.9033191954298496,
+    -3.011063984766165,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-14": [
+    0.9081847094691099,
+    -3.0272823648970326,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-15": [
+    0.9072301840435205,
+    -3.024100613478401,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-16": [
+    0.8839586221466438,
+    -2.9465287404888123,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-17": [
+    0.8892728480724055,
+    -2.9642428269080177,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-18": [
+    0.8939573385805597,
+    -2.979857795268532,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-19": [
+    0.8984637941108555,
+    -2.9948793137028513,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-20": [
+    0.8990302880586379,
+    -2.996767626862126,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-21": [
+    0.903409882809296,
+    -3.0113662760309863,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-22": [
+    0.908463420317628,
+    -3.0282114010587593,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-23": [
+    0.9135021881174878,
+    -3.045007293724959,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-24": [
+    0.9185262167775696,
+    -3.0617540559252316,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-25": [
+    0.9201245752326553,
+    -3.067081917442184,
+    "cruce mensual + pendiente horaria"
+   ]
+  },
+  "nueva con Sol < -6": {
+   "2026-09-04": [
+    1.1709779445992485,
+    -3.903259815330828,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-05": [
+    0.8840597476812935,
+    -2.946865825604311,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-06": [
+    0.5236853498256768,
+    -1.745617832752256,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-07": [
+    0.6593634667498243,
+    -2.197878222499414,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-08": [
+    0.8396792298085008,
+    -2.798930766028336,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-09": [
+    0.8213046738949129,
+    -2.737682246316376,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-10": [
+    0.8545339390289564,
+    -2.848446463429854,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-11": [
+    0.8282674562660278,
+    -2.760891520886759,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-12": [
+    0.9513179191353396,
+    -3.1710597304511317,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-13": [
+    1.0692373086657112,
+    -3.5641243622190366,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-14": [
+    1.176433900910406,
+    -3.921446336368019,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-15": [
+    1.2744440188263797,
+    -4.248146729421265,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-16": [
+    1.3635409492392487,
+    -4.545136497464162,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-17": [
+    1.3418494225347581,
+    -4.472831408449193,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-18": [
+    1.1482770266046927,
+    -3.827590088682308,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-19": [
+    2.146747755735282,
+    -3.084902326612368,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-20": [
+    1.9087722982833926,
+    -2.9471304046619933,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-21": [
+    1.9853380537718448,
+    -3.06354291202403,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-22": [
+    2.041716597043165,
+    -2.9925957999655863,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-23": [
+    2.1123466714774484,
+    -3.0787114020315567,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-24": [
+    2.175441449473836,
+    -3.1747787441986772,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-25": [
+    2.248055131901869,
+    -3.2473527793828607,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-26": [
+    2.3149554146595928,
+    -3.264082323711058,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-27": [
+    2.172222153363854,
+    -2.287333386950631,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-28": [
+    2.2148380448127245,
+    -2.791148893237224,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-29": [
+    2.1583392422664565,
+    -2.989254337452855,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-30": [
+    2.1583392422664565,
+    -2.989254337452855,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-01": [
+    2.1583392422664565,
+    -2.989254337452855,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-02": [
+    2.162821971967376,
+    -3.020841145964593,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-03": [
+    2.16428380506916,
+    -3.0502753717229183,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-04": [
+    2.1528250228733974,
+    -3.0600878540547436,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-05": [
+    2.149090297459691,
+    -3.082372958994638,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-06": [
+    2.1407691631378905,
+    -3.0970532215855053,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-07": [
+    2.1489102855659223,
+    -3.1539269360050426,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-08": [
+    2.1427292583185995,
+    -3.171104097042055,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-09": [
+    2.1494869479285432,
+    -3.1768754916929787,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-10": [
+    2.159946118730895,
+    -3.191142737797518,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-11": [
+    2.1659742400205904,
+    -3.1981785790633364,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-12": [
+    2.1727800304878393,
+    -3.2025348070749415,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-13": [
+    2.1781546933063396,
+    -3.209583547730106,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-14": [
+    2.1836152548989767,
+    -3.2166059963150917,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-15": [
+    2.191864370587222,
+    -3.1952908125161645,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-16": [
+    2.1805616188326855,
+    -3.100100462997416,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-17": [
+    2.1902209880112755,
+    -3.1330140062324507,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-18": [
+    2.199834921808411,
+    -3.1856098176967613,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-19": [
+    2.204559147145189,
+    -3.2107510741181273,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-20": [
+    2.1804555814879616,
+    -3.2188481692106787,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-21": [
+    2.154483674198254,
+    -3.224901002258469,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-22": [
+    2.1644615563346874,
+    -3.238498039946391,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-23": [
+    2.1694587071030877,
+    -3.2452968965718467,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-24": [
+    2.180906896294328,
+    -3.2571038731643167,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-25": [
+    2.1630650476300204,
+    -3.2510201761533324,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ]
+  },
+  "nueva, umbral 8 noches": {
+   "2026-09-04": [
+    1.0532305889772327,
+    -3.510768629924108,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-05": [
+    0.799249557488524,
+    -2.664165191628413,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-06": [
+    0.47189805955715686,
+    -1.5729935318571893,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-07": [
+    1.539274369796459,
+    -1.3935119536093152,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-08": [
+    1.7518999217878195,
+    -1.678842549963657,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-09": [
+    1.880033709718978,
+    -1.717886643239765,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-10": [
+    1.6796132530224892,
+    -1.5502295127576793,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-11": [
+    1.7949055562458134,
+    -1.4730101833446527,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-12": [
+    1.9278353856497028,
+    -1.6562011129544412,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-13": [
+    2.045299823286242,
+    -1.830365775984214,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-14": [
+    2.1497102508602115,
+    -1.9842180084336036,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-15": [
+    2.243735492273502,
+    -2.1218698829151172,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-16": [
+    2.329789352221707,
+    -2.242098656662458,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-17": [
+    2.3167001068248183,
+    -2.97988674634788,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-18": [
+    2.3011915801369733,
+    -2.745073233601174,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-19": [
+    2.0531225334470813,
+    -2.664887808679196,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-20": [
+    1.8447649592257123,
+    -2.760616344729651,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-21": [
+    1.9211620161484524,
+    -2.8787927667175586,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-22": [
+    1.9693926477933028,
+    -2.76194601112322,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-23": [
+    2.039088279971252,
+    -2.8574803817580157,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-24": [
+    2.1099048881847926,
+    -2.966572581568979,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-25": [
+    2.1819043982968203,
+    -3.0300272077261656,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-26": [
+    2.2538844288561313,
+    -3.029786769906032,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-27": [
+    2.1023015748239793,
+    -1.94382499833049,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-28": [
+    2.1715299655497855,
+    -2.598082766885181,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-29": [
+    2.098409384982249,
+    -2.810777712948779,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-30": [
+    2.098409384982249,
+    -2.810777712948779,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-01": [
+    2.098409384982249,
+    -2.810777712948779,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-02": [
+    2.1035733483452423,
+    -2.849859295688625,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-03": [
+    2.1048577067752197,
+    -2.8851708099769002,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-04": [
+    2.0910004933113857,
+    -2.896763167856137,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-05": [
+    2.086153636989693,
+    -2.9229605088088197,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-06": [
+    2.0760177027165545,
+    -2.9401778409821944,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-07": [
+    2.079715172889655,
+    -2.9751334247388597,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-08": [
+    2.0721630855300064,
+    -2.995681816853578,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-09": [
+    2.0802491671568775,
+    -3.002457128827979,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-10": [
+    2.086737771936119,
+    -3.0111826524423737,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-11": [
+    2.0940309334220153,
+    -3.0195585049884994,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-12": [
+    2.1021112151445998,
+    -3.0245089594201984,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-13": [
+    2.108716759447752,
+    -3.0331157992032765,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-14": [
+    2.1154654877152588,
+    -3.0416890647945776,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-15": [
+    2.1234450356891426,
+    -3.045162817045755,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-16": [
+    2.121664494461219,
+    -3.003864662921078,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-17": [
+    2.1252236653062346,
+    -3.0376424893285767,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-18": [
+    2.130824500876872,
+    -3.0704422611136657,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-19": [
+    2.136459558883047,
+    -3.1018633738917973,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-20": [
+    2.111337755245101,
+    -3.0887717993574784,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-21": [
+    2.1007311677919507,
+    -3.1020257264411466,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-22": [
+    2.1069322079872657,
+    -3.110421703698494,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-23": [
+    2.113089218012248,
+    -3.118758466739478,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-24": [
+    2.1192455079455303,
+    -3.1270739082949373,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-25": [
+    2.0982148866438113,
+    -3.12101952721925,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ]
+  },
+  "nueva, umbral 15 noches": {
+   "2026-09-04": [
+    1.0532305889772327,
+    -3.510768629924108,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-05": [
+    0.799249557488524,
+    -2.664165191628413,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-06": [
+    0.47189805955715686,
+    -1.5729935318571893,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-07": [
+    0.6731801698475707,
+    -2.243933899491902,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-08": [
+    0.8623466640035381,
+    -2.874488880011793,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-09": [
+    0.8147980058002595,
+    -2.7159933526675313,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-10": [
+    0.8260854434194521,
+    -2.7536181447315067,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-11": [
+    0.8139182490599121,
+    -2.7130608301997063,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-12": [
+    0.9409247878154972,
+    -3.13641595938499,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-13": [
+    1.0614447755973055,
+    -3.538149251991018,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-14": [
+    2.1497102508602115,
+    -1.9842180084336036,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-15": [
+    2.243735492273502,
+    -2.1218698829151172,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-16": [
+    2.329789352221707,
+    -2.242098656662458,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-17": [
+    2.3167001068248183,
+    -2.97988674634788,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-18": [
+    2.3011915801369733,
+    -2.745073233601174,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-19": [
+    2.0531225334470813,
+    -2.664887808679196,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-20": [
+    1.8447649592257123,
+    -2.760616344729651,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-21": [
+    1.9211620161484524,
+    -2.8787927667175586,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-22": [
+    1.9693926477933028,
+    -2.76194601112322,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-23": [
+    2.039088279971252,
+    -2.8574803817580157,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-24": [
+    2.1099048881847926,
+    -2.966572581568979,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-25": [
+    2.1819043982968203,
+    -3.0300272077261656,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-26": [
+    2.2538844288561313,
+    -3.029786769906032,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-27": [
+    2.1023015748239793,
+    -1.94382499833049,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-28": [
+    2.1715299655497855,
+    -2.598082766885181,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-29": [
+    2.098409384982249,
+    -2.810777712948779,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-30": [
+    2.098409384982249,
+    -2.810777712948779,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-01": [
+    2.098409384982249,
+    -2.810777712948779,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-02": [
+    2.1035733483452423,
+    -2.849859295688625,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-03": [
+    2.1048577067752197,
+    -2.8851708099769002,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-04": [
+    2.0910004933113857,
+    -2.896763167856137,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-05": [
+    2.086153636989693,
+    -2.9229605088088197,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-06": [
+    2.0760177027165545,
+    -2.9401778409821944,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-07": [
+    2.079715172889655,
+    -2.9751334247388597,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-08": [
+    2.0721630855300064,
+    -2.995681816853578,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-09": [
+    2.0802491671568775,
+    -3.002457128827979,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-10": [
+    2.086737771936119,
+    -3.0111826524423737,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-11": [
+    2.0940309334220153,
+    -3.0195585049884994,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-12": [
+    2.1021112151445998,
+    -3.0245089594201984,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-13": [
+    2.108716759447752,
+    -3.0331157992032765,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-14": [
+    2.1154654877152588,
+    -3.0416890647945776,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-15": [
+    2.1234450356891426,
+    -3.045162817045755,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-16": [
+    2.121664494461219,
+    -3.003864662921078,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-17": [
+    2.1252236653062346,
+    -3.0376424893285767,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-18": [
+    2.130824500876872,
+    -3.0704422611136657,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-19": [
+    2.136459558883047,
+    -3.1018633738917973,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-20": [
+    2.111337755245101,
+    -3.0887717993574784,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-21": [
+    2.1007311677919507,
+    -3.1020257264411466,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-22": [
+    2.1069322079872657,
+    -3.110421703698494,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-23": [
+    2.113089218012248,
+    -3.118758466739478,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-24": [
+    2.1192455079455303,
+    -3.1270739082949373,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-25": [
+    2.0982148866438113,
+    -3.12101952721925,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ]
+  },
+  "nueva, umbral 20 noches": {
+   "2026-09-04": [
+    1.0532305889772327,
+    -3.510768629924108,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-05": [
+    0.799249557488524,
+    -2.664165191628413,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-06": [
+    0.47189805955715686,
+    -1.5729935318571893,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-07": [
+    0.6731801698475707,
+    -2.243933899491902,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-08": [
+    0.8623466640035381,
+    -2.874488880011793,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-09": [
+    0.8147980058002595,
+    -2.7159933526675313,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-10": [
+    0.8260854434194521,
+    -2.7536181447315067,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-11": [
+    0.8139182490599121,
+    -2.7130608301997063,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-12": [
+    0.9409247878154972,
+    -3.13641595938499,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-13": [
+    1.0614447755973055,
+    -3.538149251991018,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-14": [
+    1.1705459320433067,
+    -3.9018197734776883,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-15": [
+    1.2699701030654622,
+    -4.233233676884874,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-16": [
+    1.3609315712705057,
+    -4.536438570901685,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-17": [
+    1.3204259540923224,
+    -4.401419846974408,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-18": [
+    1.1008155781134277,
+    -3.6693852603780917,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-19": [
+    2.0531225334470813,
+    -2.664887808679196,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-20": [
+    1.8447649592257123,
+    -2.760616344729651,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-21": [
+    1.9211620161484524,
+    -2.8787927667175586,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-22": [
+    1.9693926477933028,
+    -2.76194601112322,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-23": [
+    2.039088279971252,
+    -2.8574803817580157,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-24": [
+    2.1099048881847926,
+    -2.966572581568979,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-25": [
+    2.1819043982968203,
+    -3.0300272077261656,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-26": [
+    2.2538844288561313,
+    -3.029786769906032,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-27": [
+    2.1023015748239793,
+    -1.94382499833049,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-28": [
+    2.1715299655497855,
+    -2.598082766885181,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-29": [
+    2.098409384982249,
+    -2.810777712948779,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-30": [
+    2.098409384982249,
+    -2.810777712948779,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-01": [
+    2.098409384982249,
+    -2.810777712948779,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-02": [
+    2.1035733483452423,
+    -2.849859295688625,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-03": [
+    2.1048577067752197,
+    -2.8851708099769002,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-04": [
+    2.0910004933113857,
+    -2.896763167856137,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-05": [
+    2.086153636989693,
+    -2.9229605088088197,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-06": [
+    2.0760177027165545,
+    -2.9401778409821944,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-07": [
+    2.079715172889655,
+    -2.9751334247388597,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-08": [
+    2.0721630855300064,
+    -2.995681816853578,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-09": [
+    2.0802491671568775,
+    -3.002457128827979,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-10": [
+    2.086737771936119,
+    -3.0111826524423737,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-11": [
+    2.0940309334220153,
+    -3.0195585049884994,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-12": [
+    2.1021112151445998,
+    -3.0245089594201984,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-13": [
+    2.108716759447752,
+    -3.0331157992032765,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-14": [
+    2.1154654877152588,
+    -3.0416890647945776,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-15": [
+    2.1234450356891426,
+    -3.045162817045755,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-16": [
+    2.121664494461219,
+    -3.003864662921078,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-17": [
+    2.1252236653062346,
+    -3.0376424893285767,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-18": [
+    2.130824500876872,
+    -3.0704422611136657,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-19": [
+    2.136459558883047,
+    -3.1018633738917973,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-20": [
+    2.111337755245101,
+    -3.0887717993574784,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-21": [
+    2.1007311677919507,
+    -3.1020257264411466,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-22": [
+    2.1069322079872657,
+    -3.110421703698494,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-23": [
+    2.113089218012248,
+    -3.118758466739478,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-24": [
+    2.1192455079455303,
+    -3.1270739082949373,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-25": [
+    2.0982148866438113,
+    -3.12101952721925,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ]
+  },
+  "nueva, umbral 30 noches": {
+   "2026-09-04": [
+    1.0532305889772327,
+    -3.510768629924108,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-05": [
+    0.799249557488524,
+    -2.664165191628413,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-06": [
+    0.47189805955715686,
+    -1.5729935318571893,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-07": [
+    0.6731801698475707,
+    -2.243933899491902,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-08": [
+    0.8623466640035381,
+    -2.874488880011793,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-09": [
+    0.8147980058002595,
+    -2.7159933526675313,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-10": [
+    0.8260854434194521,
+    -2.7536181447315067,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-11": [
+    0.8139182490599121,
+    -2.7130608301997063,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-12": [
+    0.9409247878154972,
+    -3.13641595938499,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-13": [
+    1.0614447755973055,
+    -3.538149251991018,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-14": [
+    1.1705459320433067,
+    -3.9018197734776883,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-15": [
+    1.2699701030654622,
+    -4.233233676884874,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-16": [
+    1.3609315712705057,
+    -4.536438570901685,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-17": [
+    1.3204259540923224,
+    -4.401419846974408,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-18": [
+    1.1008155781134277,
+    -3.6693852603780917,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-19": [
+    1.072885499777552,
+    -3.5762849992585064,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-20": [
+    1.064575219704111,
+    -3.548584065680369,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-21": [
+    1.1360294100926334,
+    -3.7867647003087774,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-22": [
+    1.0871033073333696,
+    -3.6236776911112316,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-23": [
+    1.147245732453099,
+    -3.8241524415103294,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-24": [
+    1.2165331365688614,
+    -4.055110455229538,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-25": [
+    1.2600077589780594,
+    -4.200025863260198,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-26": [
+    1.2631514226048752,
+    -4.2105047420162505,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-27": [
+    0.7556604172384574,
+    -2.5188680574615243,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-28": [
+    0.8220479032384137,
+    -2.740159677461379,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-29": [
+    2.098409384982249,
+    -2.810777712948779,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-09-30": [
+    2.098409384982249,
+    -2.810777712948779,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-01": [
+    2.098409384982249,
+    -2.810777712948779,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-02": [
+    2.1035733483452423,
+    -2.849859295688625,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-03": [
+    2.1048577067752197,
+    -2.8851708099769002,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-04": [
+    2.0910004933113857,
+    -2.896763167856137,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-05": [
+    2.086153636989693,
+    -2.9229605088088197,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-06": [
+    2.0760177027165545,
+    -2.9401778409821944,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-07": [
+    2.079715172889655,
+    -2.9751334247388597,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-08": [
+    2.0721630855300064,
+    -2.995681816853578,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-09": [
+    2.0802491671568775,
+    -3.002457128827979,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-10": [
+    2.086737771936119,
+    -3.0111826524423737,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-11": [
+    2.0940309334220153,
+    -3.0195585049884994,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-12": [
+    2.1021112151445998,
+    -3.0245089594201984,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-13": [
+    2.108716759447752,
+    -3.0331157992032765,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-14": [
+    2.1154654877152588,
+    -3.0416890647945776,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-15": [
+    2.1234450356891426,
+    -3.045162817045755,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-16": [
+    2.121664494461219,
+    -3.003864662921078,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-17": [
+    2.1252236653062346,
+    -3.0376424893285767,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-18": [
+    2.130824500876872,
+    -3.0704422611136657,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-19": [
+    2.136459558883047,
+    -3.1018633738917973,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-20": [
+    2.111337755245101,
+    -3.0887717993574784,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-21": [
+    2.1007311677919507,
+    -3.1020257264411466,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-22": [
+    2.1069322079872657,
+    -3.110421703698494,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-23": [
+    2.113089218012248,
+    -3.118758466739478,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-24": [
+    2.1192455079455303,
+    -3.1270739082949373,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ],
+   "2026-10-25": [
+    2.0982148866438113,
+    -3.12101952721925,
+    "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+   ]
+  },
+  "publicada": {
+   "2026-09-05": [
+    0.9619714747238084,
+    -3.2065715824126944,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-06": [
+    0.562807983546276,
+    -1.8760266118209197,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-07": [
+    0.35761588534197947,
+    -1.1920529511399314,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-08": [
+    0.5873392254855916,
+    -1.957797418285305,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-09": [
+    0.4465834084791972,
+    -1.4886113615973238,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-10": [
+    0.4524910039859218,
+    -1.508303346619739,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-11": [
+    0.45373787407904737,
+    -1.512459580263491,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-12": [
+    0.5635568892519572,
+    -1.8785229641731906,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-13": [
+    0.654876882488084,
+    -2.1829229416269462,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-14": [
+    0.7521423592481438,
+    -2.5071411974938123,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-15": [
+    0.8427094607378475,
+    -2.8090315357928244,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-16": [
+    0.9226432242151821,
+    -3.0754774140506065,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-17": [
+    0.9503302107013107,
+    -3.167767369004369,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-18": [
+    0.9316928143805464,
+    -3.105642714601821,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-19": [
+    0.9316928143805464,
+    -3.105642714601821,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-20": [
+    0.9851320615394192,
+    -3.28377353846473,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-21": [
+    0.9728072088562543,
+    -3.242690696187514,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-22": [
+    1.0315168907518137,
+    -3.4383896358393784,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-23": [
+    1.0374227111846346,
+    -3.4580757039487815,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-24": [
+    1.0801096098715954,
+    -3.6003653662386506,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-25": [
+    1.1426920110008782,
+    -3.808973370002927,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-26": [
+    1.2045585343679668,
+    -4.015195114559889,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-27": [
+    1.1014597251988287,
+    -3.6715324173294284,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-28": [
+    0.8341180317003944,
+    -2.7803934390013145,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-29": [
+    0.8847322287508431,
+    -2.9491074291694765,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-09-30": [
+    0.8847322287508431,
+    -2.9491074291694765,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-01": [
+    0.8958652429053275,
+    -2.9862174763510914,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-02": [
+    0.8958652429053275,
+    -2.9862174763510914,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-03": [
+    0.9039865140219409,
+    -3.013288380073136,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-04": [
+    0.9053599045983882,
+    -3.0178663486612938,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-05": [
+    0.9053599045983882,
+    -3.0178663486612938,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-06": [
+    0.9096202568107131,
+    -3.0320675227023766,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-07": [
+    0.9181112464115907,
+    -3.0603708213719685,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-08": [
+    0.9222883734105503,
+    -3.074294578035167,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-09": [
+    0.9222883734105503,
+    -3.074294578035167,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-10": [
+    0.9281290021940053,
+    -3.093763340646684,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-11": [
+    0.9365360040138793,
+    -3.121786680046264,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-12": [
+    0.9401403655918353,
+    -3.1338012186394506,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-13": [
+    0.9401403655918353,
+    -3.1338012186394506,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-14": [
+    0.9479629208991169,
+    -3.159876402997056,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-15": [
+    0.9504197361931273,
+    -3.168065787310424,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-16": [
+    0.904413418721912,
+    -3.0147113957397065,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-17": [
+    0.904413418721912,
+    -3.0147113957397065,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-18": [
+    0.9104690690127135,
+    -3.0348968967090446,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-19": [
+    0.9177651142155797,
+    -3.0592170473852653,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-20": [
+    0.9191269850869962,
+    -3.0637566169566535,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-21": [
+    0.9293405849080626,
+    -3.0978019496935416,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-22": [
+    0.9373846540723996,
+    -3.124615513574665,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-23": [
+    0.9373846540723996,
+    -3.124615513574665,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-24": [
+    0.9413910069136245,
+    -3.1379700230454146,
+    "cruce mensual + pendiente horaria"
+   ],
+   "2026-10-25": [
+    0.9511701502789163,
+    -3.170567167596387,
+    "cruce mensual + pendiente horaria"
+   ]
+  }
+ },
+ "hourly": {
+  "n": 227,
+  "nights": 49,
+  "base_rate": 0.73568281938326,
+  "models": {
+   "nueva (produccion)": {
+    "brier": [
+     0.19073900677171765,
+     0.13812923944498448,
+     0.24781632744936
+    ],
+    "auc": [
+     0.7283932135728542,
+     0.6062003588516747,
+     0.8506389854733833
+    ],
+    "bss_clim": [
+     0.019102766473070076,
+     -0.4390510196339553,
+     0.22324987546912486
+    ],
+    "mean_p": 0.6296849300831208,
+    "bss_ref": [
+     0.05427750241418372,
+     -0.29959426956779955,
+     0.28125045143099225
+    ],
+    "d_brier": [
+     -0.010947013449462195,
+     -0.06830802875523215,
+     0.05000215743693482
+    ],
+    "d_auc": [
+     -0.0990019960079841,
+     -0.19795599333338534,
+     0.013354345868066888
+    ]
+   },
+   "anterior reajustada": {
+    "brier": [
+     0.2013272120990597,
+     0.1453259411263741,
+     0.2738056457112507
+    ],
+    "auc": [
+     0.8232035928143713,
+     0.6939371375099538,
+     0.930404528869233
+    ],
+    "bss_clim": [
+     -0.035348294635972666,
+     -0.8277299392507979,
+     0.32688248872016445
+    ],
+    "mean_p": 0.49497641317240143,
+    "bss_ref": [
+     0.0017790430974177207,
+     -0.02750321744379015,
+     0.0239747460221845
+    ],
+    "d_brier": [
+     -0.0003588081221201356,
+     -0.005269134170007095,
+     0.004682677338768228
+    ],
+    "d_auc": [
+     -0.004191616766467066,
+     -0.017746695240145518,
+     0.007373961808524753
+    ]
+   },
+   "anterior con horas limpias": {
+    "brier": [
+     0.1949735064164023,
+     0.13355633750968288,
+     0.2729292200101495
+    ],
+    "auc": [
+     0.8284930139720559,
+     0.7005697687669644,
+     0.932536720411056
+    ],
+    "bss_clim": [
+     -0.0026736339451889357,
+     -0.7740211166120702,
+     0.37073178630651454
+    ],
+    "mean_p": 0.5128863166362251,
+    "bss_ref": [
+     0.03328199841226598,
+     -0.018021988616037703,
+     0.09945277305204576
+    ],
+    "d_brier": [
+     -0.0067125138047775534,
+     -0.016593557620717438,
+     0.004035815864114623
+    ],
+    "d_auc": [
+     0.0010978043912175384,
+     -0.02126323956014302,
+     0.023752258831584067
+    ]
+   },
+   "nueva con Sol < -6": {
+    "brier": [
+     0.18849706539222813,
+     0.13600755398029912,
+     0.24588108023776598
+    ],
+    "auc": [
+     0.7345808383233533,
+     0.6124570024699556,
+     0.8577283884871034
+    ],
+    "bss_clim": [
+     0.030632207325736238,
+     -0.4650103910106111,
+     0.25326159545795535
+    ],
+    "mean_p": 0.6245512392939095,
+    "bss_ref": [
+     0.0653935003253473,
+     -0.24953498513046338,
+     0.2706083409229137
+    ],
+    "d_brier": [
+     -0.013188954828951716,
+     -0.06480562187333255,
+     0.041646044411875825
+    ],
+    "d_auc": [
+     -0.09281437125748504,
+     -0.1853104937311524,
+     0.010091392440025286
+    ]
+   },
+   "nueva, umbral 8 noches": {
+    "brier": [
+     0.16883067882096645,
+     0.11129513053251254,
+     0.23093072890745256
+    ],
+    "auc": [
+     0.7682135728542914,
+     0.6355504992195834,
+     0.8910999405886469
+    ],
+    "bss_clim": [
+     0.13176885738866473,
+     -0.1767238978935901,
+     0.3086017219434467
+    ],
+    "mean_p": 0.7281413462939874,
+    "bss_ref": [
+     0.1629034147442765,
+     -0.19792035305674624,
+     0.4063308113317733
+    ],
+    "d_brier": [
+     -0.0328553414002134,
+     -0.09701327647546239,
+     0.033904188653976076
+    ],
+    "d_auc": [
+     -0.05918163672654697,
+     -0.11666868564506352,
+     -0.010677889730744983
+    ]
+   },
+   "nueva, umbral 15 noches": {
+    "brier": [
+     0.18746243164711052,
+     0.13208844523282973,
+     0.24496377909472006
+    ],
+    "auc": [
+     0.6957584830339322,
+     0.5679881909350641,
+     0.8278756542421796
+    ],
+    "bss_clim": [
+     0.035952930105393466,
+     -0.33945313487692425,
+     0.21424896817479847
+    ],
+    "mean_p": 0.6810064783252745,
+    "bss_ref": [
+     0.07052342328174743,
+     -0.29584198005479595,
+     0.3122498423928804
+    ],
+    "d_brier": [
+     -0.014223588574069329,
+     -0.07511738979716907,
+     0.05015788836492028
+    ],
+    "d_auc": [
+     -0.13163672654690617,
+     -0.20874978181624523,
+     -0.05622637963717899
+    ]
+   },
+   "nueva, umbral 20 noches": {
+    "brier": [
+     0.19073900677171765,
+     0.13812923944498448,
+     0.24781632744936
+    ],
+    "auc": [
+     0.7283932135728542,
+     0.6062003588516747,
+     0.8506389854733833
+    ],
+    "bss_clim": [
+     0.019102766473070076,
+     -0.4390510196339553,
+     0.22324987546912486
+    ],
+    "mean_p": 0.6296849300831208,
+    "bss_ref": [
+     0.05427750241418372,
+     -0.29959426956779955,
+     0.28125045143099225
+    ],
+    "d_brier": [
+     -0.010947013449462195,
+     -0.06830802875523215,
+     0.05000215743693482
+    ],
+    "d_auc": [
+     -0.0990019960079841,
+     -0.19795599333338534,
+     0.013354345868066888
+    ]
+   },
+   "nueva, umbral 30 noches": {
+    "brier": [
+     0.20009665117128725,
+     0.13756271144853238,
+     0.2776992336187314
+    ],
+    "auc": [
+     0.7960578842315369,
+     0.6646727428594641,
+     0.904707783236878
+    ],
+    "bss_clim": [
+     -0.029019993832860358,
+     -0.8126285211370308,
+     0.3439991390209528
+    ],
+    "mean_p": 0.5385067246958117,
+    "bss_ref": [
+     0.007880412574702067,
+     -0.06339315245181665,
+     0.0834151000429562
+    ],
+    "d_brier": [
+     -0.0015893690498925972,
+     -0.01441146441266854,
+     0.01312452970877787
+    ],
+    "d_auc": [
+     -0.03133732534930145,
+     -0.09343243778993082,
+     0.00788520801232667
+    ]
+   },
+   "publicada": {
+    "brier": [
+     0.20168602022117985,
+     0.14404373903377574,
+     0.2770471119558356
+    ],
+    "auc": [
+     0.8273952095808383,
+     0.6974245441471123,
+     0.9343014254644357
+    ],
+    "bss_clim": [
+     -0.03719350658454834,
+     -0.8344622655455601,
+     0.3314228502626985
+    ],
+    "mean_p": 0.4914067811689101
+   },
+   "nube cruda (cualquier curva fija)": {
+    "brier": [
+     0.15479603524229074,
+     0.08310393873678504,
+     0.24352478269549727
+    ],
+    "auc": [
+     0.8480039920159681,
+     0.7302205039263863,
+     0.9435837730993716
+    ],
+    "bss_clim": [
+     0.20394362275449107,
+     -0.4261585656731874,
+     0.5523160421331297
+    ],
+    "mean_p": 0.6959911894273129,
+    "bss_ref": [
+     0.23249001059898455,
+     0.0412867907705705,
+     0.46475920934942844
+    ],
+    "d_brier": [
+     -0.046889984978889104,
+     -0.07975664799449131,
+     -0.009152306162531817
+    ],
+    "d_auc": [
+     0.020608782435129758,
+     -0.012953245924607129,
+     0.06082999571444442
+    ]
+   }
+  }
+ },
+ "hourly_reliability": {
+  "publicada": [
+   [
+    0.07301441129121111,
+    0.5294117647058824,
+    17
+   ],
+   [
+    0.14736369598648602,
+    0.23076923076923078,
+    26
+   ],
+   [
+    0.26267553821168244,
+    0.5,
+    18
+   ],
+   [
+    0.3515831937255391,
+    0.5714285714285714,
+    14
+   ],
+   [
+    0.45475622524560316,
+    0.6666666666666666,
+    12
+   ],
+   [
+    0.5634469770093021,
+    0.7419354838709677,
+    31
+   ],
+   [
+    0.6489250626475942,
+    0.9285714285714286,
+    70
+   ],
+   [
+    0.7301956015950855,
+    1.0,
+    39
+   ]
+  ],
+  "anterior reajustada": [
+   [
+    0.07122355138214952,
+    0.9,
+    10
+   ],
+   [
+    0.14706274225001117,
+    0.16666666666666666,
+    30
+   ],
+   [
+    0.25949092509552585,
+    0.45,
+    20
+   ],
+   [
+    0.35180719124916543,
+    0.6,
+    15
+   ],
+   [
+    0.45689868547993767,
+    0.6666666666666666,
+    12
+   ],
+   [
+    0.5612813919464138,
+    0.7741935483870968,
+    31
+   ],
+   [
+    0.6460978852757512,
+    0.9142857142857143,
+    70
+   ],
+   [
+    0.7348523664811446,
+    1.0,
+    39
+   ]
+  ],
+  "nueva (produccion)": [
+   [
+    0.05669627302931228,
+    0.5,
+    2
+   ],
+   [
+    0.16589481966887812,
+    0.5,
+    12
+   ],
+   [
+    0.2461276927708739,
+    0.5,
+    10
+   ],
+   [
+    0.34315568328476803,
+    0.6666666666666666,
+    21
+   ],
+   [
+    0.4434580477076632,
+    0.42857142857142855,
+    14
+   ],
+   [
+    0.5572560352468825,
+    0.3333333333333333,
+    18
+   ],
+   [
+    0.6596691664083626,
+    0.8,
+    45
+   ],
+   [
+    0.7487264059035423,
+    0.8979591836734694,
+    49
+   ],
+   [
+    0.8670549069659518,
+    0.875,
+    56
+   ]
+  ]
+ },
+ "instrument_control": {
+  "n": 42,
+  "exact": 1.0,
+  "max_abs": 0.0004918519845966696
+ },
+ "verdict": {
+  "n": 42,
+  "nights": 42,
+  "base_rate": 0.8333333333333334,
+  "models": {
+   "nueva (produccion)": {
+    "brier": [
+     0.1189568577537827,
+     0.07026402152152995,
+     0.17540733834077574
+    ],
+    "auc": [
+     0.8081632653061225,
+     0.5393518518518519,
+     1.0
+    ],
+    "bss_clim": [
+     0.1435106241727646,
+     -0.8861158605890448,
+     0.5108464426146799
+    ],
+    "mean_p": 0.6894746964261029,
+    "bss_ref": [
+     0.2534348788337657,
+     -0.0053028601822075905,
+     0.475152389286586
+    ],
+    "d_brier": [
+     -0.0403820322923478,
+     -0.0821488429761122,
+     0.0007426871732781692
+    ],
+    "d_auc": [
+     -0.0897959183673469,
+     -0.2222222222222222,
+     0.013888888888888845
+    ]
+   },
+   "anterior reajustada": {
+    "brier": [
+     0.15904515436861996,
+     0.1102182126276606,
+     0.21485588266474384
+    ],
+    "auc": [
+     0.8938775510204081,
+     0.7018924792139077,
+     1.0
+    ],
+    "bss_clim": [
+     -0.1451251114540637,
+     -2.014580063818091,
+     0.35960090472364953
+    ],
+    "mean_p": 0.5520940685765728,
+    "bss_ref": [
+     0.0018434650663469165,
+     -0.021027165097853562,
+     0.018782044229612424
+    ],
+    "d_brier": [
+     -0.0002937356775105371,
+     -0.0031515906302823278,
+     0.003120854137736509
+    ],
+    "d_auc": [
+     -0.004081632653061273,
+     -0.024489795918367308,
+     0.0
+    ]
+   },
+   "anterior con horas limpias": {
+    "brier": [
+     0.14904445234382033,
+     0.09982043657448819,
+     0.20715761915579284
+    ],
+    "auc": [
+     0.9142857142857143,
+     0.7757240396158464,
+     1.0
+    ],
+    "bss_clim": [
+     -0.07312005687550638,
+     -1.8306096345898624,
+     0.41079751875888126
+    ],
+    "mean_p": 0.5690860646193773,
+    "bss_ref": [
+     0.06460718848568492,
+     0.014980779451548349,
+     0.12589316882702908
+    ],
+    "d_brier": [
+     -0.010294437702310172,
+     -0.017908981506723785,
+     -0.0025442501155920802
+    ],
+    "d_auc": [
+     0.01632653061224487,
+     0.0,
+     0.06580882352941173
+    ]
+   },
+   "nueva con Sol < -6": {
+    "brier": [
+     0.11829058679705944,
+     0.06926788520014952,
+     0.17511801984362615
+    ],
+    "auc": [
+     0.8163265306122449,
+     0.5696497678018576,
+     1.0
+    ],
+    "bss_clim": [
+     0.1483077750611721,
+     -0.8968168200076589,
+     0.5251150457896036
+    ],
+    "mean_p": 0.6897069921128922,
+    "bss_ref": [
+     0.2576163498891394,
+     0.017122416809086237,
+     0.4720667866603846
+    ],
+    "d_brier": [
+     -0.041048303249071064,
+     -0.08029391321064093,
+     -0.0023586805145905574
+    ],
+    "d_auc": [
+     -0.08163265306122447,
+     -0.2138022638022638,
+     0.01565456081081078
+    ]
+   },
+   "nueva, umbral 8 noches": {
+    "brier": [
+     0.09179096571782813,
+     0.04535031777746984,
+     0.14591521126072743
+    ],
+    "auc": [
+     0.8530612244897959,
+     0.6049663299663299,
+     1.0
+    ],
+    "bss_clim": [
+     0.33910504683163745,
+     -0.37837688147268095,
+     0.6451707196869244
+    ],
+    "mean_p": 0.7376872815119802,
+    "bss_ref": [
+     0.4239261633412059,
+     0.1527809223914224,
+     0.6581375765609297
+    ],
+    "d_brier": [
+     -0.06754792432830237,
+     -0.1108970965308717,
+     -0.02286840326117543
+    ],
+    "d_auc": [
+     -0.04489795918367345,
+     -0.1306122448979592,
+     0.021621621621621623
+    ]
+   },
+   "nueva, umbral 15 noches": {
+    "brier": [
+     0.10476274108408926,
+     0.058314211689397516,
+     0.15746289059247526
+    ],
+    "auc": [
+     0.8244897959183674,
+     0.569281045751634,
+     1.0
+    ],
+    "bss_clim": [
+     0.24570826419455738,
+     -0.6325591005976973,
+     0.5679906627772177
+    ],
+    "mean_p": 0.7104120785194779,
+    "bss_ref": [
+     0.34251618638890224,
+     0.0720947190605909,
+     0.564486450525955
+    ],
+    "d_brier": [
+     -0.05457614896204124,
+     -0.09737551815381144,
+     -0.010571960312422739
+    ],
+    "d_auc": [
+     -0.07346938775510203,
+     -0.19200065167807104,
+     0.017094017094017144
+    ]
+   },
+   "nueva, umbral 20 noches": {
+    "brier": [
+     0.1189568577537827,
+     0.07026402152152995,
+     0.17540733834077574
+    ],
+    "auc": [
+     0.8081632653061225,
+     0.5393518518518519,
+     1.0
+    ],
+    "bss_clim": [
+     0.1435106241727646,
+     -0.8861158605890448,
+     0.5108464426146799
+    ],
+    "mean_p": 0.6894746964261029,
+    "bss_ref": [
+     0.2534348788337657,
+     -0.0053028601822075905,
+     0.475152389286586
+    ],
+    "d_brier": [
+     -0.0403820322923478,
+     -0.0821488429761122,
+     0.0007426871732781692
+    ],
+    "d_auc": [
+     -0.0897959183673469,
+     -0.2222222222222222,
+     0.013888888888888845
+    ]
+   },
+   "nueva, umbral 30 noches": {
+    "brier": [
+     0.1229608784959659,
+     0.07237812087431582,
+     0.17770870460268803
+    ],
+    "auc": [
+     0.8653061224489796,
+     0.66937424969988,
+     1.0
+    ],
+    "bss_clim": [
+     0.11468167482904557,
+     -1.1812142391363183,
+     0.5219377966699248
+    ],
+    "mean_p": 0.6468557001086996,
+    "bss_ref": [
+     0.22830591790637378,
+     0.04684896836524427,
+     0.4047084747272094
+    ],
+    "d_brier": [
+     -0.036378011550164596,
+     -0.06423997062024976,
+     -0.007370530978645993
+    ],
+    "d_auc": [
+     -0.03265306122448974,
+     -0.19460751192368841,
+     0.08171768707482983
+    ]
+   },
+   "publicada": {
+    "brier": [
+     0.1593388900461305,
+     0.1098037308168329,
+     0.2159014059629802
+    ],
+    "auc": [
+     0.8979591836734694,
+     0.7241350441350441,
+     1.0
+    ],
+    "bss_clim": [
+     -0.14724000833213946,
+     -2.0097378367692333,
+     0.3608658308406919
+    ],
+    "mean_p": 0.5496141877137035
+   },
+   "publicado (noche.json)": {
+    "brier": [
+     0.15973592857142857,
+     0.11045831428571429,
+     0.21646424107142848
+    ],
+    "auc": [
+     0.889795918367347,
+     0.6864214214214214,
+     1.0
+    ],
+    "bss_clim": [
+     -0.15009868571428564,
+     -2.015583261025642,
+     0.3594266746528375
+    ],
+    "mean_p": 0.5488809523809524,
+    "bss_ref": [
+     -0.00249178668925798,
+     -0.010090822082882195,
+     0.0024787554361428124
+    ],
+    "d_brier": [
+     0.00039703852529807127,
+     -0.00040615316016500493,
+     0.0014347433466323615
+    ],
+    "d_auc": [
+     -0.008163265306122436,
+     -0.03706018518518523,
+     0.0
+    ]
+   }
+  }
+ },
+ "verdict_thresholds": {
+  "n": 42,
+  "nights": 42,
+  "base_rate": 0.8333333333333334,
+  "models": {
+   "nueva (produccion)": {
+    "brier": [
+     0.1189568577537827,
+     0.07026402152152995,
+     0.17540733834077574
+    ],
+    "auc": [
+     0.8081632653061225,
+     0.5393518518518519,
+     1.0
+    ],
+    "bss_clim": [
+     0.1435106241727646,
+     -0.8861158605890448,
+     0.5108464426146799
+    ],
+    "mean_p": 0.6894746964261029
+   },
+   "nueva, umbral 8 noches": {
+    "brier": [
+     0.09179096571782813,
+     0.04535031777746984,
+     0.14591521126072743
+    ],
+    "auc": [
+     0.8530612244897959,
+     0.6049663299663299,
+     1.0
+    ],
+    "bss_clim": [
+     0.33910504683163745,
+     -0.37837688147268095,
+     0.6451707196869244
+    ],
+    "mean_p": 0.7376872815119802,
+    "bss_ref": [
+     0.22836759938786066,
+     0.09636877753911935,
+     0.4399921319566554
+    ],
+    "d_brier": [
+     -0.02716589203595457,
+     -0.05158821214548272,
+     -0.01086009577408692
+    ],
+    "d_auc": [
+     0.04489795918367345,
+     0.0,
+     0.13198421597377952
+    ]
+   },
+   "nueva, umbral 15 noches": {
+    "brier": [
+     0.10476274108408926,
+     0.058314211689397516,
+     0.15746289059247526
+    ],
+    "auc": [
+     0.8244897959183674,
+     0.569281045751634,
+     1.0
+    ],
+    "bss_clim": [
+     0.24570826419455738,
+     -0.6325591005976973,
+     0.5679906627772177
+    ],
+    "mean_p": 0.7104120785194779,
+    "bss_ref": [
+     0.11932155016293788,
+     0.008718554797174732,
+     0.3034312934045067
+    ],
+    "d_brier": [
+     -0.014194116669693446,
+     -0.037031664070465535,
+     -0.0009950227580913795
+    ],
+    "d_auc": [
+     0.01632653061224487,
+     0.0,
+     0.048979591836734726
+    ]
+   },
+   "nueva, umbral 20 noches": {
+    "brier": [
+     0.1189568577537827,
+     0.07026402152152995,
+     0.17540733834077574
+    ],
+    "auc": [
+     0.8081632653061225,
+     0.5393518518518519,
+     1.0
+    ],
+    "bss_clim": [
+     0.1435106241727646,
+     -0.8861158605890448,
+     0.5108464426146799
+    ],
+    "mean_p": 0.6894746964261029,
+    "bss_ref": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "d_brier": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "d_auc": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   "nueva, umbral 30 noches": {
+    "brier": [
+     0.1229608784959659,
+     0.07237812087431582,
+     0.17770870460268803
+    ],
+    "auc": [
+     0.8653061224489796,
+     0.66937424969988,
+     1.0
+    ],
+    "bss_clim": [
+     0.11468167482904557,
+     -1.1812142391363183,
+     0.5219377966699248
+    ],
+    "mean_p": 0.6468557001086996,
+    "bss_ref": [
+     -0.0336594360156246,
+     -0.3196147925025542,
+     0.1852242904854335
+    ],
+    "d_brier": [
+     0.004004020742183201,
+     -0.025078649986012332,
+     0.03456679324343003
+    ],
+    "d_auc": [
+     0.05714285714285716,
+     -0.050000000000000044,
+     0.21899353899353877
+    ]
+   }
+  }
+ },
+ "verdict_acc": {
+  "nueva (produccion)": {
+   "accuracy": [
+    0.8333333333333334,
+    0.7142857142857143,
+    0.9285714285714286
+   ],
+   "d_accuracy": [
+    -0.023809523809523725,
+    -0.09523809523809523,
+    0.04761904761904767
+   ],
+   "hits": 31,
+   "false_alarms": 3,
+   "misses": 4,
+   "correct_neg": 4
+  },
+  "anterior reajustada": {
+   "accuracy": [
+    0.8571428571428571,
+    0.7380952380952381,
+    0.9523809523809523
+   ],
+   "d_accuracy": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "hits": 30,
+   "false_alarms": 1,
+   "misses": 5,
+   "correct_neg": 6
+  },
+  "anterior con horas limpias": {
+   "accuracy": [
+    0.8571428571428571,
+    0.7380952380952381,
+    0.9523809523809523
+   ],
+   "d_accuracy": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "hits": 30,
+   "false_alarms": 1,
+   "misses": 5,
+   "correct_neg": 6
+  },
+  "nueva con Sol < -6": {
+   "accuracy": [
+    0.8333333333333334,
+    0.7142857142857143,
+    0.9285714285714286
+   ],
+   "d_accuracy": [
+    -0.023809523809523725,
+    -0.09523809523809523,
+    0.04761904761904767
+   ],
+   "hits": 31,
+   "false_alarms": 3,
+   "misses": 4,
+   "correct_neg": 4
+  },
+  "nueva, umbral 8 noches": {
+   "accuracy": [
+    0.8571428571428571,
+    0.7619047619047619,
+    0.9523809523809523
+   ],
+   "d_accuracy": [
+    0.0,
+    -0.09523809523809523,
+    0.09523809523809523
+   ],
+   "hits": 32,
+   "false_alarms": 3,
+   "misses": 3,
+   "correct_neg": 4
+  },
+  "nueva, umbral 15 noches": {
+   "accuracy": [
+    0.8571428571428571,
+    0.7619047619047619,
+    0.9523809523809523
+   ],
+   "d_accuracy": [
+    0.0,
+    -0.09523809523809523,
+    0.09523809523809523
+   ],
+   "hits": 32,
+   "false_alarms": 3,
+   "misses": 3,
+   "correct_neg": 4
+  },
+  "nueva, umbral 20 noches": {
+   "accuracy": [
+    0.8333333333333334,
+    0.7142857142857143,
+    0.9285714285714286
+   ],
+   "d_accuracy": [
+    -0.023809523809523725,
+    -0.09523809523809523,
+    0.04761904761904767
+   ],
+   "hits": 31,
+   "false_alarms": 3,
+   "misses": 4,
+   "correct_neg": 4
+  },
+  "nueva, umbral 30 noches": {
+   "accuracy": [
+    0.8571428571428571,
+    0.7613095238095238,
+    0.9523809523809523
+   ],
+   "d_accuracy": [
+    0.0,
+    -0.0714285714285714,
+    0.0714285714285714
+   ],
+   "hits": 31,
+   "false_alarms": 2,
+   "misses": 4,
+   "correct_neg": 5
+  },
+  "publicada": {
+   "accuracy": [
+    0.8571428571428571,
+    0.7380952380952381,
+    0.9523809523809523
+   ],
+   "d_accuracy": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "hits": 30,
+   "false_alarms": 1,
+   "misses": 5,
+   "correct_neg": 6
+  },
+  "publicado (noche.json)": {
+   "accuracy": [
+    0.8571428571428571,
+    0.7380952380952381,
+    0.9523809523809523
+   ],
+   "d_accuracy": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "hits": 30,
+   "false_alarms": 1,
+   "misses": 5,
+   "correct_neg": 6
+  }
+ },
+ "always_open_acc": 0.8333333333333334,
+ "verdict_reliability": {
+  "publicada": [
+   [
+    0.07538445689506802,
+    0.2857142857142857,
+    7
+   ],
+   [
+    0.3395654876849437,
+    1.0,
+    1
+   ],
+   [
+    0.5176824887434752,
+    0.875,
+    8
+   ],
+   [
+    0.6951953572337433,
+    0.9615384615384616,
+    26
+   ]
+  ],
+  "nueva (produccion)": [
+   [
+    0.0,
+    0.0,
+    2
+   ],
+   [
+    0.2760632684724965,
+    0.5,
+    4
+   ],
+   [
+    0.5069821079401399,
+    0.75,
+    4
+   ],
+   [
+    0.7079403719221925,
+    0.9285714285714286,
+    14
+   ],
+   [
+    0.884143918740838,
+    0.9444444444444444,
+    18
+   ]
+  ]
+ },
+ "hours": {
+  "n": 41,
+  "mean_real": 9.24648357283143,
+  "publicada | toda la rejilla": {
+   "mean": 5.702983658540359,
+   "bias": [
+    -3.543499914291071,
+    -4.699945619399648,
+    -2.3346219544934517
+   ],
+   "mae": [
+    4.339140897141806,
+    3.517736100756218,
+    5.216183731376025
+   ],
+   "r": 0.6725738526968056
+  },
+  "publicada | solo noche astronomica": {
+   "mean": 4.2790093852278,
+   "bias": [
+    -4.9674741876036315,
+    -6.155498922328648,
+    -3.7160146321003538
+   ],
+   "mae": [
+    5.490490427797645,
+    4.52714879911522,
+    6.424309444113647
+   ],
+   "r": 0.6789599352982237
+  },
+  "anterior reajustada | toda la rejilla": {
+   "mean": 5.7378618190423385,
+   "bias": [
+    -3.5086217537890914,
+    -4.664596898508788,
+    -2.3080527719489514
+   ],
+   "mae": [
+    4.331713812325076,
+    3.5076952171414284,
+    5.194243151481181
+   ],
+   "r": 0.6733933933297185
+  },
+  "anterior reajustada | solo noche astronomica": {
+   "mean": 4.2975620485769115,
+   "bias": [
+    -4.948921524254518,
+    -6.140351389125072,
+    -3.7093100696611585
+   ],
+   "mae": [
+    5.490827040224079,
+    4.532657971857172,
+    6.417388285411973
+   ],
+   "r": 0.6804652388360374
+  },
+  "nueva (produccion) | toda la rejilla": {
+   "mean": 7.5204689371088635,
+   "bias": [
+    -1.7260146357225674,
+    -2.894056440695931,
+    -0.504346191193008
+   ],
+   "mae": [
+    3.4972313941445328,
+    2.7757174558980844,
+    4.24126215550242
+   ],
+   "r": 0.6158399076960371
+  },
+  "nueva (produccion) | solo noche astronomica": {
+   "mean": 5.608660829697466,
+   "bias": [
+    -3.637822743133964,
+    -4.826474221583132,
+    -2.3407594382546293
+   ],
+   "mae": [
+    4.744464575423207,
+    3.9731740557512545,
+    5.483466849460751
+   ],
+   "r": 0.6124774427680769
+  },
+  "nueva con Sol < -6 | toda la rejilla": {
+   "mean": 7.497254673152344,
+   "bias": [
+    -1.7492288996790861,
+    -2.909566498777574,
+    -0.5378106230274227
+   ],
+   "mae": [
+    3.4749024198526803,
+    2.744354067712595,
+    4.234955312026952
+   ],
+   "r": 0.6209974190557453
+  },
+  "nueva con Sol < -6 | solo noche astronomica": {
+   "mean": 5.593702727617089,
+   "bias": [
+    -3.6527808452143415,
+    -4.827771456383335,
+    -2.368331930187147
+   ],
+   "mae": [
+    4.720201226399504,
+    3.9486366297724396,
+    5.466036522258142
+   ],
+   "r": 0.6179246418325911
+  },
+  "publicado (noche.json)": {
+   "mean": 5.692682926829268
+  }
+ },
+ "closed": [
+  {
+   "night": "2026-09-16",
+   "roof_hours": 1.0,
+   "source": "tabla limpio",
+   "published": 0.0,
+   "publicada": 0.0,
+   "anterior reajustada": 0.0,
+   "nueva (produccion)": 0.0,
+   "nueva con Sol < -6": 0.0
+  },
+  {
+   "night": "2026-09-27",
+   "roof_hours": 0.0,
+   "source": "lecturas",
+   "published": 0.093,
+   "publicada": 0.09310066764504568,
+   "anterior reajustada": 0.15369443045827094,
+   "nueva (produccion)": 0.5778570639937378,
+   "nueva con Sol < -6": 0.5169623476083381
+  },
+  {
+   "night": "2026-09-28",
+   "roof_hours": 0.0,
+   "source": "lecturas",
+   "published": 0.679,
+   "publicada": 0.6793325633600694,
+   "anterior reajustada": 0.6874538977796781,
+   "nueva (produccion)": 0.8902783519673909,
+   "nueva con Sol < -6": 0.8938897291824037
+  },
+  {
+   "night": "2026-10-17",
+   "roof_hours": 0.0,
+   "source": "cota: <=2 h en todo el tramo",
+   "published": 0.094,
+   "publicada": 0.0940347833881839,
+   "anterior reajustada": 0.09287679165518224,
+   "nueva (produccion)": 0.24791841363110823,
+   "nueva con Sol < -6": 0.24279148252495392
+  },
+  {
+   "night": "2026-10-18",
+   "roof_hours": 0.0,
+   "source": "cota: <=2 h en todo el tramo",
+   "published": 0.091,
+   "publicada": 0.0907832487597442,
+   "anterior reajustada": 0.08941193396838067,
+   "nueva (produccion)": 0.2389622236704998,
+   "nueva con Sol < -6": 0.23111229358473567
+  },
+  {
+   "night": "2026-10-19",
+   "roof_hours": 0.0,
+   "source": "cota: <=2 h en todo el tramo",
+   "published": 0.485,
+   "publicada": 0.4847086847487366,
+   "anterior reajustada": 0.48465051962090105,
+   "nueva (produccion)": 0.7583882354409048,
+   "nueva con Sol < -6": 0.7644293615494567
+  },
+  {
+   "night": "2026-10-20",
+   "roof_hours": 0.0,
+   "source": "cota: <=2 h en todo el tramo",
+   "published": 0.0,
+   "publicada": 0.0,
+   "anterior reajustada": 0.0,
+   "nueva (produccion)": 0.0,
+   "nueva con Sol < -6": 0.0
+  }
+ ],
+ "nights": [
+  {
+   "night": "2026-09-05",
+   "opened": true,
+   "roof_hours": 8.0,
+   "source": "tabla limpio",
+   "p_pub": 0.40497246855558516,
+   "p_new": 0.42074890502895135,
+   "p_old": 0.43018421966226844,
+   "published_p": 0.405,
+   "new_method": "cruce mensual + pendiente horaria"
+  },
+  {
+   "night": "2026-09-06",
+   "opened": true,
+   "roof_hours": 11.0,
+   "source": "tabla limpio",
+   "p_pub": 0.6371020042189673,
+   "p_new": 0.6158329031326979,
+   "p_old": 0.5700724711152239,
+   "published_p": 0.637,
+   "new_method": "cruce mensual + pendiente horaria"
+  },
+  {
+   "night": "2026-09-07",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.5884631848628242,
+   "p_new": 0.6622148862865013,
+   "p_old": 0.6073005050030384,
+   "published_p": 0.588,
+   "new_method": "cruce mensual + pendiente horaria"
+  },
+  {
+   "night": "2026-09-08",
+   "opened": true,
+   "roof_hours": 11.0,
+   "source": "tabla limpio",
+   "p_pub": 0.642754407854576,
+   "p_new": 0.7031507064264164,
+   "p_old": 0.642754407854576,
+   "published_p": 0.643,
+   "new_method": "cruce mensual + pendiente horaria"
+  },
+  {
+   "night": "2026-09-09",
+   "opened": true,
+   "roof_hours": 7.0,
+   "source": "tabla limpio",
+   "p_pub": 0.5955696849998608,
+   "p_new": 0.6695517232624065,
+   "p_old": 0.5955696849998608,
+   "published_p": 0.596,
+   "new_method": "cruce mensual + pendiente horaria"
+  },
+  {
+   "night": "2026-09-10",
+   "opened": true,
+   "roof_hours": 12.0,
+   "source": "tabla limpio",
+   "p_pub": 0.5201968757249792,
+   "p_new": 0.5919375164031675,
+   "p_old": 0.5201968757249792,
+   "published_p": 0.52,
+   "new_method": "cruce mensual + pendiente horaria"
+  },
+  {
+   "night": "2026-09-11",
+   "opened": true,
+   "roof_hours": 12.0,
+   "source": "tabla limpio",
+   "p_pub": 0.6115275785883947,
+   "p_new": 0.6929438303333598,
+   "p_old": 0.6115275785883947,
+   "published_p": 0.612,
+   "new_method": "cruce mensual + pendiente horaria"
+  },
+  {
+   "night": "2026-09-12",
+   "opened": true,
+   "roof_hours": 12.0,
+   "source": "tabla limpio",
+   "p_pub": 0.6372751357105001,
+   "p_new": 0.7192864223899549,
+   "p_old": 0.6372751357105001,
+   "published_p": 0.637,
+   "new_method": "cruce mensual + pendiente horaria"
+  },
+  {
+   "night": "2026-09-13",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.658108613941962,
+   "p_new": 0.7429665469730053,
+   "p_old": 0.658108613941962,
+   "published_p": 0.658,
+   "new_method": "cruce mensual + pendiente horaria"
+  },
+  {
+   "night": "2026-09-14",
+   "opened": true,
+   "roof_hours": 12.0,
+   "source": "tabla limpio",
+   "p_pub": 0.679645329228916,
+   "p_new": 0.7632436813332627,
+   "p_old": 0.679645329228916,
+   "published_p": 0.658,
+   "new_method": "cruce mensual + pendiente horaria"
+  },
+  {
+   "night": "2026-09-15",
+   "opened": true,
+   "roof_hours": 12.0,
+   "source": "tabla limpio",
+   "p_pub": 0.6930929417496229,
+   "p_new": 0.7734048607152771,
+   "p_old": 0.6930929417496229,
+   "published_p": 0.674,
+   "new_method": "cruce mensual + pendiente horaria"
+  },
+  {
+   "night": "2026-09-16",
+   "opened": false,
+   "roof_hours": 1.0,
+   "source": "tabla limpio",
+   "p_pub": 0.0,
+   "p_new": 0.0,
+   "p_old": 0.0,
+   "published_p": 0.0,
+   "new_method": "cruce mensual + pendiente horaria"
+  },
+  {
+   "night": "2026-09-17",
+   "opened": true,
+   "roof_hours": 9.0,
+   "source": "tabla limpio",
+   "p_pub": 0.3395654876849437,
+   "p_new": 0.289632022232153,
+   "p_old": 0.33956548768507877,
+   "published_p": 0.344,
+   "new_method": "cruce mensual + pendiente horaria"
+  },
+  {
+   "night": "2026-09-18",
+   "opened": true,
+   "roof_hours": 3.0,
+   "source": "tabla limpio",
+   "p_pub": 0.6362247590478731,
+   "p_new": 0.6593703048690301,
+   "p_old": 0.6362247590478731,
+   "published_p": 0.639,
+   "new_method": "cruce mensual + pendiente horaria"
+  },
+  {
+   "night": "2026-09-19",
+   "opened": true,
+   "roof_hours": 2.0,
+   "source": "tabla limpio",
+   "p_pub": 0.5585774976308473,
+   "p_new": 0.7540650932069565,
+   "p_old": 0.565691227921519,
+   "published_p": 0.559,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-09-20",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7281253418014505,
+   "p_new": 0.8635112767537702,
+   "p_old": 0.7256786803138116,
+   "published_p": 0.728,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-09-21",
+   "opened": true,
+   "roof_hours": 12.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7256786803138116,
+   "p_new": 0.8722679575469265,
+   "p_old": 0.7372098710415586,
+   "published_p": 0.726,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-09-22",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7372098710415586,
+   "p_new": 0.8775458626064779,
+   "p_old": 0.7383524104314949,
+   "published_p": 0.737,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-09-23",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7383524104314949,
+   "p_new": 0.8848403982187307,
+   "p_old": 0.7465147254278289,
+   "published_p": 0.738,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-09-24",
+   "opened": true,
+   "roof_hours": 12.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7465147254278289,
+   "p_new": 0.8918621606114899,
+   "p_old": 0.7581735525492251,
+   "published_p": 0.747,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-09-25",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7581735525492251,
+   "p_new": 0.898612709605458,
+   "p_old": 0.7683901397412954,
+   "published_p": 0.758,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-09-26",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.07040985103799792,
+   "p_new": 0.32774041435622486,
+   "p_old": 0.07625241815635384,
+   "published_p": 0.07,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-09-27",
+   "opened": false,
+   "roof_hours": 0.0,
+   "source": "lecturas",
+   "p_pub": 0.09310066764504568,
+   "p_new": 0.5778570639937378,
+   "p_old": 0.15369443045827094,
+   "published_p": 0.093,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-09-28",
+   "opened": false,
+   "roof_hours": 0.0,
+   "source": "lecturas",
+   "p_pub": 0.6793325633600694,
+   "p_new": 0.8902783519673909,
+   "p_old": 0.6874538977796781,
+   "published_p": 0.679,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-08",
+   "opened": true,
+   "roof_hours": null,
+   "source": "lectura suelta abierta",
+   "p_pub": 0.7155081480154033,
+   "p_new": 0.8881679916975207,
+   "p_old": 0.7155081480154033,
+   "published_p": 0.716,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-09",
+   "opened": true,
+   "roof_hours": 14.105826486088635,
+   "source": "tabla aprox",
+   "p_pub": 0.7155081480154033,
+   "p_new": 0.8889686293191674,
+   "p_old": 0.7158271246558807,
+   "published_p": 0.716,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-10",
+   "opened": true,
+   "roof_hours": 14.0,
+   "source": "tabla limpio",
+   "p_pub": 0.6909102981051725,
+   "p_new": 0.877212114234707,
+   "p_old": 0.6916983583476656,
+   "published_p": 0.691,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-11",
+   "opened": true,
+   "roof_hours": 8.228732538452803,
+   "source": "tabla aprox",
+   "p_pub": 0.7120411542054612,
+   "p_new": 0.8873381564252404,
+   "p_old": 0.7120411542054612,
+   "published_p": 0.712,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-12",
+   "opened": true,
+   "roof_hours": 12.822735680422182,
+   "source": "tabla aprox",
+   "p_pub": 0.7191280097398525,
+   "p_new": 0.8911082084539667,
+   "p_old": 0.7191280097398525,
+   "published_p": 0.719,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-13",
+   "opened": true,
+   "roof_hours": 8.948531781125016,
+   "source": "tabla aprox",
+   "p_pub": 0.7191280097398525,
+   "p_new": 0.891747519306115,
+   "p_old": 0.7198739284858201,
+   "published_p": 0.719,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-14",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.405271127390436,
+   "p_new": 0.6513634591217476,
+   "p_old": 0.405271127390436,
+   "published_p": 0.405,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-15",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.17936264743450447,
+   "p_new": 0.4373849463347028,
+   "p_old": 0.18353797998020688,
+   "published_p": 0.179,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-16",
+   "opened": true,
+   "roof_hours": 8.0,
+   "source": "tabla limpio",
+   "p_pub": 0.6183035416055792,
+   "p_new": 0.8456814059012735,
+   "p_old": 0.6183035416055792,
+   "published_p": 0.624,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-17",
+   "opened": false,
+   "roof_hours": 0.0,
+   "source": "cota: <=2 h en todo el tramo",
+   "p_pub": 0.0940347833881839,
+   "p_new": 0.24791841363110823,
+   "p_old": 0.09287679165518224,
+   "published_p": 0.094,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-18",
+   "opened": false,
+   "roof_hours": 0.0,
+   "source": "cota: <=2 h en todo el tramo",
+   "p_pub": 0.0907832487597442,
+   "p_new": 0.2389622236704998,
+   "p_old": 0.08941193396838067,
+   "published_p": 0.091,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-19",
+   "opened": false,
+   "roof_hours": 0.0,
+   "source": "cota: <=2 h en todo el tramo",
+   "p_pub": 0.4847086847487366,
+   "p_new": 0.7583882354409048,
+   "p_old": 0.48465051962090105,
+   "published_p": 0.485,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-20",
+   "opened": false,
+   "roof_hours": 0.0,
+   "source": "cota: <=2 h en todo el tramo",
+   "p_pub": 0.0,
+   "p_new": 0.0,
+   "p_old": 0.0,
+   "published_p": 0.0,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-21",
+   "opened": true,
+   "roof_hours": 14.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7169414853189828,
+   "p_new": 0.8909742241330418,
+   "p_old": 0.7169414853189828,
+   "published_p": 0.715,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-22",
+   "opened": true,
+   "roof_hours": 11.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7185710671339627,
+   "p_new": 0.8915751291564784,
+   "p_old": 0.7185710671339627,
+   "published_p": 0.717,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-23",
+   "opened": true,
+   "roof_hours": 14.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7185710671339627,
+   "p_new": 0.8921688872689507,
+   "p_old": 0.7193805486787315,
+   "published_p": 0.719,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-24",
+   "opened": true,
+   "roof_hours": 10.0,
+   "source": "tabla limpio",
+   "p_pub": 0.5837003860345323,
+   "p_new": 0.7453825534191723,
+   "p_old": 0.5846493534828348,
+   "published_p": 0.584,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  },
+  {
+   "night": "2026-10-25",
+   "opened": true,
+   "roof_hours": 11.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7213504437974454,
+   "p_new": 0.8907295541283782,
+   "p_old": 0.7213504437974454,
+   "published_p": 0.721,
+   "new_method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC"
+  }
+ ],
+ "calendar": [
+  {
+   "night": "2026-08-28",
+   "opened": true,
+   "roof_hours": 9.280453831875,
+   "source": "lecturas",
+   "p_pub": null,
+   "p_new": null
+  },
+  {
+   "night": "2026-08-29",
+   "opened": true,
+   "roof_hours": 10.800719541568682,
+   "source": "tabla aprox",
+   "p_pub": null,
+   "p_new": null
+  },
+  {
+   "night": "2026-08-30",
+   "opened": true,
+   "roof_hours": 12.199280458431318,
+   "source": "tabla aprox",
+   "p_pub": null,
+   "p_new": null
+  },
+  {
+   "night": "2026-08-31",
+   "opened": true,
+   "roof_hours": 4.0,
+   "source": "tabla limpio",
+   "p_pub": null,
+   "p_new": null
+  },
+  {
+   "night": "2026-09-01",
+   "opened": false,
+   "roof_hours": 1.0,
+   "source": "tabla limpio",
+   "p_pub": null,
+   "p_new": null
+  },
+  {
+   "night": "2026-09-02",
+   "opened": true,
+   "roof_hours": 10.0,
+   "source": "tabla limpio",
+   "p_pub": null,
+   "p_new": null
+  },
+  {
+   "night": "2026-09-03",
+   "opened": true,
+   "roof_hours": 11.0,
+   "source": "tabla limpio",
+   "p_pub": null,
+   "p_new": null
+  },
+  {
+   "night": "2026-09-04",
+   "opened": true,
+   "roof_hours": 9.0,
+   "source": "tabla limpio",
+   "p_pub": null,
+   "p_new": null
+  },
+  {
+   "night": "2026-09-05",
+   "opened": true,
+   "roof_hours": 8.0,
+   "source": "tabla limpio",
+   "p_pub": 0.40497246855558516,
+   "p_new": 0.42074890502895135,
+   "p_published": 0.405
+  },
+  {
+   "night": "2026-09-06",
+   "opened": true,
+   "roof_hours": 11.0,
+   "source": "tabla limpio",
+   "p_pub": 0.6371020042189673,
+   "p_new": 0.6158329031326979,
+   "p_published": 0.637
+  },
+  {
+   "night": "2026-09-07",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.5884631848628242,
+   "p_new": 0.6622148862865013,
+   "p_published": 0.588
+  },
+  {
+   "night": "2026-09-08",
+   "opened": true,
+   "roof_hours": 11.0,
+   "source": "tabla limpio",
+   "p_pub": 0.642754407854576,
+   "p_new": 0.7031507064264164,
+   "p_published": 0.643
+  },
+  {
+   "night": "2026-09-09",
+   "opened": true,
+   "roof_hours": 7.0,
+   "source": "tabla limpio",
+   "p_pub": 0.5955696849998608,
+   "p_new": 0.6695517232624065,
+   "p_published": 0.596
+  },
+  {
+   "night": "2026-09-10",
+   "opened": true,
+   "roof_hours": 12.0,
+   "source": "tabla limpio",
+   "p_pub": 0.5201968757249792,
+   "p_new": 0.5919375164031675,
+   "p_published": 0.52
+  },
+  {
+   "night": "2026-09-11",
+   "opened": true,
+   "roof_hours": 12.0,
+   "source": "tabla limpio",
+   "p_pub": 0.6115275785883947,
+   "p_new": 0.6929438303333598,
+   "p_published": 0.612
+  },
+  {
+   "night": "2026-09-12",
+   "opened": true,
+   "roof_hours": 12.0,
+   "source": "tabla limpio",
+   "p_pub": 0.6372751357105001,
+   "p_new": 0.7192864223899549,
+   "p_published": 0.637
+  },
+  {
+   "night": "2026-09-13",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.658108613941962,
+   "p_new": 0.7429665469730053,
+   "p_published": 0.658
+  },
+  {
+   "night": "2026-09-14",
+   "opened": true,
+   "roof_hours": 12.0,
+   "source": "tabla limpio",
+   "p_pub": 0.679645329228916,
+   "p_new": 0.7632436813332627,
+   "p_published": 0.658
+  },
+  {
+   "night": "2026-09-15",
+   "opened": true,
+   "roof_hours": 12.0,
+   "source": "tabla limpio",
+   "p_pub": 0.6930929417496229,
+   "p_new": 0.7734048607152771,
+   "p_published": 0.674
+  },
+  {
+   "night": "2026-09-16",
+   "opened": false,
+   "roof_hours": 1.0,
+   "source": "tabla limpio",
+   "p_pub": 0.0,
+   "p_new": 0.0,
+   "p_published": 0.0
+  },
+  {
+   "night": "2026-09-17",
+   "opened": true,
+   "roof_hours": 9.0,
+   "source": "tabla limpio",
+   "p_pub": 0.3395654876849437,
+   "p_new": 0.289632022232153,
+   "p_published": 0.344
+  },
+  {
+   "night": "2026-09-18",
+   "opened": true,
+   "roof_hours": 3.0,
+   "source": "tabla limpio",
+   "p_pub": 0.6362247590478731,
+   "p_new": 0.6593703048690301,
+   "p_published": 0.639
+  },
+  {
+   "night": "2026-09-19",
+   "opened": true,
+   "roof_hours": 2.0,
+   "source": "tabla limpio",
+   "p_pub": 0.5585774976308473,
+   "p_new": 0.7540650932069565,
+   "p_published": 0.559
+  },
+  {
+   "night": "2026-09-20",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7281253418014505,
+   "p_new": 0.8635112767537702,
+   "p_published": 0.728
+  },
+  {
+   "night": "2026-09-21",
+   "opened": true,
+   "roof_hours": 12.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7256786803138116,
+   "p_new": 0.8722679575469265,
+   "p_published": 0.726
+  },
+  {
+   "night": "2026-09-22",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7372098710415586,
+   "p_new": 0.8775458626064779,
+   "p_published": 0.737
+  },
+  {
+   "night": "2026-09-23",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7383524104314949,
+   "p_new": 0.8848403982187307,
+   "p_published": 0.738
+  },
+  {
+   "night": "2026-09-24",
+   "opened": true,
+   "roof_hours": 12.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7465147254278289,
+   "p_new": 0.8918621606114899,
+   "p_published": 0.747
+  },
+  {
+   "night": "2026-09-25",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7581735525492251,
+   "p_new": 0.898612709605458,
+   "p_published": 0.758
+  },
+  {
+   "night": "2026-09-26",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.07040985103799792,
+   "p_new": 0.32774041435622486,
+   "p_published": 0.07
+  },
+  {
+   "night": "2026-09-27",
+   "opened": false,
+   "roof_hours": 0.0,
+   "source": "lecturas",
+   "p_pub": 0.09310066764504568,
+   "p_new": 0.5778570639937378,
+   "p_published": 0.093
+  },
+  {
+   "night": "2026-09-28",
+   "opened": false,
+   "roof_hours": 0.0,
+   "source": "lecturas",
+   "p_pub": 0.6793325633600694,
+   "p_new": 0.8902783519673909,
+   "p_published": 0.679
+  },
+  {
+   "night": "2026-09-29",
+   "opened": null,
+   "roof_hours": null,
+   "source": null,
+   "p_pub": 0.5,
+   "p_new": 0.7781945776540663,
+   "p_published": 0.5
+  },
+  {
+   "night": "2026-09-30",
+   "opened": null,
+   "roof_hours": null,
+   "source": null,
+   "p_pub": null,
+   "p_new": null,
+   "p_published": 0.762
+  },
+  {
+   "night": "2026-10-01",
+   "opened": null,
+   "roof_hours": null,
+   "source": null,
+   "p_pub": 0.1804213284903215,
+   "p_new": 0.4271568263795582,
+   "p_published": 0.182
+  },
+  {
+   "night": "2026-10-02",
+   "opened": null,
+   "roof_hours": null,
+   "source": null,
+   "p_pub": 0.28379233220555194,
+   "p_new": 0.5902887493490543,
+   "p_published": 0.284
+  },
+  {
+   "night": "2026-10-03",
+   "opened": null,
+   "roof_hours": null,
+   "source": null,
+   "p_pub": 0.3563381631018571,
+   "p_new": 0.566561204868097,
+   "p_published": 0.356
+  },
+  {
+   "night": "2026-10-04",
+   "opened": null,
+   "roof_hours": null,
+   "source": null,
+   "p_pub": 0.31984883374105005,
+   "p_new": 0.6219376578864482,
+   "p_published": 0.32
+  },
+  {
+   "night": "2026-10-05",
+   "opened": null,
+   "roof_hours": null,
+   "source": null,
+   "p_pub": 0.27738189691014725,
+   "p_new": 0.5304465352911796,
+   "p_published": 0.277
+  },
+  {
+   "night": "2026-10-06",
+   "opened": null,
+   "roof_hours": null,
+   "source": null,
+   "p_pub": 0.12178564796245095,
+   "p_new": 0.28228802086197097,
+   "p_published": 0.122
+  },
+  {
+   "night": "2026-10-07",
+   "opened": null,
+   "roof_hours": null,
+   "source": null,
+   "p_pub": 0.7146571028797088,
+   "p_new": 0.8889159113178794,
+   "p_published": 0.715
+  },
+  {
+   "night": "2026-10-08",
+   "opened": true,
+   "roof_hours": null,
+   "source": "lectura suelta abierta",
+   "p_pub": 0.7155081480154033,
+   "p_new": 0.8881679916975207,
+   "p_published": 0.716
+  },
+  {
+   "night": "2026-10-09",
+   "opened": true,
+   "roof_hours": 14.105826486088635,
+   "source": "tabla aprox",
+   "p_pub": 0.7155081480154033,
+   "p_new": 0.8889686293191674,
+   "p_published": 0.716
+  },
+  {
+   "night": "2026-10-10",
+   "opened": true,
+   "roof_hours": 14.0,
+   "source": "tabla limpio",
+   "p_pub": 0.6909102981051725,
+   "p_new": 0.877212114234707,
+   "p_published": 0.691
+  },
+  {
+   "night": "2026-10-11",
+   "opened": true,
+   "roof_hours": 8.228732538452803,
+   "source": "tabla aprox",
+   "p_pub": 0.7120411542054612,
+   "p_new": 0.8873381564252404,
+   "p_published": 0.712
+  },
+  {
+   "night": "2026-10-12",
+   "opened": true,
+   "roof_hours": 12.822735680422182,
+   "source": "tabla aprox",
+   "p_pub": 0.7191280097398525,
+   "p_new": 0.8911082084539667,
+   "p_published": 0.719
+  },
+  {
+   "night": "2026-10-13",
+   "opened": true,
+   "roof_hours": 8.948531781125016,
+   "source": "tabla aprox",
+   "p_pub": 0.7191280097398525,
+   "p_new": 0.891747519306115,
+   "p_published": 0.719
+  },
+  {
+   "night": "2026-10-14",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.405271127390436,
+   "p_new": 0.6513634591217476,
+   "p_published": 0.405
+  },
+  {
+   "night": "2026-10-15",
+   "opened": true,
+   "roof_hours": 13.0,
+   "source": "tabla limpio",
+   "p_pub": 0.17936264743450447,
+   "p_new": 0.4373849463347028,
+   "p_published": 0.179
+  },
+  {
+   "night": "2026-10-16",
+   "opened": true,
+   "roof_hours": 8.0,
+   "source": "tabla limpio",
+   "p_pub": 0.6183035416055792,
+   "p_new": 0.8456814059012735,
+   "p_published": 0.624
+  },
+  {
+   "night": "2026-10-17",
+   "opened": false,
+   "roof_hours": 0.0,
+   "source": "cota: <=2 h en todo el tramo",
+   "p_pub": 0.0940347833881839,
+   "p_new": 0.24791841363110823,
+   "p_published": 0.094
+  },
+  {
+   "night": "2026-10-18",
+   "opened": false,
+   "roof_hours": 0.0,
+   "source": "cota: <=2 h en todo el tramo",
+   "p_pub": 0.0907832487597442,
+   "p_new": 0.2389622236704998,
+   "p_published": 0.091
+  },
+  {
+   "night": "2026-10-19",
+   "opened": false,
+   "roof_hours": 0.0,
+   "source": "cota: <=2 h en todo el tramo",
+   "p_pub": 0.4847086847487366,
+   "p_new": 0.7583882354409048,
+   "p_published": 0.485
+  },
+  {
+   "night": "2026-10-20",
+   "opened": false,
+   "roof_hours": 0.0,
+   "source": "cota: <=2 h en todo el tramo",
+   "p_pub": 0.0,
+   "p_new": 0.0,
+   "p_published": 0.0
+  },
+  {
+   "night": "2026-10-21",
+   "opened": true,
+   "roof_hours": 14.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7169414853189828,
+   "p_new": 0.8909742241330418,
+   "p_published": 0.715
+  },
+  {
+   "night": "2026-10-22",
+   "opened": true,
+   "roof_hours": 11.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7185710671339627,
+   "p_new": 0.8915751291564784,
+   "p_published": 0.717
+  },
+  {
+   "night": "2026-10-23",
+   "opened": true,
+   "roof_hours": 14.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7185710671339627,
+   "p_new": 0.8921688872689507,
+   "p_published": 0.719
+  },
+  {
+   "night": "2026-10-24",
+   "opened": true,
+   "roof_hours": 10.0,
+   "source": "tabla limpio",
+   "p_pub": 0.5837003860345323,
+   "p_new": 0.7453825534191723,
+   "p_published": 0.584
+  },
+  {
+   "night": "2026-10-25",
+   "opened": true,
+   "roof_hours": 11.0,
+   "source": "tabla limpio",
+   "p_pub": 0.7213504437974454,
+   "p_new": 0.8907295541283782,
+   "p_published": 0.721
+  }
+ ],
+ "final": {
+  "nueva": {
+   "intercept": 2.104287989663465,
+   "cloud_weight": -3.1292274397603084,
+   "crossing": 0.6724624624359835,
+   "p": {
+    "0": 0.8913192506414457,
+    "30": 0.7623342363623539,
+    "60": 0.5564462339586048,
+    "100": 0.26406637288977386
+   },
+   "method": "horario: 2 parametros, horas de noche astronomica, nube disponible a las 15 UTC",
+   "slope_p10_p90": [
+    -4.8390780360000605,
+    -2.0377294366229592
+   ],
+   "monthly_mae": 0.1447660455522001,
+   "held_out_mae": 0.09105970716154267,
+   "nights": 55,
+   "hours": 266
+  },
+  "anterior reajustada hoy": {
+   "intercept": 0.9551330913785272,
+   "cloud_weight": -3.1837769712617567,
+   "crossing": 0.30000000000000004,
+   "p": {
+    "0": 0.7221463115592495,
+    "30": 0.5000000000000001,
+    "60": 0.27785368844075065,
+    "100": 0.09720758675378467
+   },
+   "monthly_mae": 0.12445339065268075,
+   "held_out_mae": 0.12031432033895623,
+   "nights": 55,
+   "hours": 367
+  },
+  "publicada (archivo)": {
+   "intercept": 0.9551330913785272,
+   "cloud_weight": -3.1837769712617567,
+   "crossing": 0.30000000000000004,
+   "p": {
+    "0": 0.7221463115592495,
+    "30": 0.5000000000000001,
+    "60": 0.27785368844075065,
+    "100": 0.09720758675378467
+   },
+   "fitted_at": "2026-10-25T21:51:12+00:00",
+   "method": "cruce mensual + pendiente horaria"
+  },
+  "clean_months": {
+   "n": 7,
+   "nueva": 0.10396787226578304,
+   "anterior": 0.10193206461111688
+  }
+ },
+ "cloud_bins": {
+  "nuevo": [
+   [
+    1.096551724137931,
+    0.903448275862069,
+    145,
+    0,
+    10
+   ],
+   [
+    15.0,
+    0.8181818181818182,
+    11,
+    10,
+    20
+   ],
+   [
+    24.375,
+    0.6875,
+    16,
+    20,
+    30
+   ],
+   [
+    34.18181818181818,
+    0.6818181818181818,
+    11,
+    30,
+    40
+   ],
+   [
+    45.9,
+    0.45,
+    10,
+    40,
+    50
+   ],
+   [
+    55.90909090909091,
+    0.6363636363636364,
+    11,
+    50,
+    60
+   ],
+   [
+    63.61538461538461,
+    0.6923076923076923,
+    13,
+    60,
+    70
+   ],
+   [
+    75.6,
+    0.4,
+    10,
+    70,
+    80
+   ],
+   [
+    83.42857142857143,
+    0.19047619047619047,
+    7,
+    80,
+    90
+   ],
+   [
+    96.375,
+    0.328125,
+    32,
+    90,
+    100
+   ]
+  ],
+  "anterior": [
+   [
+    1.0894736842105264,
+    0.9241228070175438,
+    190,
+    0,
+    10
+   ],
+   [
+    14.142857142857142,
+    0.6904761904761905,
+    21,
+    10,
+    20
+   ],
+   [
+    23.37037037037037,
+    0.5370370370370371,
+    27,
+    20,
+    30
+   ],
+   [
+    34.10526315789474,
+    0.42105263157894735,
+    19,
+    30,
+    40
+   ],
+   [
+    45.27777777777778,
+    0.5555555555555556,
+    18,
+    40,
+    50
+   ],
+   [
+    55.31818181818182,
+    0.3181818181818182,
+    22,
+    50,
+    60
+   ],
+   [
+    63.38461538461539,
+    0.5,
+    13,
+    60,
+    70
+   ],
+   [
+    75.18181818181819,
+    0.45454545454545453,
+    11,
+    70,
+    80
+   ],
+   [
+    85.53333333333333,
+    0.4888888888888889,
+    15,
+    80,
+    90
+   ],
+   [
+    96.38709677419355,
+    0.3870967741935484,
+    31,
+    90,
+    100
+   ]
+  ]
+ }
+}

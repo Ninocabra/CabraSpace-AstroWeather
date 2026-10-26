@@ -7,6 +7,8 @@
 #                planifica: mira que esta vencido y lo hace (`colector.py`).
 #   photutils    solo lo usa el pipeline de FWHM, que corre a mano sobre FITS
 #                que ya estan en disco y por eso esta fuera del scheduler.
+#   matplotlib   solo las figuras del retroanalisis (`hindcast.py`, 26-10-2026),
+#                que se corre a mano en el escritorio, nunca en el runner.
 #
 # Las versiones van fijadas por MINOR (`~=`) y son las que corren en el
 # escritorio: sin fijar, una version nueva de astropy o de numpy cambia numeros

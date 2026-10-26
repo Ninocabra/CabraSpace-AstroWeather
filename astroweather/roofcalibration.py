@@ -28,14 +28,33 @@ porque cada una determina un parametro distinto de la logistica
     un intervalo del 10-90 % de [-19,6; -1,9]: la pendiente esta mal
     determinada y el fichero lo dice.
 
-LA NOTA DE LAS 60 NOCHES. Cuando el archivo tenga `NIGHTS_FOR_HOURLY_REFIT`
-noches de techo con prevision, el ajuste pasa SOLO a horario en los dos
-parametros (`method = "horario"`), y el mensual queda como comprobacion. No
-hay que acordarse: `fit()` lo decide contando noches, `webexport` publica
-cuantas faltan, y `tests/test_roofcalibration.py` cubre el cambio de metodo.
-Lo que SI hay que hacer ese dia es MIRAR: que el cruce horario siga cerca del
-30 % mensual, y que el MAE mensual de la curva horaria no empeore al del
-cruce mensual. Si discrepan, gana el que prediga meses que no ha visto.
+LA NOTA DE LAS 60 NOCHES, Y POR QUE SE ADELANTO (26-10-2026, M1 del
+retroanalisis `docs/verificacion_2026-10-26.md`). El cruce mensual ponia un
+TECHO a la curva: con el cruce en el 30 % y la pendiente de las horas, P con 0 %
+de nube era sigmoid(0,955) = 0,72, y hora a hora, cuando la curva decia
+0,64-0,73, el techo estaba abierto el 96-98 % de las horas. La base mensual
+(0,56) es la de TODAS las horas con el Sol bajo el horizonte de 31 meses, con
+sus noches cubiertas; no es la de una hora con cielo limpio. Desde entonces:
+
+  * Con `NIGHTS_FOR_HOURLY_REFIT` noches, los DOS parametros salen de las horas
+    (`METHOD_HOURLY`), y los meses quedan como comprobacion (MAE mensual).
+  * Las horas son de NOCHE ASTRONOMICA (Sol < -18 grados a la media hora, de
+    `ephem`), no de 18 a 05 UTC: esa ventana fija metia a finales de agosto
+    horas con el Sol aun sobre el horizonte, con el techo cerrado por horario y
+    no por el tiempo, y bajaba la curva.
+  * La nube es la que habia en el archivo al corte de la tarde
+    (`ISSUE_CUTOFF_HOUR_UTC`), elegida por `retrieved_at` en el Parquet crudo
+    (`asof.py`). La vista deduplicada daba la recogida de las 21-23 UTC de esa
+    misma noche: una pendiente ajustada con nube que nadie tenia a las 15 UTC.
+  * Por debajo del umbral, o si el ajuste de dos parametros sale sin sentido
+    fisico (pendiente >= 0), se cae al metodo anterior (cruce mensual +
+    pendiente horaria, con las mismas horas limpias); y sin horas suficientes
+    `fit()` se niega, `load_calibrator` cae a la curva del fotometro y el
+    arranque en frio sigue como estaba.
+
+Validado prequencialmente (cada noche con una curva ajustada SOLO con las
+noches anteriores): `python -m astroweather.hindcast --m1`, figura y cifras en
+`docs/verificacion_2026-10-26/m1_*`.
 
 Lo que esta curva NO es: no es "probabilidad de cielo despejado". Es la
 probabilidad de que el techo este abierto dada la nube prevista, y lleva
@@ -56,8 +75,9 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import minimize, minimize_scalar
 
+from .asof import raw_forecast_asof
 from .calibration import BACKFILL_MODEL, Calibrator
-from .ephem import sun_positions
+from .ephem import ASTRONOMICAL, sun_positions
 from .queries import DATA_ROOT, connect
 from .roof import dark_hours
 from .site import NERPIO, Site
@@ -66,9 +86,30 @@ ROOF_MODEL_PATH = DATA_ROOT / "roof_calibration.json"
 OPEN_HOURS_PATH = DATA_ROOT / "open_hours_nerpio.json"
 
 # Con cuantas noches de techo+prevision se deja de necesitar el mensual para
-# el cruce. 60 es la cifra pactada el 2026-09-04: con 9 noches el bootstrap de
-# la pendiente cubria un factor 10, y el cruce horario iba de 0 a 47 %.
-NIGHTS_FOR_HOURLY_REFIT = 60
+# el cruce. 60 era la cifra pactada el 2026-09-04 (con 9 noches el bootstrap de
+# la pendiente cubria un factor 10). 20 desde el 26-10, con la evaluacion
+# prequencial de M1 delante (`hindcast --m1`, 42 noches del 05-09 al 25-10):
+#   * Brier del veredicto con el umbral en 8 / 15 / 20 / 30 noches: 0,092 /
+#     0,105 / 0,119 / 0,123, contra 0,159 de la curva publicada. Cualquier
+#     umbral gana; el de 8 es el que reproduce el retroanalisis (0,088), y
+#     gana al de 20 por -0,027 [-0,052, -0,011] (IC95, noches remuestreadas).
+#   * Pero con 8-16 noches las curvas horarias salian PLANAS: P(100 % de nube)
+#     de 0,52 a 0,58, o sea "Abierto" con el cielo cubierto previsto, porque en
+#     las primeras noches de septiembre casi no hubo horas cerradas con nube. La
+#     pendiente se asento (-2,6 a -3,1, P(100 %) < 0,4) a partir de 18 noches,
+#     cuando llegaron las primeras noches cubiertas.
+#   * Este otono seco premia decir "Abierto" (83 % de noches abiertas); con un
+#     invierno de nube baja una curva plana seria una falsa alarma tras otra.
+#     Se paga Brier en las primeras noches por no publicar curvas planas: es un
+#     JUICIO sobre el riesgo, no algo que este otono pueda medir.
+# Hoy hay 55 noches: el umbral solo decide si el archivo de techo se pierde o
+# se reinicia. Y no hay que tocarlo a mano: `fit()` lo cuenta.
+NIGHTS_FOR_HOURLY_REFIT = 20
+METHOD_HOURLY = ("horario: 2 parametros, horas de noche astronomica, "
+                 "nube disponible a las 15 UTC")
+METHOD_MONTHLY = "cruce mensual + pendiente horaria"
+# Hora "de noche": Sol por debajo de esto a la media hora (noche astronomica).
+DARK_SUN_ALTITUDE = ASTRONOMICAL
 # Menos que esto y la pendiente ni se intenta: se cae a la curva del fotometro.
 MIN_HOURS_FOR_SLOPE = 30
 MIN_HOURS_PER_MONTH = 200
@@ -161,7 +202,9 @@ def monthly_pairs(root: Path | None = None, open_hours_path: Path | None = None,
     lo que existe para 2024-2026. Horas nocturnas = Sol bajo el horizonte, el
     unico denominador que no produce meses imposibles (ver `roof.py`).
     """
-    path = open_hours_path or OPEN_HOURS_PATH
+    # La tabla de horas abiertas, de la MISMA raiz que la prevision: hasta el
+    # 26-10 se leia siempre de DATA_ROOT aunque se pasara otra raiz.
+    path = open_hours_path or ((root / "open_hours_nerpio.json") if root else OPEN_HOURS_PATH)
     if not path.exists():
         return []
     open_hours = json.loads(path.read_text(encoding="utf-8"))
@@ -191,12 +234,17 @@ def monthly_pairs(root: Path | None = None, open_hours_path: Path | None = None,
     return pairs
 
 
-def hourly_pairs(root: Path | None = None) -> list[tuple[dt.datetime, float, float]]:
+def hourly_pairs(root: Path | None = None,
+                 site: Site = NERPIO) -> list[tuple[dt.datetime, float, float]]:
     """(hora UTC, nube prevista %, fraccion de muestras con techo abierto).
 
-    Horas de 18 a 05 UTC con al menos una muestra del scraper, y la prevision
-    del modelo del calibrador emitida antes de las 15 UTC del dia de la noche.
+    Horas de NOCHE ASTRONOMICA (Sol < `DARK_SUN_ALTITUDE` a la media hora) con
+    al menos una muestra del scraper, y la nube del modelo del calibrador tal
+    como estaba en el archivo a las `ISSUE_CUTOFF_HOUR_UTC` del dia en que
+    empieza la noche: la ultima RECOGIDA anterior al corte (`asof.py`), no la
+    ultima fila de la etiqueta de pasada, que es la de las 21-23 UTC.
     """
+    root = root or DATA_ROOT
     connection = connect(root)
     try:
         roof = connection.execute(r"""
@@ -205,25 +253,31 @@ def hourly_pairs(root: Path | None = None) -> list[tuple[dt.datetime, float, flo
                                  AS INT) > 0 THEN 1.0 ELSE 0.0 END) AS open_fraction
             FROM measurements
             WHERE instrument_id = 'astrocamp_roofs' AND quality_flags LIKE 'open=%'
-              AND (hour(t_utc) >= 18 OR hour(t_utc) <= 5)
             GROUP BY 1 ORDER BY 1
         """).fetchall()
     except Exception:
         return []
+    if not roof:
+        return []
+    utc = dt.timezone.utc
+    hours = [h if h.tzinfo else h.replace(tzinfo=utc) for h, _ in roof]
+    altitudes = [p.altitude for p in
+                 sun_positions([h + dt.timedelta(minutes=30) for h in hours], site)]
+    try:
+        cloud = raw_forecast_asof(connection, root, BACKFILL_MODEL,
+                                  min(hours) - dt.timedelta(days=3))
+    except Exception:
+        return []
     pairs = []
-    for hour, open_fraction in roof:
-        hour = hour if hour.tzinfo else hour.replace(tzinfo=dt.timezone.utc)
+    for hour, (_, open_fraction), altitude in zip(hours, roof, altitudes):
+        if altitude >= DARK_SUN_ALTITUDE:
+            continue
         night = (hour - dt.timedelta(hours=12)).date()
         cutoff = dt.datetime(night.year, night.month, night.day,
-                             ISSUE_CUTOFF_HOUR_UTC, tzinfo=dt.timezone.utc)
-        row = connection.execute("""
-            SELECT cloud_total FROM forecasts
-            WHERE model = ? AND member IS NULL AND cloud_total IS NOT NULL
-              AND valid_utc = ? AND run_utc <= ?
-            ORDER BY run_utc DESC LIMIT 1
-        """, [BACKFILL_MODEL, hour, cutoff]).fetchone()
-        if row:
-            pairs.append((hour, float(row[0]), float(open_fraction)))
+                             ISSUE_CUTOFF_HOUR_UTC, tzinfo=utc)
+        value = cloud.at(hour.astimezone(utc).replace(tzinfo=None), cutoff)
+        if value is not None:
+            pairs.append((hour, float(value[0]), float(open_fraction)))
     return pairs
 
 
@@ -281,6 +335,25 @@ def _fit_hourly(pairs) -> tuple[float, float]:
     return float(best.x[0]), float(best.x[1])
 
 
+def _hourly_slope_interval(pairs, rounds: int = BOOTSTRAP_ROUNDS,
+                           seed: int = 1) -> tuple[float, float]:
+    """Intervalo 10-90 % de la pendiente con los DOS parametros reajustados en
+    cada remuestreo de noches enteras (no con el cruce fijo: ya no lo esta)."""
+    nights = np.array([(t - dt.timedelta(hours=12)).toordinal() for t, _, _ in pairs])
+    unique = np.unique(nights)
+    groups = [np.flatnonzero(nights == n) for n in unique]
+    rng = np.random.default_rng(seed)
+    draws = []
+    for _ in range(rounds):
+        index = np.concatenate([groups[i] for i in rng.integers(0, len(groups), len(groups))])
+        draws.append(_fit_hourly([pairs[i] for i in index])[1])
+    if not draws:
+        slope = _fit_hourly(pairs)[1]
+        return slope, slope
+    low, high = np.percentile(draws, [10, 90])
+    return float(low), float(high)
+
+
 def _monthly_errors(pairs: list[MonthPair], intercept: float, slope: float):
     return np.array([p.open_fraction - float(_sigmoid(intercept + slope * p.clouds).mean())
                      for p in pairs])
@@ -295,16 +368,20 @@ def fit(month_pairs: list[MonthPair], hour_pairs, *,
         raise ValueError(f"hacen falta {MIN_HOURS_FOR_SLOPE} horas de techo con "
                          f"prevision, hay {len(hour_pairs)}")
     nights = nights_in(hour_pairs)
-    if nights >= nights_target:
-        intercept, slope = _fit_hourly(hour_pairs)
+    hourly = _fit_hourly(hour_pairs) if nights >= nights_target else None
+    # Una pendiente >= 0 (mas nube, mas techo abierto) no es fisica: con pocas
+    # horas o sin noches cubiertas el ajuste libre puede salir asi, y entonces
+    # manda el metodo anterior, que es el que estaba en produccion.
+    if hourly is not None and hourly[1] < 0:
+        intercept, slope = hourly
         crossing = -intercept / slope
-        _, low, high = slope_from_hours(hour_pairs, crossing, rounds)
-        method = "horario"
+        low, high = _hourly_slope_interval(hour_pairs, rounds)
+        method = METHOD_HOURLY
     else:
         crossing = crossing_from_months(month_pairs)
         slope, low, high = slope_from_hours(hour_pairs, crossing, rounds)
         intercept = -slope * crossing
-        method = "cruce mensual + pendiente horaria"
+        method = METHOD_MONTHLY
 
     errors = _monthly_errors(month_pairs, intercept, slope)
     fractions = np.array([p.open_fraction for p in month_pairs])
@@ -315,7 +392,12 @@ def fit(month_pairs: list[MonthPair], hour_pairs, *,
     train_months = [p for p in month_pairs if p.year < last_year]
     test_months = [p for p in month_pairs if p.year == last_year]
     held_out = None
-    if len(train_months) >= 12 and test_months:
+    if method == METHOD_HOURLY and test_months:
+        # La curva horaria no se ajusta con los meses: los del ultimo anio son
+        # su comprobacion externa (solo sus horas de techo, desde el 27-08-2026,
+        # caen dentro de los ultimos de ellos).
+        held_out = float(np.abs(_monthly_errors(test_months, intercept, slope)).mean())
+    elif len(train_months) >= 12 and test_months:
         c = crossing_from_months(train_months)
         held_out = float(np.abs(_monthly_errors(test_months, -slope * c, slope)).mean())
 
@@ -348,14 +430,24 @@ def summary(model: RoofCalibrator) -> str:
         text += f", {model.held_out_mae:.3f} fuera de muestra"
     if model.nights_missing:
         text += f"; faltan {model.nights_missing} noches para el ajuste horario"
+    elif model.method != METHOD_HOURLY:
+        text += "; el ajuste horario salio sin sentido fisico y manda el metodo anterior"
     else:
         text += "; ajuste horario en vigor"
+    text += (f"; P(0 %) = {model.probability(0):.2f}, P(30 %) = {model.probability(30):.2f}, "
+             f"P(60 %) = {model.probability(60):.2f}, P(100 %) = {model.probability(100):.2f}")
     return text
 
 
-def main() -> int:
-    model = train()
-    path = model.save()
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+    parser = argparse.ArgumentParser(description="Reajusta la curva del techo")
+    parser.add_argument("--root", type=Path, default=None,
+                        help="raiz del archivo (por defecto DATA_ROOT); el JSON se "
+                             "escribe en ella")
+    args = parser.parse_args(argv)
+    model = train(args.root)
+    path = model.save((args.root / "roof_calibration.json") if args.root else None)
     print(summary(model))
     print(f"guardado en {path}")
     return 0

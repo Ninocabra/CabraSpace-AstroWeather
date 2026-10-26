@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from .roofcalibration import load_calibrator
 from .calibration import (WEATHERNEXT_LEAD_DAYS, WEATHERNEXT_MODEL, Calibrator,
                           model_path)
-from .ephem import moon_illumination, moon_positions, night_for
+from .ephem import dark_slot_weights, moon_illumination, moon_positions, night_for
 from .verification import wind_correction
 from .gates import (SafetyVerdict, evaluate, opening_probability, opening_window,
                     probability_usable)
@@ -68,17 +68,60 @@ class NightReport:
     # What the probability was calibrated against: "techo" (the real roof) or
     # "fotometro" (a clear sky). WeatherNext's curve is the photometer one.
     cloud_truth: str | None = None
+    # Los cruces de -18 grados de esta noche (`ephem.night_for`). Sin ellos
+    # (un informe armado a mano) la noche no se acota y todo cuenta como antes.
+    dusk_astronomical: dt.datetime | None = None
+    dawn_astronomical: dt.datetime | None = None
+
+    @property
+    def dark_weights(self) -> list[float]:
+        """Cuanto de cada casilla cae dentro de la noche astronomica (M6).
+
+        La rejilla (lo que se pinta) va de ocaso-1 h a orto+1 h, pero la curva
+        del techo se ajusta solo con horas de Sol < -18 grados
+        (`roofcalibration.DARK_SUN_ALTITUDE`): fuera de ahi es extrapolar. Solo
+        cuentan, para la ventana del veredicto, la probabilidad de abrir y las
+        horas esperadas, las casillas cuyo punto medio es de noche astronomica,
+        y la que cruza -18 grados cuenta en proporcion (ver
+        `ephem.dark_slot_weights`): la suma nunca pasa de `dark_hours`.
+        """
+        return dark_slot_weights([h.t_utc for h in self.hours], self.step_hours,
+                                 self.dusk_astronomical, self.dawn_astronomical)
+
+    def _clip_to_darkness(self, start: dt.datetime, end: dt.datetime):
+        """Una ventana nunca sale de [inicio, fin] de la noche astronomica: la
+        casilla que cruza -18 grados cuenta, pero solo su parte oscura."""
+        if self.dusk_astronomical and self.dawn_astronomical:
+            return (max(start, self.dusk_astronomical),
+                    min(end, self.dawn_astronomical))
+        return start, end
 
     @property
     def usable_hours(self) -> float:
+        """Horas utilizables esperadas DENTRO de la noche astronomica.
+
+        Hasta M6 (26-10-2026) sumaba toda la rejilla, crepusculo incluido, y
+        con la curva horaria de M1 la noche del 26-10 daba 11,9 h esperadas
+        con 10,3 h de noche astronomica: imposible. La suma de las casillas
+        oscuras, cada una por su fraccion oscura, no puede pasar de `dark_hours`.
+        """
+        return sum(h.usable_probability * w
+                   for h, w in zip(self.hours, self.dark_weights))
+
+    @property
+    def usable_hours_grid(self) -> float:
+        """La suma de antes de M6, sobre toda la rejilla (ocaso-1 h a orto+1 h),
+        crepusculo incluido. Solo para poder comparar; no es una cantidad que
+        el producto prometa."""
         return sum(h.usable_probability for h in self.hours)
 
     @property
     def best_window(self) -> tuple[dt.datetime, dt.datetime, float] | None:
         """Longest run of hours above even odds, with its mean probability."""
         best, current = None, []
-        for hour in self.hours + [None]:
-            if hour and hour.usable_probability >= 0.5:
+        weights = self.dark_weights
+        for hour, weight in zip(self.hours + [None], weights + [0.0]):
+            if hour and weight > 0 and hour.usable_probability >= 0.5:
                 current.append(hour)
                 continue
             if len(current) >= 2:
@@ -86,7 +129,10 @@ class NightReport:
                 if best is None or len(current) > best[2]:
                     best = (current[0].t_utc, current[-1].t_utc, len(current), mean)
             current = []
-        return (best[0], best[1], best[3]) if best else None
+        if not best:
+            return None
+        start, end = self._clip_to_darkness(best[0], best[1])
+        return (start, end, best[3])
 
     @property
     def step_hours(self) -> float:
@@ -101,18 +147,24 @@ class NightReport:
     def verdict_window(self) -> tuple[dt.datetime, dt.datetime, float] | None:
         """The two hours the verdict rests on, so "Abierto" names its window."""
         found = opening_window([h.usable_probability for h in self.hours],
-                               step_hours=self.step_hours)
+                               step_hours=self.step_hours, weights=self.dark_weights)
         if found is None:
             return None
         first, last, floor = found
         # El final es el FINAL de la ultima casilla: "02:00-04:00" son dos horas.
-        return (self.hours[first].t_utc,
-                self.hours[last].t_utc + dt.timedelta(hours=self.step_hours), floor)
+        # Y se recorta a la noche astronomica: si la primera casilla de la
+        # ventana es la que cruza -18 grados, la ventana empieza en el ocaso
+        # astronomico y no a la hora en punto anterior.
+        start, end = self._clip_to_darkness(
+            self.hours[first].t_utc,
+            self.hours[last].t_utc + dt.timedelta(hours=self.step_hours))
+        return (start, end, floor)
 
     @property
     def opening_probability(self) -> float:
         return opening_probability([h.usable_probability for h in self.hours],
-                                   step_hours=self.step_hours)
+                                   step_hours=self.step_hours,
+                                   weights=self.dark_weights)
 
 
 def _safety_rows(connection, site: Site, start: dt.datetime, end: dt.datetime):
@@ -337,6 +389,8 @@ def report(day: dt.datetime | None = None, site: Site = NERPIO, root=None) -> Ni
         calibration_note=note,
         cloud_model=cloud_model,
         cloud_truth=cloud_truth,
+        dusk_astronomical=night.dusk_astronomical,
+        dawn_astronomical=night.dawn_astronomical,
     )
 
 
@@ -357,7 +411,8 @@ def render(night_report: NightReport) -> str:
         "=" * 64,
         f"  oscuridad astronomica: {night_report.dark_hours:.1f} h"
         f"   ·   Luna al {night_report.moon_illumination * 100:.0f} %",
-        f"  horas utilizables esperadas: {night_report.usable_hours:.1f}",
+        f"  horas utilizables esperadas (solo noche astronomica): "
+        f"{night_report.usable_hours:.1f}",
         f"  probabilidad de condiciones para abrir: "
         f"{night_report.opening_probability:.0%}",
     ]

@@ -94,6 +94,44 @@ def moon_illumination(when: datetime) -> float:
     return float((1.0 + np.cos(np.radians(moon_phase_angle(when)))) / 2.0)
 
 
+def dark_slot_weights(starts: list[datetime], step_hours: float,
+                      dusk: datetime | None, dawn: datetime | None) -> list[float]:
+    """Cuanto de cada casilla [t, t + paso) cuenta como noche astronomica.
+
+    M6 (26-10-2026). La rejilla de presentacion va de ocaso-1 h a orto+1 h
+    (`WINDOW_MARGIN`), pero la curva del techo (roofcalibration.py) se ajusta
+    SOLO con horas cuyo punto medio tiene el Sol por debajo de
+    `DARK_SUN_ALTITUDE` (= `ASTRONOMICAL`, -18 grados): aplicarla al crepusculo
+    es extrapolar. Medido con el archivo: con M1 la noche del 26-10 daba 11,9
+    horas esperadas con 10,3 h de noche astronomica, y 13 + 26 ventanas
+    publicadas acababan despues del orto.
+
+    Una casilla CUENTA (peso > 0) si su punto medio cae dentro de [dusk, dawn],
+    que es lo mismo que Sol < -18 grados a la media hora (`dusk` y `dawn` son
+    los cruces de ese mismo umbral, `night_for`). Su peso es la fraccion de la
+    casilla que de verdad esta dentro de la noche astronomica: la hora que
+    cruza -18 grados cuenta en proporcion, no entera. Asi la suma de
+    `peso * p` nunca pasa de las horas de noche astronomica (p <= 1 y los
+    solapes suman a lo sumo `dawn - dusk`); contarla entera con el criterio del
+    punto medio SI podia pasarse (hasta 1 h por encima: 11 casillas en 10,3 h).
+
+    Sin ocaso/orto astronomicos (no ocurre a 38 N, donde el Sol baja de -28 en
+    el solsticio de verano) no se puede decir que es noche: todo cuenta entero,
+    el comportamiento anterior, en vez de dejar la noche vacia.
+    """
+    if dusk is None or dawn is None:
+        return [1.0] * len(starts)
+    step = timedelta(hours=step_hours)
+    weights = []
+    for start in starts:
+        if not (dusk <= start + step / 2 <= dawn):
+            weights.append(0.0)
+            continue
+        overlap = (min(start + step, dawn) - max(start, dusk)).total_seconds()
+        weights.append(max(0.0, overlap) / step.total_seconds())
+    return weights
+
+
 def _crossings(times: list[datetime], altitudes, threshold: float):
     """Times at which an altitude curve crosses a threshold, by interpolation."""
     down, up = None, None

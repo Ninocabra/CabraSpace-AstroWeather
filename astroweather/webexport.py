@@ -209,15 +209,26 @@ def _night(day: dt.datetime, site: Site, root=None, *,
     # El informe viene con marcas EN PUNTO (las del proveedor) y la rejilla del
     # recomendador arranca en el ocaso, que no cae en punto: buscar por igualdad
     # exacta fallaba siempre y dejaba E[Q] en cero. Se empareja por la hora.
+    #
+    # M6 (26-10-2026): E[Q] solo cuenta la noche astronomica. La curva del techo
+    # se ajusta con horas de Sol < -18 grados, asi que su probabilidad en el
+    # crepusculo es una extrapolacion; el rendimiento SI se calcula en
+    # crepusculo (la rejilla es la misma de la web) pero se pesa con 0 alli. La
+    # casilla que cruza -18 grados vale entera para las muestras que caen
+    # dentro de la noche astronomica y 0 para las de fuera, o sea en proporcion
+    # a lo que tiene de noche.
     usable = {h.t_utc.replace(minute=0, second=0, microsecond=0):
-              h.usable_probability for h in night_report.hours}
+              (h.usable_probability if w > 0 else 0.0)
+              for h, w in zip(night_report.hours, night_report.dark_weights)}
+    dusk, dawn = night.dusk_astronomical, night.dawn_astronomical
     # Con catalogo grande solo en la primera noche: la segunda no lleva trazas
     # ni ranking, asi que no hace falta puntuar mil objetos para ella.
     universo = _suben_esta_noche(times, site) if with_catalogue else list(CATALOGUE)
     targets = evaluate_night(
         universo, times,
         usable_probability=[
-            usable.get(t.replace(minute=0, second=0, microsecond=0), 0.0)
+            (usable.get(t.replace(minute=0, second=0, microsecond=0), 0.0)
+             if (dusk is None or dawn is None or dusk <= t <= dawn) else 0.0)
             for t in times],
         turbulence=turbulence, aod_total=forecast["aod_total"],
         aod_dust=forecast["aod_dust"], serie=serie_horaria, site=site)
@@ -278,15 +289,17 @@ def _night(day: dt.datetime, site: Site, root=None, *,
         # que no pueden discrepar nunca.
         "veredicto_abrir": _veredicto_abrir(night_report.opening_probability,
                                             night_report.verdict_window),
-        # OJO a la diferencia, que confunde y con razon: esto es la suma de la
-        # probabilidad utilizable sobre TODA la ventana de producto (del ocaso
-        # menos una hora al orto mas una), asi que incluye el crepusculo. Por
-        # eso puede pasar de la oscuridad astronomica: 11,4 contra 7,8 la misma
-        # noche. Lo que se puede hacer en crepusculo es planetaria y objetos
-        # brillantes, no cielo profundo, y por eso va tambien la cuenta
-        # restringida a la oscuridad de verdad.
+        # DESDE M6 (26-10-2026) esto es la suma DENTRO de la noche astronomica
+        # (casillas con el Sol < -18 grados a la media hora, la que cruza
+        # contada en proporcion), y por tanto nunca pasa de
+        # `oscuridad_astronomica_h`. Antes sumaba toda la ventana de producto
+        # (ocaso -1 h a orto +1 h) y con la curva horaria de M1 daba 11,9 h en
+        # una noche de 10,3: la curva se ajusta solo con horas oscuras y en
+        # crepusculo era extrapolar. La cuenta de antes, crepusculo incluido,
+        # sigue en `horas_utilizables_rejilla` (campo nuevo, aditivo).
         "horas_utilizables_esperadas": round(night_report.usable_hours, 1),
         "horas_utilizables_oscuras": _horas_oscuras(night_report, night),
+        "horas_utilizables_rejilla": round(night_report.usable_hours_grid, 1),
         # Que significa EXACTAMENTE la probabilidad de arriba, dentro del JSON:
         # sin esto, "probabilidad de que la noche sea utilizable" se lee como
         # "probabilidad de que abran el techo", y no es eso.
@@ -495,17 +508,16 @@ def _calibracion_fotometro() -> dict:
 def _horas_oscuras(night_report, night) -> float | None:
     """Horas utilizables esperadas DENTRO de la oscuridad astronomica.
 
-    La cuenta grande incluye el crepusculo porque la ventana de producto va del
-    ocaso menos una hora al orto mas una, y en crepusculo se puede hacer
-    planetaria y objetos brillantes. Pero para cielo profundo lo que cuenta es
-    esta, y publicar solo la grande hacia parecer que la noche da mas de lo que
-    da.
+    Desde M6 (26-10-2026) es la MISMA cuenta que `horas_utilizables_esperadas`
+    (`NightReport.usable_hours`): las dos van por la noche astronomica, y el
+    campo se queda por compatibilidad con quien ya lo leia. Antes sumaba la
+    probabilidad entera de las casillas cuya marca caia entre el ocaso y el
+    orto astronomicos, y la casilla que cruza -18 grados podia hacer pasar la
+    suma de las horas de oscuridad.
     """
     if not (night.dusk_astronomical and night.dawn_astronomical):
         return 0.0
-    total = sum(h.usable_probability for h in night_report.hours
-                if night.dusk_astronomical <= h.t_utc <= night.dawn_astronomical)
-    return round(total, 1)
+    return round(night_report.usable_hours, 1)
 
 
 def _objeto(resultado) -> dict:
@@ -920,12 +932,21 @@ def _avisos_curva_techo(calibrator) -> list[str]:
             f"{calibrator.slope_high:.1f}): faltan {calibrator.nights_missing} noches "
             f"para reajustarla entera por horas. Ese día hay que COMPROBAR que el "
             f"cruce horario siga cerca del mensual.")
-    else:
+    elif calibrator.method.startswith("horario"):
+        # Desde el 26-10-2026 (M1) el cruce del 30 % mensual ya no es la
+        # referencia: era el que ponia el techo de 0,72 a la curva. Los meses
+        # quedan como comprobacion, y eso es lo que se publica.
         avisos.append(
             f"La curva del techo ya se ajusta por horas ({calibrator.nights} "
-            f"noches): comprobar que su cruce ({calibrator.crossing:.0%}) siga "
-            f"cerca del 30 % mensual y que el MAE mensual "
-            f"({calibrator.monthly_mae:.3f}) no empeore.")
+            f"noches de noche astronómica, con la nube disponible a las 15 UTC): "
+            f"cruce al {calibrator.crossing:.0%} de nube. Comprobación con los "
+            f"meses: MAE mensual {calibrator.monthly_mae:.3f} contra "
+            f"{calibrator.monthly_mae_climatology:.3f} de la climatología.")
+    else:
+        avisos.append(
+            f"Hay {calibrator.nights} noches de techo pero el ajuste por horas "
+            f"salió sin sentido físico: manda el cruce mensual "
+            f"({calibrator.crossing:.0%} de nube).")
     if not calibrator.beats_climatology:
         avisos.append("La curva del techo NO mejora a la climatología mensual: "
                       "trátala como un supuesto.")

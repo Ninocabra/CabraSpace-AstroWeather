@@ -39,6 +39,7 @@ CODIGO = RAIZ / "astroweather"
 FUERA = {
     "apscheduler": "el planificador de proceso vivo; el colector no planifica",
     "photutils": "solo el pipeline de FWHM, que corre a mano sobre FITS en disco",
+    "matplotlib": "solo las figuras del retroanalisis (`hindcast.py`), que corre a mano",
 }
 
 

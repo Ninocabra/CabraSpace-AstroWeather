@@ -12,6 +12,136 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 26-10-2026 — M1: la curva del techo, por horas y sin fuga
+
+Primera mejora del retroanalisis de hoy (`docs/verificacion_2026-10-26.md`,
+seccion 10). La curva P(techo abierto | nube prevista) tenia un TECHO: el
+cruce salia de la climatologia mensual (30 %, base 0,56) y solo la pendiente
+de las horas, asi que con 0 % de nube no pasaba de sigmoid(0,955) = 0,72,
+cuando hora a hora, al decir 0,64-0,73, el techo estaba abierto el 96-98 %.
+
+**Que cambia** (`roofcalibration.py`):
+
+- Con `NIGHTS_FOR_HOURLY_REFIT` noches (20, antes 60) los DOS parametros salen
+  de las horas; los meses quedan como comprobacion. Por debajo, o si el ajuste
+  libre sale con pendiente >= 0, manda el metodo anterior; sin horas
+  suficientes `fit()` se niega como antes (arranque en frio intacto).
+- Horas de NOCHE ASTRONOMICA (Sol < -18 grados, `ephem`), no de 18 a 05 UTC:
+  la ventana fija metia horas con el Sol sobre el horizonte a finales de agosto.
+- La nube es la que habia al corte de las 15 UTC, elegida por `retrieved_at`
+  en el Parquet crudo (`asof.py`, la reconstruccion del retroanalisis movida a
+  un modulo comun). La vista deduplicada daba la recogida de las 21-23 UTC de
+  esa misma noche: en estas 266 horas coincide con la del corte solo en el 42 %.
+- `method` dice ahora "horario: 2 parametros, horas de noche astronomica, nube
+  disponible a las 15 UTC"; el JSON conserva sus campos. El aviso de la web ya
+  no manda comprobar el cruce contra el 30 % mensual (era el techo).
+
+**Medido** (`python -m astroweather.hindcast --m1`, cada noche con una curva
+ajustada por el codigo de produccion SOLO con las noches anteriores; IC95 por
+remuestreo de noches, 2000 remuestreos):
+
+- Control del instrumento: la P(abrir) publicada, recalculada con la curva
+  vigente al publicar, sale identica en 42 de 42 noches (error max 0,0005); el
+  metodo anterior reajustado reproduce la curva publicada (dBrier 0,000).
+- Veredicto, 42 noches del 05-09 al 25-10: Brier 0,159 -> 0,119 (dif -0,040
+  [-0,082, +0,001]); con el arranque en 8 noches, como el retroanalisis, 0,092
+  (dif -0,068 [-0,111, -0,023]): reproduce el -0,067 del informe. Acierto 0,86
+  -> 0,83 (0,86 con 8 noches); AUC 0,90 -> 0,81 (dif -0,09 [-0,22, +0,01]).
+- Horas esperadas contra reales (41 noches): sesgo -3,5 h -> -1,7 h [-2,9,
+  -0,5]; MAE 4,3 -> 3,5 h.
+- Hora a hora (227 h de noche astronomica): Brier 0,202 -> 0,191 (dif -0,011
+  [-0,068, +0,050], NO significativo) y AUC 0,83 -> 0,73: lo pierde el periodo
+  con curvas que cambian de noche a noche, no la forma (cualquier curva fija da
+  el AUC de la nube cruda, 0,85).
+- **Noches cerradas: empeora 2 de 7.** 27-09 (0,09 -> 0,58) y 19-10 (0,48 ->
+  0,76) pasan a falsa alarma; 28-09 ya lo era (0,68 -> 0,89); 17 y 18-10 suben a
+  0,25 y siguen en Cerrado; 16-09 y 20-10 quedan en 0 por las puertas.
+- Meses: MAE mensual 0,124 -> 0,145 en los 31 meses (el cruce viejo estaba
+  ajustado a ellos); en enero-julio de 2026, que ninguna ha visto por horas,
+  0,102 contra 0,104: empate. El BSS mensual de la nota de `tonight` baja de
+  +54 % a +19 %.
+- Curva de hoy (55 noches, 266 h): intercepto 0,955 -> 2,104, pendiente -3,18
+  -> -3,13 [-4,8; -2,0]; cruce 30 % -> 67 %. P(0/30/60/100 %) = 0,72 / 0,50 /
+  0,28 / 0,10 -> 0,89 / 0,76 / 0,56 / 0,26.
+
+El umbral de 20 noches es un juicio, no una medida: en este otono seco el de 8
+gana al de 20 (dif -0,027 [-0,052, -0,011]), pero con 8-16 noches las curvas
+salian planas (P(100 %) de 0,52-0,58, "Abierto" con cubierto previsto). Hoy hay
+55 noches y el resultado es el mismo con cualquiera de los dos. Llega a
+produccion cuando se empuje: el runner reentrena la curva cada dia.
+
+Ademas: `tests/conftest.py` pone astropy sin descarga del IERS (los servidores
+daban 400 hoy y 11 tests de `test_webexport.py` caian en rojo con HEAD sin
+tocar); `matplotlib` queda excluido a proposito del colector (solo lo importa
+`hindcast.py`, que se corre a mano; `test_requisitos_del_colector` lo pedia);
+y `monthly_pairs` lee la tabla de horas abiertas de la misma raiz que la
+prevision.
+
+---
+
+## 26-10-2026 (2) — M6: la ventana y las horas esperadas, dentro de la noche astronomica
+
+Segunda mejora del retroanalisis de hoy (seccion 10 de
+`docs/verificacion_2026-10-26.md`). La rejilla de presentacion va de ocaso-1 h
+a orto+1 h (`ephem.WINDOW_MARGIN`), pero la curva del techo de M1 se ajusta solo
+con horas de Sol < -18 grados; aplicarla al crepusculo es extrapolar. Con M1, la
+noche del 26-10 daba 11,9 horas esperadas con 10,3 h de noche astronomica
+(imposible), 13 + 26 ventanas publicadas acababan despues del orto y la falsa
+alarma del 28-09 se apoyo en una ventana de 06-08 UTC.
+
+**Que cambia**:
+
+- `ephem.dark_slot_weights`: una casilla cuenta si su punto medio tiene el Sol
+  por debajo de `ASTRONOMICAL` (= `roofcalibration.DARK_SUN_ALTITUDE`, la
+  constante de M1; un test las ata), y la que cruza -18 grados cuenta en
+  PROPORCION (su fraccion oscura), no entera. Decidido asi porque el criterio
+  del punto medio a secas se pasaba: 11 casillas en 10,3 h. Con el peso, la suma
+  de `peso * p` no puede pasar de las horas de noche astronomica.
+- `NightReport` (`tonight.py`) guarda el ocaso y el orto astronomicos y
+  `usable_hours`, `verdict_window`, `opening_probability` y `best_window` solo
+  miran esas casillas; las ventanas se recortan a [ocaso, orto] astronomicos.
+  `gates.opening_window` y `opening_probability` aceptan `weights` (opcional:
+  sin el, todo igual que antes). Un informe sin ocaso/orto astronomicos
+  conserva el comportamiento anterior.
+- Rendimiento por objeto (`q_expected`): `webexport`, `nightview` y `dome` ponen
+  probabilidad 0 a las muestras con el Sol por encima de -18 grados.
+- JSON publicado: la REJILLA (`horas`) no cambia. `horas_utilizables_esperadas`
+  y `horas_utilizables_oscuras` pasan a ser la misma cuenta (solo noche
+  astronomica); la de antes, crepusculo incluido, va en
+  `horas_utilizables_rejilla` (campo nuevo, aditivo). `expected_hours` de la
+  tarjeta del techo de la cupula, igual que `horas_utilizables_esperadas`.
+
+**Medido** (`python -m astroweather.hindcast --m6`, 42 noches del 05-09 al 25-10,
+curva de M1 ajustada prequencialmente, la rejilla publicada a las 16 UTC, IC95
+por remuestreo de noches, 2000 remuestreos; `NightReport` real, sin
+reimplementar):
+
+- Control positivo: con M6 quitado, las 42 noches reproducen
+  `m1_resultados.json` con diferencia 0 (P(abrir) de M1 y de la curva publicada,
+  Brier, acierto, sesgo y MAE de horas).
+- Invariante: horas esperadas > noche astronomica en 17 de 42 noches sin M6
+  (hasta x1,28), en 0 con M6 (maximo x0,89). Ventanas fuera de [ocaso, orto]
+  astronomicos: 13 -> 0; acabando tras el orto: 2 -> 0. En las 207
+  publicaciones (esta noche y la siguiente): tras el orto 13 + 26 -> 0, fuera de la noche (+-40 min)
+  36 + 52 -> 0; el veredicto pasaria a Cerrado en 5 + 4 de ellas (nunca a
+  Abierto).
+- Veredicto: NINGUNO de los 42 cambia. Brier 0,119 -> 0,122 (+0,003 [-0,003,
+  +0,011]); acierto 0,83 igual (31 aciertos, 3 falsas alarmas, 4 fallos, 4
+  cierres). El 28-09 sigue siendo falsa alarma (0,89 -> 0,85; la ventana pasa
+  de 06-08 UTC a 03:00-04:35 UTC), 27-09 y 19-10 no se mueven (0,58 y 0,76: su
+  ventana ya estaba en la oscuridad). M6 corrige la ventana, no esas noches.
+- Horas esperadas contra horas de techo de la tabla (41 noches, incluyen la
+  apertura en crepusculo): sesgo -1,7 [-2,9, -0,5] -> -4,0 [-5,2, -2,7] h; MAE
+  3,5 -> 5,0 h. Contra horas abiertas con el Sol < -18 (24 noches con
+  lecturas): +0,6 [-0,7, +1,9] -> -1,9 [-3,1, -0,7] h; MAE 2,6 -> 3,3 h. O sea
+  que las horas de crepusculo tapaban una curva conservadora (tope 0,89); no es
+  un defecto de M6, pero la cifra nueva sale corta y esta dicho.
+- `tonight` (curva de M1 ajustada en memoria con el archivo): noche del 26-10,
+  11,9 -> 8,2 h esperadas con 10,3 h de noche; P(abrir) 0,89 igual, ventana
+  00:00-02:00 UTC igual.
+
+---
+
 ## 08-09-2026 (tarde) — H_a no se puede calibrar, y no es falta de datos
 
 Intento de cerrar el pendiente historico: medir `AEROSOL_SCALE_HEIGHT_M`, el

@@ -26,7 +26,8 @@ from dataclasses import dataclass, asdict
 
 import requests
 
-from .ephem import moon_illumination, moon_phase_angle, moon_positions, night_for, sun_positions
+from .ephem import (ASTRONOMICAL, moon_illumination, moon_phase_angle, moon_positions,
+                    night_for, sun_positions)
 from .extinction import evaluate as evaluate_transparency
 from .moonsky import moon_brightness, nl_to_mag, mag_to_nl
 from .seeing import integrate
@@ -207,7 +208,11 @@ def build(day: dt.datetime | None = None, site: Site = NERPIO,
                        if cloud_index is not None else []),
         })
 
-    targets = evaluate_night(CATALOGUE, times, usable_probability=[0.8] * len(times),
+    # M6 (26-10-2026): E[Q] solo cuenta la noche astronomica (Sol < -18 grados),
+    # como el veredicto y `nightview`.
+    targets = evaluate_night(CATALOGUE, times,
+                             usable_probability=[0.8 if s.altitude < ASTRONOMICAL
+                                                 else 0.0 for s in suns],
                              turbulence=turbulence, aod_total=aod_total,
                              aod_dust=aod_dust, site=site,
                              serie=night_series(times[0], times[-1], site.site_id))
