@@ -70,13 +70,23 @@ import argparse
 import datetime as dt
 import json
 import os
-import subprocess
 from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
 
 from .asof import NWP_LATENCY, AsOf, raw_forecast_asof  # noqa: F401
+# La vara de medir y las verdades viven desde el 26-10-2026 en dos modulos
+# comunes, porque la nota diaria (`nightscore.py`) y la aspirante de la curva
+# (`curvecontest.py`) tienen que medir EXACTAMENTE igual que este informe. Se
+# importan con su nombre de siempre para que nada de aqui cambie.
+from .skill import RESAMPLES, SEED, NightBootstrap, auc, brier, bss, sigmoid  # noqa: F401
+from .nighttruth import (  # noqa: F401
+    ALLSKY_CLEAR_STARS, ALLSKY_HOURS, DECISION_HOUR_UTC, OPEN_HOURS_MIN, aware,
+    file_history, gated_usable, git, hour_ephemeris, hour_key, night_frames, night_of,
+    parse_publication, pick_publication, sensor_truths)
+from . import nighttruth as _truth
+from .nighttruth import astropy_offline as _astropy_offline  # noqa: F401
 
 UTC = dt.timezone.utc
 ENGINE = Path(__file__).resolve().parent.parent
@@ -102,21 +112,12 @@ WN_PRODUCT_FROM = dt.datetime(2026, 9, 25, 12, tzinfo=dt.timezone.utc)
 
 LEAD_BUCKETS = ((0, 12), (12, 24), (24, 49))
 LEAD_LABELS = ("0-12 h", "12-24 h", "24-48 h")
-# La decision de subir se toma por la tarde: la publicacion vigente a esta hora.
-DECISION_HOUR_UTC = 16
-OPEN_HOURS_MIN = 2.0          # "abrio" = al menos la ventana de dos horas del veredicto
-# Allsky: horas validas (desde las 03 UTC la camara da 0 estrellas cada noche,
-# medido en las 15 noches limpias: p90 = 9 a las 03, 0 a las 04) y umbral, el
-# valle de la distribucion de medianas horarias (5 horas entre 73 y 109
-# estrellas contra 49-85 por intervalo por encima de 239).
-ALLSKY_HOURS = (19, 20, 21, 22, 23, 0, 1, 2)
-ALLSKY_CLEAR_STARS = 100
+# DECISION_HOUR_UTC (16), OPEN_HOURS_MIN (2 h) y el corte de la allsky (19-03 UTC,
+# 100 estrellas) viven en `nighttruth.py`, con su porque.
 # Ridge de los ajustes prequenciales, sobre variables en fraccion 0-1. Solo
 # estabiliza las primeras noches (separacion perfecta); no se ha barrido.
 RIDGE = 1.0
 PREQ_MIN_NIGHTS = 8
-RESAMPLES = 2000
-SEED = 20261026
 PROVIDERS = ("ecmwf_ifs025", "ecmwf_ifs", "gfs_seamless", "icon_seamless",
              "meteofrance_seamless", "weathernext3")
 TRUTHS = ("fotometro", "consenso", "cloudwatcher", "allsky")
@@ -128,49 +129,6 @@ C_INK, C_INK2, C_GRID, C_GREY = "#0b0b0b", "#52514e", "#e4e3df", "#a3a29c"
 
 
 # --- utilidades --------------------------------------------------------------
-
-def _astropy_offline() -> None:
-    """Sin red para el IERS astropy se niega a dar la altura del Sol. UT1-UTC
-    < 0,9 s mueve las alturas < 0,004 grados: irrelevante para etiquetar horas."""
-    from astropy.utils import iers
-    iers.conf.auto_download = False
-    iers.conf.auto_max_age = None
-
-
-def hour_key(t: dt.datetime) -> dt.datetime:
-    """Hora UTC naive, la clave de `observed_clear_hours`."""
-    if t.tzinfo is not None:
-        t = t.astimezone(UTC).replace(tzinfo=None)
-    return t.replace(minute=0, second=0, microsecond=0)
-
-
-def night_of(h: dt.datetime) -> dt.date:
-    return (h - dt.timedelta(hours=12)).date()
-
-
-def aware(t: dt.datetime) -> dt.datetime:
-    return t if t.tzinfo else t.replace(tzinfo=UTC)
-
-
-def sigmoid(z):
-    return 1.0 / (1.0 + np.exp(-np.clip(z, -60, 60)))
-
-
-def brier(p, o) -> float:
-    p, o = np.asarray(p, float), np.asarray(o, float)
-    return float(np.mean((p - o) ** 2)) if len(o) else float("nan")
-
-
-def auc(p, o) -> float:
-    from .scoreboard import _auc
-    value = _auc(np.asarray(p, float), np.asarray(o, float))
-    return float("nan") if value is None else value
-
-
-def bss(p, o, ref) -> float:
-    b_ref = brier(ref, o)
-    return 1.0 - brier(p, o) / b_ref if b_ref > 0 else float("nan")
-
 
 def kappa(matrix) -> float:
     m = np.asarray(matrix, float)
@@ -199,57 +157,6 @@ def fit_logistic(X: np.ndarray, y: np.ndarray, ridge: float = RIDGE) -> np.ndarr
     return w
 
 
-class NightBootstrap:
-    """Remuestreo de noches enteras, el mismo para todas las metricas de un
-    bloque: asi las diferencias entre dos previsiones son PAREADAS."""
-
-    def __init__(self, nights, resamples: int = RESAMPLES, seed: int = SEED):
-        nights = np.asarray(nights)
-        self.unique = np.unique(nights)
-        groups = [np.flatnonzero(nights == u) for u in self.unique]
-        rng = np.random.default_rng(seed)
-        self.everything = np.arange(len(nights))
-        self.draws = []
-        for _ in range(resamples):
-            pick = rng.integers(0, len(groups), len(groups))
-            self.draws.append(np.concatenate([groups[i] for i in pick])
-                              if len(groups) else self.everything)
-
-    @property
-    def n_nights(self) -> int:
-        return len(self.unique)
-
-    def ci(self, fn) -> tuple[float, float, float]:
-        point = fn(self.everything)
-        values = np.array([fn(idx) for idx in self.draws], float)
-        values = values[np.isfinite(values)]
-        if not len(values):
-            return point, float("nan"), float("nan")
-        lo, hi = np.percentile(values, [2.5, 97.5])
-        return float(point), float(lo), float(hi)
-
-
-def git(repo: Path, *args: str) -> bytes:
-    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True,
-                          check=True).stdout
-
-
-def file_history(repo: Path, path: str) -> list[tuple[dt.datetime, dict]]:
-    """Cada version de un JSON en el historial git: (fecha del commit, contenido)."""
-    log = git(repo, "log", "--reverse", "--format=%H %cI", "--", path).decode()
-    out = []
-    for line in log.splitlines():
-        if not line.strip():
-            continue
-        commit, when = line.split()
-        try:
-            content = json.loads(git(repo, "show", f"{commit}:{path}").decode("utf-8"))
-        except (subprocess.CalledProcessError, json.JSONDecodeError):
-            continue
-        out.append((dt.datetime.fromisoformat(when).astimezone(UTC), content))
-    return out
-
-
 # --- carga de datos ----------------------------------------------------------
 
 
@@ -270,37 +177,16 @@ class Data:
         from .calibration import observed_clear_hours
         return observed_clear_hours(since=since, root=self.archive)
 
+    # Los tres lectores de sensores viven en `nighttruth.py` (26-10-2026): la nota
+    # diaria lee EXACTAMENTE lo mismo. Aqui solo se les pasa la conexion.
     def cloudwatcher(self, since: dt.datetime) -> dict[dt.datetime, tuple[float, int]]:
-        rows = self.con.execute("""
-            SELECT date_trunc('hour', t_utc) AS h,
-                   avg(CASE WHEN clear_flag THEN 1.0 ELSE 0.0 END), count(*)
-            FROM measurements
-            WHERE starts_with(instrument_id, 'cloudwatcher') AND clear_flag IS NOT NULL
-              AND t_utc >= ?
-            GROUP BY 1
-        """, [since]).fetchall()
-        return {hour_key(h): (float(f), int(n)) for h, f, n in rows}
+        return _truth.cloudwatcher_hours(self.con, since)
 
     def allsky(self, since: dt.datetime) -> dict[dt.datetime, float]:
-        rows = self.con.execute("""
-            SELECT date_trunc('hour', t_utc), median(star_count), count(*)
-            FROM measurements
-            WHERE instrument_type = 'ALLSKY' AND star_count IS NOT NULL AND t_utc >= ?
-            GROUP BY 1
-        """, [since]).fetchall()
-        return {hour_key(h): float(m) for h, m, n in rows if n >= 20}
+        return _truth.allsky_hours(self.con, since)
 
     def roof_samples(self, since: dt.datetime) -> list[tuple[dt.datetime, int, int]]:
-        rows = self.con.execute(r"""
-            SELECT t_utc,
-                   CAST(regexp_extract(quality_flags, 'open=(\d+)/', 1) AS INT),
-                   CAST(regexp_extract(quality_flags, 'open=\d+/(\d+)', 1) AS INT)
-            FROM measurements
-            WHERE instrument_id = 'astrocamp_roofs' AND quality_flags LIKE 'open=%'
-              AND t_utc >= ?
-            ORDER BY t_utc
-        """, [since]).fetchall()
-        return [(aware(t), int(a), int(b)) for t, a, b in rows if a is not None]
+        return _truth.roof_samples(self.con, since)
 
     def tess_hourly(self, since: dt.datetime) -> dict[dt.datetime, float]:
         rows = self.con.execute("""
@@ -355,68 +241,10 @@ class Data:
 
 
     def published(self) -> list[dict]:
-        """Cada version de noche.json: lo que vio el usuario, en orden."""
-        log = git(self.data_repo, "log", "--reverse", "--format=%H", "--",
-                  "noche.json").decode().split()
-        pubs = []
-        for commit in log:
-            try:
-                d = json.loads(git(self.data_repo, "show", f"{commit}:noche.json")
-                               .decode("utf-8"))
-            except (subprocess.CalledProcessError, json.JSONDecodeError):
-                continue
-            generated = dt.datetime.fromisoformat(d["generado_utc"]).astimezone(UTC)
-            cupula = d.get("cupula") or {}
-            confianza = d.get("confianza") or {}
-
-            def when(text):
-                return dt.datetime.fromisoformat(text).astimezone(UTC) if text else None
-
-            nights = []
-            for n in d.get("noches", []):
-                verdict = n.get("veredicto_abrir") or {}
-                window = verdict.get("ventana") or {}
-                twilight = n.get("crepusculo") or {}
-                cielo = n.get("cielo") or {}
-                trans = cielo.get("transparencia") or {}
-                entry = {
-                    "night": dt.date.fromisoformat(n["noche"]),
-                    "p_open": n.get("probabilidad_de_abrir"),
-                    "open": verdict.get("abierto"),
-                    "verdict_derived": "abierto" not in verdict,
-                    "window": ((when(window["desde"]), when(window["hasta"]))
-                               if window.get("desde") else None),
-                    "expected_hours": n.get("horas_utilizables_esperadas"),
-                    "cloud_model": n.get("modelo_nubes"),
-                    "truth": n.get("verdad_terreno") or confianza.get("verdad_terreno"),
-                    "moon": n.get("luna_iluminacion"),
-                    "sunset": when(twilight.get("ocaso")),
-                    "sunrise": when(twilight.get("orto")),
-                    "dark_from": when(twilight.get("astronomico_desde")),
-                    "dark_to": when(twilight.get("astronomico_hasta")),
-                    "darkest_mag": cielo.get("mag_cenit_mas_oscuro"),
-                    "aod": trans.get("aod"),
-                    "seeing_tercile": (cielo.get("seeing") or {}).get("tercil"),
-                    "hours": [{
-                        "t": hour_key(dt.datetime.fromisoformat(h["t_utc"])),
-                        "cloud": h.get("nubes_previstas"),
-                        "p_clear": h.get("p_despejado"),
-                        "p_usable": h.get("p_utilizable"),
-                        "safe": h.get("seguro_para_abrir"),
-                        "limits": h.get("limita"),
-                    } for h in n.get("horas", [])],
-                }
-                if cupula.get("night") == n.get("noche"):
-                    entry["sky_tercile"] = cupula.get("sky_tercile")
-                    entry["aod_tercile"] = cupula.get("aod_tercile")
-                    entry["cupula_seeing"] = (cupula.get("seeing") or {}).get("tercile")
-                if entry["open"] is None and entry["p_open"] is not None:
-                    entry["open"] = entry["p_open"] >= 0.5
-                nights.append(entry)
-            pubs.append({"generated": generated, "nights": nights,
-                         "curve_fitted": confianza.get("curva_ajustada_el")})
-        pubs.sort(key=lambda p: p["generated"])
-        return pubs
+        """Cada version de noche.json: lo que vio el usuario, en orden. El analisis
+        de cada version es `nighttruth.parse_publication`, el mismo que usa la
+        captura del trabajo `publicar` para la nota diaria."""
+        return _truth.published_history(self.data_repo)
 
 
 # --- calibradores vigentes en cada momento ------------------------------------
@@ -484,44 +312,20 @@ class Curves:
 
 # --- ephemerides --------------------------------------------------------------
 
-def hour_ephemeris(hours) -> dict[dt.datetime, tuple[float, float]]:
-    """(altura del Sol, altura de la Luna) a la media hora de cada hora."""
-    from .ephem import moon_positions, sun_positions
-    hours = sorted(set(hours))
-    if not hours:
-        return {}
-    mids = [h.replace(tzinfo=UTC) + dt.timedelta(minutes=30) for h in hours]
-    sun = sun_positions(mids)
-    moon = moon_positions(mids)
-    return {h: (s.altitude, m.altitude) for h, s, m in zip(hours, sun, moon)}
-
-
-def night_frames(nights) -> dict[dt.date, dict]:
-    from .ephem import moon_illumination, night_for
-    out = {}
-    for n in nights:
-        frame = night_for(dt.datetime(n.year, n.month, n.day, 12, tzinfo=UTC))
-        midnight = dt.datetime(n.year, n.month, n.day, 23, 30, tzinfo=UTC)
-        out[n] = {"sunset": frame.sunset, "sunrise": frame.sunrise,
-                  "dusk": frame.dusk_astronomical, "dawn": frame.dawn_astronomical,
-                  "dark_hours": frame.dark_hours, "moon": moon_illumination(midnight)}
-    return out
+# `hour_ephemeris` y `night_frames` viven en `nighttruth.py`.
 
 
 # --- la verdad del techo, noche a noche ----------------------------------------
 
 def roof_truth(data: Data, frames: dict, samples) -> dict[dt.date, dict]:
-    """Horas de techo abierto de cada noche, de las dos fuentes y cruzadas.
+    """Horas de techo abierto de cada noche (`nighttruth.roof_truth`), con la tabla
+    leida del historial git del archivo como la leyo el informe del 26-10-2026.
 
     La tabla mensual de AstroCamp (`open_hours_nerpio.json`) se reescribe una
-    vez al dia y el historial git del archivo guarda cada version: la diferencia
-    entre dos fotos consecutivas es lo que abrieron entre ellas, y se reparte
-    entre las noches que solapan el intervalo en proporcion a lo solapado.
-      limpio  -- la noche cae entera en intervalos que no tocan otra noche;
-      aprox   -- una foto de tarde partio la noche (reparto proporcional);
-      reparto -- un intervalo de muchas noches (30-09 a 08-10, 17-10 a 21-10).
-    Las lecturas sueltas del techo dan la misma cifra donde hay cadencia
-    (>= 12 lecturas por noche, hasta el 28-09).
+    vez al dia y el historial git guarda cada version: la diferencia entre dos
+    fotos consecutivas de agosto-octubre de 2026 es lo que abrieron entre ellas.
+    La nota diaria (`nightscore.py`) usa el mismo reparto con la diferencia mes
+    a mes (`nighttruth.table_deltas`); sobre estas noches da lo mismo.
     """
     history = file_history(data.archive, "open_hours_nerpio.json")
     snaps = []
@@ -529,51 +333,8 @@ def roof_truth(data: Data, frames: dict, samples) -> dict[dt.date, dict]:
         months = (content.get("2026") or {}).get("months") or []
         snaps.append((when, float(sum(v for v in months[7:10] if v is not None))))
     snaps.sort()
-    intervals = {n: (frames[n]["sunset"], frames[n]["sunrise"]) for n in frames}
-    alloc: dict[dt.date, list] = defaultdict(list)
-    for (t0, v0), (t1, v1) in zip(snaps[:-1], snaps[1:]):
-        delta = v1 - v0
-        touched = []
-        for n, (a, b) in intervals.items():
-            overlap = (min(b, t1) - max(a, t0)).total_seconds() / 3600.0
-            if overlap > 0:
-                touched.append((n, overlap, (b - a).total_seconds() / 3600.0))
-        span = sum(o for _, o, _ in touched)
-        for n, overlap, length in touched:
-            alloc[n].append({"delta": delta, "share": overlap / span,
-                             "covers": overlap / length, "nights": len(touched)})
-    out = {}
-    for n in frames:
-        a, b = intervals[n]
-        parts = alloc.get(n, [])
-        night_len = (b - a).total_seconds() / 3600.0
-        entry = {"table_hours": None, "table_quality": None, "table_span_max": None,
-                 "samples": 0, "samples_open": 0, "sample_hours": None, "hours": None,
-                 "opened": None, "source": None}
-        if parts and sum(p["covers"] for p in parts) > 0.95:
-            nights_max = max(p["nights"] for p in parts)
-            entry["table_hours"] = sum(p["delta"] * p["share"] for p in parts)
-            entry["table_quality"] = ("limpio" if nights_max == 1 else
-                                      "aprox" if nights_max <= 2 else "reparto")
-            entry["table_span_max"] = max(p["delta"] for p in parts)
-        inside = [(t, o, k) for t, o, k in samples if a <= t <= b]
-        entry["samples"] = len(inside)
-        entry["samples_open"] = sum(1 for _, o, _ in inside if o > 0)
-        if len(inside) >= 12:
-            entry["sample_hours"] = entry["samples_open"] / len(inside) * night_len
-        if entry["table_quality"] in ("limpio", "aprox"):
-            entry["hours"], entry["source"] = entry["table_hours"], "tabla " + entry["table_quality"]
-        elif entry["sample_hours"] is not None:
-            entry["hours"], entry["source"] = entry["sample_hours"], "lecturas"
-        elif (entry["table_quality"] == "reparto" and entry["table_span_max"] <= OPEN_HOURS_MIN
-              and entry["samples_open"] == 0):
-            entry["hours"], entry["source"] = 0.0, "cota: <=2 h en todo el tramo"
-        if entry["hours"] is not None:
-            entry["opened"] = entry["hours"] >= OPEN_HOURS_MIN
-        elif entry["samples_open"] > 0:
-            entry["opened"], entry["source"] = True, "lectura suelta abierta"
-        out[n] = entry
-    return out
+    deltas = [(t0, t1, v1 - v0) for (t0, v0), (t1, v1) in zip(snaps[:-1], snaps[1:])]
+    return _truth.roof_truth(frames, samples, deltas)
 
 
 # --- seleccion y puntuacion -----------------------------------------------------
@@ -633,23 +394,7 @@ def reliability_curve(p: np.ndarray, o: np.ndarray, bins: int = 10):
     return out
 
 
-def gated_usable(hours: list[dict], p_of_cloud) -> list[float] | None:
-    """P(utilizable) de cada hora publicada con OTRA curva y las MISMAS puertas.
-
-    El factor de seguridad de cada hora se toma de lo publicado (p_utilizable /
-    p_despejado); donde la curva publicada dio 0, del `seguro_para_abrir`. None
-    si alguna hora no trae nube.
-    """
-    usable = []
-    for x in hours:
-        if x["cloud"] is None:
-            return None
-        if x["p_clear"]:
-            gate = (x["p_usable"] or 0.0) / x["p_clear"]
-        else:
-            gate = 0.0 if x["safe"] is False else 1.0
-        usable.append(p_of_cloud(x["cloud"]) * gate)
-    return usable
+# `gated_usable` vive en `nighttruth.py`: la aspirante de la curva lo usa igual.
 
 
 def cloud_category(low, mid, high, total) -> str:
@@ -712,19 +457,9 @@ def analyse(archive: Path = ARCHIVE, data_repo: Path = DATA_REPO,
     def deep(h):
         return h in eph and eph[h][0] < -18.0
 
-    T = {
-        "fotometro": {h: v for h, v in truth_all.items() if in_period(h)},
-        "cloudwatcher": {h: f >= 0.5 for h, (f, n) in cw_raw.items()
-                         if deep(h) and in_period(h)},
-        "allsky": {h: s >= ALLSKY_CLEAR_STARS for h, s in sky_raw.items()
-                   if deep(h) and h.hour in ALLSKY_HOURS and in_period(h)},
-    }
-    consensus = {}
-    for h in set(T["fotometro"]) | set(T["cloudwatcher"]) | set(T["allsky"]):
-        votes = [T[k][h] for k in ("fotometro", "cloudwatcher", "allsky") if h in T[k]]
-        if len(votes) >= 2 and 2 * sum(votes) != len(votes):
-            consensus[h] = 2 * sum(votes) > len(votes)
-    T["consenso"] = consensus
+    # Las tres verdades y su consenso: `nighttruth.sensor_truths`, la misma que
+    # usa la nota diaria de cada noche.
+    T = sensor_truths(truth_all, cw_raw, sky_raw, eph, in_period)
     R["truth_sizes"] = {k: {"hours": len(v), "clear_rate": float(np.mean(list(v.values())))}
                         for k, v in T.items()}
 
@@ -994,15 +729,7 @@ def analyse(archive: Path = ARCHIVE, data_repo: Path = DATA_REPO,
                               pubs[-1]["generated"].isoformat())
 
     def pick(night: dt.date, day: dt.date):
-        cutoff = dt.datetime(day.year, day.month, day.day, DECISION_HOUR_UTC, tzinfo=UTC)
-        chosen = None
-        for pub in pubs:
-            if pub["generated"] > cutoff:
-                break
-            for entry in pub["nights"]:
-                if entry["night"] == night:
-                    chosen = (pub, entry)
-        return chosen
+        return pick_publication(pubs, night, day)
 
     night_rows = []
     for n in nights:
@@ -1665,15 +1392,7 @@ def m1_evaluation(archive: Path = ARCHIVE, data_repo: Path = DATA_REPO,
     pubs = data.published()
 
     def pick(night: dt.date):
-        cutoff = dt.datetime(night.year, night.month, night.day, DECISION_HOUR_UTC, tzinfo=UTC)
-        chosen = None
-        for pub in pubs:
-            if pub["generated"] > cutoff:
-                break
-            for entry in pub["nights"]:
-                if entry["night"] == night:
-                    chosen = (pub, entry)
-        return chosen
+        return pick_publication(pubs, night, night)
 
     night_rows = []
     control = []
@@ -1986,15 +1705,7 @@ def m6_evaluation(archive: Path = ARCHIVE, data_repo: Path = DATA_REPO,
     pubs = data.published()
 
     def pick(night: dt.date):
-        cutoff = dt.datetime(night.year, night.month, night.day, DECISION_HOUR_UTC, tzinfo=UTC)
-        chosen = None
-        for pub in pubs:
-            if pub["generated"] > cutoff:
-                break
-            for entry in pub["nights"]:
-                if entry["night"] == night:
-                    chosen = (pub, entry)
-        return chosen
+        return pick_publication(pubs, night, night)
 
     night_rows = []
     for n in nights:

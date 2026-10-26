@@ -12,6 +12,62 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 26-10-2026 — El producto se puntua solo: nota diaria, aspirante contra campeona y salud
+
+Tres piezas en el colector para que lo que midio el retroanalisis de hoy a mano
+se mida cada manana sin nadie. Detalle, formatos y cifras:
+`docs/aprendizaje_continuo.md`.
+
+**Comun.** `skill.py` (Brier, AUC, remuestreo por noches) y `nighttruth.py`
+(marco de la noche, verdades de nubes y consenso, verdad del techo por la tabla
+de AstroCamp, lo publicado) salen de `hindcast.py`, que los importa. Control:
+`hindcast --resamples 50` antes y despues da los mismos numeros salvo la fila
+"barajada" y el orden de dos filas, que cambian igual entre dos ejecuciones del
+mismo codigo. Tres almacenes nuevos de solo anadir (`schema.py`):
+`night_publications`, `night_scores`, `curve_decisions`, que viajan al archivo
+(`archivepush.MIRRORED`, enlaces en `colector.yml`).
+
+**1. Nota de cada noche** (`nightscore.py`, trabajo `nota`, diario desde las
+10 UTC). Lo publicado a las 16 UTC del dia y de la vispera (capturado por
+`publicar` en cada commit de `noche.json`, porque el runner clona con
+profundidad 1), lo que paso (techo total y con Sol < -18, fotometro,
+CloudWatcher, allsky, consenso y voto) y sus aciertos. Rehace las ultimas 4
+noches y nunca sustituye una verdad del techo por otra peor. Relleno:
+`python -m astroweather.nightscore --backfill`. **Control positivo**: D0 desde
+el 05-09, 42 noches, 30 aciertos, 1 falsa alarma, 5 sorpresas, 6 cierres, Brier
+0,160, AUC 0,89, igual que el informe; horas de techo de las 59 noches
+identicas; capturas releidas del Parquet contra historial git, 0 diferencias.
+
+**2. Aspirante contra campeona** (`curvecontest.py`, `techo_curva` ya no guarda
+a ciegas). Aspirante ajustada sin las ultimas 14 noches puntuables; sustituye
+solo si su Brier del veredicto en esas noches es menor por >= 0,02. K y margen
+salen de simular el protocolo del 20-09 al 26-10: K = 14 es el menor con noches
+cerradas en todas las ventanas; 0,02 es el p90 del ruido de reajuste (sin
+margen la curva cambiaba 18 veces en 37 dias). Coste de reservar, no medible
+este otono (+0,004 [-0,040, +0,050] de Brier la noche siguiente contra
+reajustar a ciegas). Con el archivo de hoy: `sustituye` (la horaria de M1 gana a
+la del cruce mensual por -0,054 en 14 noches); **control en rojo**: una curva
+con la pendiente al reves y otra plana a 0,99 salen rechazadas y la vigente no
+se toca. Decisiones en `curve_decisions`.
+
+**3. Salud** (`health.py`, trabajo `salud` en cada pasada; bloque `salud` en
+`estado_colector.json`; `marcador.json` en el repo de datos, solo si cambia un
+nivel o una cifra diaria). Nota movil de 14 noches contra la climatologia,
+cadencia y frescura de techo, CloudWatcher, estacion, fotometro y allsky, corte
+de madrugada de la allsky (M13) y ultima decision de la curva; `ok` / `aviso` /
+`rojo`. **Control en rojo con los datos de hoy**: techo, CloudWatcher y
+estacion en rojo (4 lecturas el 25-10 de 34-36 esperadas: M11); el 20-09, en
+verde. El corte de la allsky salta en septiembre (5 de 7 noches) y no esta
+semana (2 de 7: la camara llega ya a las 04 UTC).
+
+**Coste medido** (escritorio): `nota` 9,0 s, `techo_curva` 14,2 s (como antes),
+`salud` 0,6 s por pasada (1,8 s la primera del dia). NO medido en el runner.
+
+Tests: `tests/test_aprendizaje_continuo.py` (23, sin red), cada uno visto en
+rojo con su fallo puesto (merge desactivado, aspirante que entra siempre, sin
+rojo de cadencia, deltas de todos los meses, fotos repetidas que parten el
+intervalo).
+
 ## 26-10-2026 — M1: la curva del techo, por horas y sin fuga
 
 Primera mejora del retroanalisis de hoy (`docs/verificacion_2026-10-26.md`,

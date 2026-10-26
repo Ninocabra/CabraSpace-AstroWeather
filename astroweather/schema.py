@@ -192,6 +192,141 @@ DAILY_OBSERVATION_SCHEMA = pa.schema(
 SCHEMAS["daily_observations"] = DAILY_OBSERVATION_SCHEMA
 
 
+# --- el producto se puntua a si mismo (26-10-2026) ----------------------------
+#
+# Tres almacenes de SOLO ANADIR, con el mismo mecanismo que los demas
+# (`archive.write_canonical`: un Parquet nuevo por escritura, nunca se reescribe
+# nada). Se eligio esto y no un JSON suelto como `roof_calibration.json` por lo
+# que paso el 17-09-2026 con `open_hours`: los sueltos SE REESCRIBEN, y una
+# maquina atrasada copio su version encima de la buena (258 -> 254). Un registro
+# de aciertos que una maquina vieja puede pisar no es un registro. Con un
+# fichero por escritura, dos maquinas que puntuan la misma noche dejan dos
+# ficheros y el lector se queda con el mas reciente: no hay choque de git
+# posible ni nada que fundir. `date` es la noche (la fecha en que empieza), y es
+# por donde `write_canonical` particiona.
+
+# Lo que se PUBLICO, capturado por el trabajo `publicar` en cada commit de
+# `noche.json`. El historial git del repo de datos ya lo guarda, pero el runner
+# lo clona con profundidad 1: a la manana siguiente la version de las 16 UTC ya
+# no esta en su disco. Una fila por (publicacion, noche); las horas van en JSON
+# porque son lo que permite repuntuar esa noche con OTRA curva y las mismas
+# puertas (`nighttruth.gated_usable`).
+NIGHT_PUBLICATION_SCHEMA = pa.schema(
+    [
+        pa.field("site_id", pa.string()),
+        pa.field("date", pa.date32()),                   # la noche
+        pa.field("published_utc", pa.timestamp("s", tz="UTC")),   # generado_utc
+        pa.field("night_index", pa.int16()),             # 0 esta noche, 1 la siguiente
+        pa.field("p_open", pa.float32()),                # probabilidad_de_abrir
+        pa.field("open", pa.bool_()),                    # veredicto_abrir.abierto
+        pa.field("open_derived", pa.bool_()),            # sin regla escrita: p >= 0,5
+        pa.field("window_from", pa.timestamp("s", tz="UTC")),
+        pa.field("window_to", pa.timestamp("s", tz="UTC")),
+        pa.field("expected_h", pa.float32()),            # horas_utilizables_esperadas
+        pa.field("curve_fitted", pa.string()),           # confianza.curva_ajustada_el
+        pa.field("truth_curve", pa.string()),            # 'techo' | 'fotometro'
+        pa.field("cloud_model", pa.string()),
+        pa.field("hours_json", pa.string()),             # t, nube, p_desp, p_util, seguro
+        pa.field("source", pa.string()),                 # 'publicar' | 'git noche.json'
+        pa.field("retrieved_at", pa.timestamp("s", tz="UTC")),
+        pa.field("pipeline_version", pa.string()),
+    ]
+)
+
+# La NOTA de cada noche: lo publicado a las 16 UTC del dia (d0_) y de la vispera
+# (dm1_), lo que paso y sus aciertos. Una fila por noche y pasada de
+# puntuacion; la vigente es la de `scored_utc` mas reciente (una noche solo se
+# vuelve a escribir si su verdad cambia, p. ej. cuando AstroCamp apunta sus
+# horas en la tabla). Formato completo en docs/aprendizaje_continuo.md.
+_PUBLISHED_FIELDS = []
+for _p in ("d0", "dm1"):
+    _PUBLISHED_FIELDS += [
+        pa.field(f"{_p}_published_utc", pa.timestamp("s", tz="UTC")),
+        pa.field(f"{_p}_p_open", pa.float32()),
+        pa.field(f"{_p}_open", pa.bool_()),
+        pa.field(f"{_p}_window_from", pa.timestamp("s", tz="UTC")),
+        pa.field(f"{_p}_window_to", pa.timestamp("s", tz="UTC")),
+        pa.field(f"{_p}_expected_h", pa.float32()),
+        pa.field(f"{_p}_curve_fitted", pa.string()),
+        pa.field(f"{_p}_truth_curve", pa.string()),
+        pa.field(f"{_p}_source", pa.string()),
+        pa.field(f"{_p}_outcome", pa.string()),   # acierto|falsa_alarma|sorpresa|cierre_bien
+        pa.field(f"{_p}_hit", pa.bool_()),
+        pa.field(f"{_p}_brier", pa.float32()),
+        pa.field(f"{_p}_hours_error", pa.float32()),       # esperadas - techo (h)
+        pa.field(f"{_p}_hours_error_dark", pa.float32()),  # esperadas - techo con Sol < -18
+    ]
+
+NIGHT_SCORE_SCHEMA = pa.schema(
+    [
+        pa.field("site_id", pa.string()),
+        pa.field("date", pa.date32()),
+        pa.field("scored_utc", pa.timestamp("s", tz="UTC")),
+        pa.field("origin", pa.string()),                 # 'diario' | 'relleno'
+        pa.field("dark_hours", pa.float32()),            # noche astronomica (h)
+        pa.field("moon", pa.float32()),                  # iluminacion a las 23:30 UTC
+        # el techo
+        pa.field("roof_hours", pa.float32()),
+        pa.field("roof_source", pa.string()),
+        pa.field("roof_opened", pa.bool_()),             # >= 2 h, la ventana del veredicto
+        pa.field("roof_dark_hours", pa.float32()),       # abiertas con Sol < -18 (lecturas)
+        pa.field("roof_samples", pa.int16()),
+        pa.field("roof_table_hours", pa.float32()),
+        pa.field("roof_table_quality", pa.string()),     # limpio | aprox | reparto
+        # el cielo: horas medidas y fraccion despejada de cada verdad
+        pa.field("phot_hours", pa.int16()),
+        pa.field("phot_clear_frac", pa.float32()),
+        pa.field("cw_hours", pa.int16()),
+        pa.field("cw_clear_frac", pa.float32()),
+        pa.field("sky_hours", pa.int16()),
+        pa.field("sky_clear_frac", pa.float32()),
+        pa.field("consensus_hours", pa.int16()),
+        pa.field("consensus_clear_frac", pa.float32()),
+        pa.field("vote", pa.string()),                   # despejada | nublada | None
+    ] + _PUBLISHED_FIELDS + [
+        # La version de la tabla de AstroCamp vigente al puntuar y el primer
+        # instante en que se vio: en el runner (clon de profundidad 1) es la unica
+        # forma de saber manana cuanto abrieron hoy.
+        pa.field("table_seen_utc", pa.timestamp("s", tz="UTC")),
+        pa.field("table_json", pa.string()),
+        pa.field("pipeline_version", pa.string()),
+    ]
+)
+
+# Cada vez que una curva aspirante se mide contra la vigente: con que, quien
+# gano y por que. Es el registro que dice cuando y por que cambio lo publicado.
+CURVE_DECISION_SCHEMA = pa.schema(
+    [
+        pa.field("site_id", pa.string()),
+        pa.field("date", pa.date32()),                   # dia de la decision
+        pa.field("decided_utc", pa.timestamp("s", tz="UTC")),
+        pa.field("curve", pa.string()),                  # 'techo' | 'fotometro'
+        pa.field("decision", pa.string()),               # sustituye | se_queda | arranque_en_frio
+        pa.field("reason", pa.string()),
+        pa.field("k_nights", pa.int16()),
+        pa.field("margin", pa.float32()),
+        pa.field("n_nights", pa.int16()),                # noches puntuadas de verdad
+        pa.field("nights", pa.string()),                 # cuales (JSON)
+        pa.field("champion_fitted_at", pa.string()),
+        pa.field("challenger_fitted_at", pa.string()),
+        pa.field("champion_brier", pa.float32()),
+        pa.field("challenger_brier", pa.float32()),
+        pa.field("d_brier", pa.float32()),               # aspirante - vigente
+        pa.field("d_brier_lo", pa.float32()),            # IC90 pareado por noches
+        pa.field("d_brier_hi", pa.float32()),
+        pa.field("champion_auc", pa.float32()),
+        pa.field("challenger_auc", pa.float32()),
+        pa.field("champion_json", pa.string()),
+        pa.field("challenger_json", pa.string()),
+        pa.field("pipeline_version", pa.string()),
+    ]
+)
+
+SCHEMAS["night_publications"] = NIGHT_PUBLICATION_SCHEMA
+SCHEMAS["night_scores"] = NIGHT_SCORE_SCHEMA
+SCHEMAS["curve_decisions"] = CURVE_DECISION_SCHEMA
+
+
 # --- Lo que hace que una fila sea una fila -----------------------------------
 #
 # El esquema dice de que TIPO es cada columna y ahi se paraba: `write_canonical`
@@ -210,6 +345,9 @@ CLAVES_OBLIGATORIAS = {
     "forecasts": ("site_id", "model", "run_utc", "valid_utc"),
     "measurements": ("site_id", "t_utc"),
     "daily_observations": ("site_id", "date", "station_id"),
+    "night_publications": ("site_id", "date", "published_utc", "source"),
+    "night_scores": ("site_id", "date", "scored_utc", "origin"),
+    "curve_decisions": ("site_id", "date", "decided_utc", "curve", "decision"),
 }
 
 # `member` es NULL en las pasadas deterministas y `lead_h` puede faltar: son

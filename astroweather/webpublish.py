@@ -225,6 +225,47 @@ def publicar_nubes(site: Site = NERPIO, *, repo: Path | None = None,
     return _git(repo, "rev-parse", "--short", "HEAD").stdout.strip()
 
 
+# La salud del producto y sus ultimas notas, para que la web pueda pintar
+# "como vamos" (26-10-2026). Fichero aparte por lo mismo que `ahora.json`: cambia
+# a otro ritmo que la prevision y pesa ~10 kB que no necesita quien solo quiere
+# el veredicto. Formato estable en docs/aprendizaje_continuo.md.
+FICHERO_MARCADOR = "marcador.json"
+
+
+def publicar_marcador(*, payload: dict, repo: Path | None = None,
+                      push: bool = True) -> str | None:
+    """`marcador.json` al repo de datos, SOLO si cambio algo que importa.
+
+    El bloque se calcula en cada pasada y lleva la edad de cada sensor, que
+    cambia siempre: comparar con eso dentro haria un commit cada media hora. Se
+    compara sin las horas ni las edades (`health.significant`), asi que el
+    historial guarda cuando cambio un nivel o una cifra diaria, no cada latido.
+    """
+    from .health import significant
+    repo = repo or repo_path()
+    if repo is None:
+        return None
+    destino = repo / FICHERO_MARCADOR
+    if destino.exists():
+        try:
+            previo = json.loads(destino.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            previo = None
+        if previo is not None and significant(previo) == significant(payload):
+            return None
+    destino.write_text(json.dumps(payload, indent=1, ensure_ascii=False), encoding="utf-8")
+    _git(repo, "add", FICHERO_MARCADOR)
+    if _git(repo, "diff", "--cached", "--quiet").returncode == 0:
+        return None
+    _git(repo, "commit", "-m", f"Marcador de {payload.get('generado_utc', '')}")
+    if push:
+        _git(repo, "pull", "--rebase", "--autostash")
+        subido = _git(repo, "push")
+        if subido.returncode != 0:
+            raise RuntimeError(f"marcador sin subir: {subido.stderr.strip()}")
+    return _git(repo, "rev-parse", "--short", "HEAD").stdout.strip()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, default=None)

@@ -51,8 +51,12 @@ from .queries import DATA_ROOT
 ENV_VAR = "ASTROWEATHER_ARCHIVE_REPO"
 DEFAULT_REPO = Path(__file__).resolve().parent.parent.parent / "AstroWeather-Archive"
 
-# Almacenes canonicos: Parquet de solo-anadir, se copian tal cual.
-MIRRORED = ("measurements", "forecasts", "daily_observations")
+# Almacenes canonicos: Parquet de solo-anadir, se copian tal cual. Los tres
+# ultimos (26-10-2026) son el producto puntuandose a si mismo: lo publicado, la
+# nota de cada noche y las decisiones de la curva (`schema.py`). En el runner
+# viven enlazados dentro del clon del archivo, como los demas (`colector.yml`).
+MIRRORED = ("measurements", "forecasts", "daily_observations",
+            "night_publications", "night_scores", "curve_decisions")
 
 # Raw que se agrupa por dia. Los scrapes porque llegan cada 5 minutos; la
 # allsky porque cada consulta trae 5 h de serie y las consultas se solapan
@@ -244,16 +248,25 @@ def bundle_months(source: Path, destination: Path, *, today: str) -> list[Path]:
 
 
 def _fundir(viejo: dict, nuevo: dict) -> dict:
-    """La marca mas reciente de cada trabajo, venga de donde venga."""
+    """La marca mas reciente de cada trabajo, venga de donde venga.
+
+    Y el bloque `salud` (26-10-2026) entero, el calculado mas tarde: no se funde
+    campo a campo porque sus niveles se juzgan juntos. Sin esto, la fusion lo
+    tiraba: solo sabia de `escrito_utc` y `trabajos`.
+    """
     trabajos = dict(viejo.get("trabajos", {}))
     for nombre, marca in nuevo.get("trabajos", {}).items():
         if nombre not in trabajos or marca > trabajos[nombre]:
             trabajos[nombre] = marca
-    return {
+    fundido = {
         "escrito_utc": max(filter(None, (viejo.get("escrito_utc"),
                                          nuevo.get("escrito_utc"))), default=""),
         "trabajos": dict(sorted(trabajos.items())),
     }
+    saludes = [s for s in (viejo.get("salud"), nuevo.get("salud")) if s]
+    if saludes:
+        fundido["salud"] = max(saludes, key=lambda s: s.get("calculado_utc", ""))
+    return fundido
 
 
 def _texto_estado(estado: dict) -> str:

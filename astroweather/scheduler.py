@@ -167,10 +167,44 @@ def _job_suelo():
 
 
 def _job_techo_curva():
-    from .roofcalibration import summary, train
-    model = train()
-    model.save()
-    return summary(model)
+    """La curva del techo solo cambia si la aspirante GANA el examen.
+
+    Hasta el 26-10-2026 esto era `train()` + `save()`: cada manana una curva
+    nueva, sin mirar si era mejor que la que sustituia. Ahora la aspirante se
+    ajusta sin las ultimas 14 noches puntuables y se mide contra la vigente en
+    esas noches, con el Brier del veredicto (`curvecontest.py`); la decision, sea
+    la que sea, queda en el registro `curve_decisions` del archivo.
+    """
+    from .curvecontest import roof_duel, summary
+    return summary(roof_duel())
+
+
+def _job_nota():
+    """La nota de la noche de ayer (y el repaso de las tres anteriores).
+
+    Desde las 10 UTC: AstroCamp apunta las horas de la noche en su tabla hacia
+    las 08:00 UTC en verano (10:00 de su hora; 26 de 26 dias de septiembre) y
+    con el horario de invierno eso pueden ser las 09:00 UTC.
+    """
+    from .nightscore import run_daily
+    out = run_daily()
+    return (f"noches {out['noches'][0]} a {out['noches'][-1]}; filas nuevas: "
+            f"{', '.join(out['filas_nuevas']) or 'ninguna'}")
+
+
+def _job_salud():
+    """El bloque de salud de cada pasada y, si cambio algo que importa, el
+    `marcador.json` del repo de datos (`health.py`). Lo lee `colector` para
+    meterlo en `estado_colector.json`."""
+    from . import health
+    from .webpublish import publicar_marcador, repo_path
+    block = health.compute()
+    health.write(block)
+    resumen = f"salud {block['nivel']}"
+    if repo_path() is None:
+        return resumen + " (sin repo de datos: no se publica)"
+    commit = publicar_marcador(payload=health.marcador(block))
+    return f"{resumen}; marcador {commit}" if commit else f"{resumen}; marcador sin cambios"
 
 
 def _job_tess_live():
@@ -213,6 +247,13 @@ def _job_publish():
     if repo_path() is None:
         return f"{local} (sin repo de datos en esta maquina: no se publica)"
     commit = publish(payload=payload)
+    if commit:
+        # LO QUE SE PUBLICO, guardado para la nota de manana (`nightscore`). El
+        # runner clona el repo de datos con profundidad 1: a la manana siguiente
+        # la version de las 16 UTC ya no esta en su disco. Solo si hubo commit:
+        # lo que no llego al repo no lo vio nadie.
+        from .nightscore import record_publication
+        record_publication(payload)
     return commit or "la prevision no ha cambiado"
 
 
@@ -490,14 +531,24 @@ JOBS: dict[str, Trabajo] = {
     # relleno del TESS: el numero que usa el recomendador tiene que ser el de
     # hoy, no el de hace siete anios.
     "suelo": Trabajo(_job_suelo, timedelta(hours=24), desde_hora_utc=8),
-    # La curva P(techo abierto | nube prevista), reajustada cada dia con la
-    # noche anterior ya cerrada: cada noche de techo es una mas hacia las 60
-    # que hacen falta para que el ajuste sea horario del todo
-    # (roofcalibration.NIGHTS_FOR_HOURLY_REFIT).
-    "techo_curva": Trabajo(_job_techo_curva, timedelta(hours=24), desde_hora_utc=8),
+    # La nota de la noche de ayer: lo publicado a las 16 UTC contra lo que paso
+    # (`nightscore.py`). Desde las 10 UTC, cuando AstroCamp ya ha apuntado la
+    # noche en su tabla, y DESPUES de `tess` y `allsky` (orden de esta tabla), que
+    # rellenan las verdades de la noche. Antes de la curva: el examen de la curva
+    # se puntua con estas notas.
+    "nota": Trabajo(_job_nota, timedelta(hours=24), desde_hora_utc=10),
+    # La curva P(techo abierto | nube prevista). Desde el 26-10-2026 no se
+    # guarda a ciegas: una aspirante ajustada sin las ultimas 14 noches tiene que
+    # ganar a la vigente en esas noches (`curvecontest.py`). A las 10 y no a las
+    # 8 para examinar con la nota de anoche ya escrita.
+    "techo_curva": Trabajo(_job_techo_curva, timedelta(hours=24), desde_hora_utc=10),
     # Barato, diario, y es lo unico que hay entre una clave que caduca en
     # silencio y una fuente que deja de responder sin que nadie se entere.
     "credenciales": Trabajo(_job_credentials, timedelta(hours=24)),
+    # La salud en CADA pasada (periodo por debajo del reloj, como `ahora`): la
+    # caida de cadencia del 30-09 (M11) estuvo cuatro semanas sin que nada la
+    # dijera. Va justo antes de `archivo` para que el estado que sube la lleve.
+    "salud": Trabajo(_job_salud, timedelta(minutes=10)),
     # Y sacar el archivo de este disco. CADA pasada y no una vez al dia: en un
     # runner efimero el disco se destruye al terminar, asi que lo que no se
     # empuje aqui no ha existido. Agrupar por dias sigue esperando a que el dia

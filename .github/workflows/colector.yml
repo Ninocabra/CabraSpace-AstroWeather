@@ -311,9 +311,13 @@ jobs:
         # copiar 74 MB en cada pasada. `raw/` NO se enlaza a proposito -- ahi
         # van los ficheros sueltos del dia, que el archivo solo quiere
         # agrupados -- y el raw del fotometro tampoco sube (37 MB recuperables).
+        # Los tres ultimos (26-10-2026) son la nota de cada noche, lo publicado
+        # que puntua y las decisiones de la curva del techo: de solo anadir, como
+        # los demas, y sin enlace se escribirian en el disco que se destruye.
         run: |
           mkdir -p data/raw
-          for almacen in measurements forecasts daily_observations; do
+          for almacen in measurements forecasts daily_observations \
+                         night_publications night_scores curve_decisions; do
             mkdir -p "archivo/$almacen"
             ln -sfn "$GITHUB_WORKSPACE/archivo/$almacen" "data/$almacen"
           done

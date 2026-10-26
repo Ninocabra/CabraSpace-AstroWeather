@@ -69,12 +69,24 @@ def leer_estado(root: Path | None = None) -> dict[str, dt.datetime]:
 
 
 def escribir_estado(estado: dict[str, dt.datetime], root: Path | None = None) -> Path:
+    """Las marcas de cada trabajo y, desde el 26-10-2026, el bloque `salud`.
+
+    La salud la calcula el trabajo `salud` (`health.py`) y la deja en
+    `data/salud.json`; aqui solo se copia, para que este fichero -- que ya viaja
+    al archivo en cada pasada -- diga tambien si acertamos y si llegan los
+    sensores. Leer un JSON no puede fallar la pasada: sin salud, sin bloque.
+    """
+    from .health import read as leer_salud
     ruta = ruta_estado(root)
     ruta.parent.mkdir(parents=True, exist_ok=True)
-    ruta.write_text(json.dumps({
+    contenido = {
         "escrito_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "trabajos": {n: f.isoformat() for n, f in sorted(estado.items())},
-    }, indent=1, ensure_ascii=False), encoding="utf-8")
+    }
+    salud = leer_salud(root)
+    if salud is not None:
+        contenido["salud"] = salud
+    ruta.write_text(json.dumps(contenido, indent=1, ensure_ascii=False), encoding="utf-8")
     return ruta
 
 
