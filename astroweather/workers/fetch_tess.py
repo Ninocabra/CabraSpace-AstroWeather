@@ -208,41 +208,113 @@ def ultima_archivada(station: str = DEFAULT_STATION,
     return marca if marca.tzinfo else marca.replace(tzinfo=timezone.utc)
 
 
-def top_up(site: Site = NERPIO, *, station: str = DEFAULT_STATION,
-           root: Path | None = None, solape: timedelta = timedelta(hours=2),
-           pause: float = 1.0) -> int:
-    """Pedir SOLO lo que falta: de la ultima medida archivada hasta ahora.
+# Cuanto mira `top_up` hacia atras, en dias enteros. Cuatro, porque lo peor
+# que tiene que aguantar es un fin de semana con el colector caido: de la
+# ultima pasada buena del viernes por la manana a la primera del lunes por la
+# manana van ~72 h, y `tess` corre cada 24 h, asi que el lunes puede pasar
+# hasta un dia mas tarde. 4 d = 96 h cubre eso con margen. Mas no compra nada:
+# un hueco mas viejo que la ventana se pide igual, desde la ultima archivada.
+VENTANA_DIAS = 4
+# Un hueco es mas de este tiempo sin muestra. La cadencia es de una por minuto,
+# asi que 5 min no confunde el jitter del MQTT con un agujero.
+HUECO_MINIMO = timedelta(minutes=5)
+# Dos huecos separados por menos que esto se piden juntos: la fila que se
+# repite en medio cuesta menos que otra peticion al servicio comunitario.
+FUSIONAR_HUECOS = timedelta(hours=1)
 
-    ESTO ES LO QUE FALTABA, y el sintoma fue un agujero. `run(resume=True)`
-    salta un mes en cuanto tiene un parquet dentro, asi que el mes EN CURSO no
-    se rellenaba nunca: lo unico que entraba del mes vivo era lo que pillara
-    `tess_vivo` con la maquina encendida. La noche del 28-08-2026 el PC no
-    estuvo, y esa noche se quedo sin UNA sola fila de fotometro -- mientras
-    STARS4ALL la servia perfectamente.
 
-    Se pide desde la ultima archivada MENOS un solape, no exactamente desde
-    ella: la serie llega por minutos y cortar al segundo exacto es como se
-    pierde la fila del borde. Lo repetido lo quita la vista deduplicada.
+def instantes_archivados(station: str, desde: datetime, hasta: datetime,
+                         root: Path | None = None) -> list[datetime]:
+    """Las marcas de tiempo que ya hay en el archivo entre `desde` y `hasta`."""
+    from ..queries import connect
 
-    Y se pide por meses, no de una tirada, porque la fuente sirve por meses y
-    porque un hueco de tres anios en una sola peticion es como se tumba un
-    servicio comunitario.
+    try:
+        filas = connect(root).execute(
+            "SELECT DISTINCT t_utc FROM measurements "
+            "WHERE instrument_id = ? AND t_utc >= ? AND t_utc < ? ORDER BY t_utc",
+            [station, desde, hasta]).fetchall()
+    except (duckdb.Error, OSError):
+        # Mismo criterio que `ultima_archivada`: sin archivo no hay nada dentro.
+        return []
+    return [t if t.tzinfo else t.replace(tzinfo=timezone.utc) for (t,) in filas]
+
+
+def huecos(instantes: list[datetime], desde: datetime, hasta: datetime, *,
+           minimo: timedelta = HUECO_MINIMO,
+           fusionar: timedelta = FUSIONAR_HUECOS) -> list[tuple[datetime, datetime]]:
+    """Los tramos [inicio, fin) de la ventana donde el archivo no tiene muestras.
+
+    Los bordes son EXCLUSIVOS de lo que ya hay: el tramo empieza un segundo
+    despues de la ultima muestra antes del hueco y acaba en la primera
+    despues, y `_window_sql` pide `>= inicio AND < fin`. Asi rellenar un hueco
+    no vuelve a escribir las filas que lo rodean.
     """
-    desde = ultima_archivada(station, root)
-    if desde is None:
+    tramos: list[tuple[datetime, datetime]] = []
+    anterior = None   # None: el hueco de cabeza empieza en `desde`, incluido
+    for instante in [*instantes, hasta]:
+        inicio = desde if anterior is None else anterior + timedelta(seconds=1)
+        referencia = desde if anterior is None else anterior
+        if instante - referencia > minimo and instante > inicio:
+            tramos.append((inicio, instante))
+        anterior = instante
+
+    fusionados: list[tuple[datetime, datetime]] = []
+    for inicio, fin in tramos:
+        if fusionados and inicio - fusionados[-1][1] < fusionar:
+            fusionados[-1] = (fusionados[-1][0], fin)
+        else:
+            fusionados.append((inicio, fin))
+    return fusionados
+
+
+def top_up(site: Site = NERPIO, *, station: str = DEFAULT_STATION,
+           root: Path | None = None, dias: int = VENTANA_DIAS,
+           pause: float = 1.0) -> int:
+    """Pedir los HUECOS de los ultimos `dias` dias enteros, no solo la cola.
+
+    Hasta el 26-10-2026 se pedia desde la ULTIMA medida archivada hasta ahora.
+    Parecia lo mismo y no lo era: `tess_vivo` escribe la ultima hora y media
+    cada pocos minutos, asi que la ultima archivada siempre era de hace un
+    rato y las horas que quedaban ENTRE dos pasadas del vivo (el PC apagado,
+    el runner que no arranca) no se pedian nunca. El retroanalisis lo midio:
+    en octubre de 2026 solo 103 de 245 horas oscuras tenian fotometro, y
+    STARS4ALL las servia todas.
+
+    Por que huecos y no la ventana entera: pedir 4 dias enteros cada pasada
+    reescribe ~5.700 filas repetidas diarias (4 x 1.440), el mismo pecado, en
+    pequenio, que el mes entero que se abandono (ver `_job_tess`). Mirando
+    antes que hay en el archivo, una pasada sin huecos no escribe NADA, y la
+    vista deduplicada queda para lo que es: el solape de los bordes.
+
+    Las horas que STARS4ALL tampoco tiene (dia, estacion caida) se vuelven a
+    pedir en cada pasada mientras sigan en la ventana y vuelven vacias, sin
+    escribir. Son pocas peticiones -- los huecos cercanos se piden juntos -- y
+    es el precio de no confundir "aun no lo tengo" con "no existe".
+    """
+    ultima = ultima_archivada(station, root)
+    if ultima is None:
         # Archivo vacio: esto no es ponerse al dia, es el relleno historico.
         return run(site, station=station, root=root, pause=pause)
 
-    desde = desde - solape
     hasta = utcnow()
-    if desde >= hasta:
-        print(f"[fetch_tess] al dia (ultima {desde + solape:%Y-%m-%d %H:%M} UTC)")
+    desde = (hasta - timedelta(days=dias)).replace(hour=0, minute=0, second=0)
+    # Un apagon mas largo que la ventana no se queda a medias: si la ultima
+    # medida es anterior, la ventana empieza en ella.
+    desde = min(desde, ultima)
+
+    tramos = huecos(instantes_archivados(station, desde, hasta, root), desde, hasta)
+    if not tramos:
+        print(f"[fetch_tess] sin huecos desde {desde:%Y-%m-%d %H:%M} UTC")
         return 0
 
-    print(f"[fetch_tess] al dia desde {desde:%Y-%m-%d %H:%M} UTC "
-          f"({(hasta - desde).total_seconds() / 3600:.1f} h de hueco)")
-    return run(site, station=station, start=desde, end=hasta,
-               resume=False, root=root, pause=pause)
+    horas = sum((fin - inicio).total_seconds() for inicio, fin in tramos) / 3600
+    print(f"[fetch_tess] {len(tramos)} hueco(s) desde {desde:%Y-%m-%d %H:%M} UTC "
+          f"({horas:.1f} h)")
+    total = 0
+    for inicio, fin in tramos:
+        total += run(site, station=station, start=inicio, end=fin,
+                     resume=False, root=root, pause=pause)
+    return total
 
 
 def run(
@@ -257,7 +329,7 @@ def run(
 ) -> int:
     """Relleno HISTORICO, un mes por peticion.
 
-    Para ponerse al dia se usa `top_up`, que pide solo el hueco: `resume` aqui
+    Para ponerse al dia se usa `top_up`, que pide solo los huecos: `resume` aqui
     salta meses que ya tienen fichero, y el mes en curso siempre lo tiene.
     """
     start = start or HISTORY_START
