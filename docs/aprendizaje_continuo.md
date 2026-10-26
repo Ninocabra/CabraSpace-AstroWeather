@@ -1,6 +1,6 @@
 # Aprendizaje continuo: el producto se puntua solo cada manana
 
-Desde el 26-10-2026. Tres piezas encadenadas, que corren dentro del colector
+Desde el 26-10-2026. Cuatro piezas encadenadas, que corren dentro del colector
 (`astroweather/scheduler.py`, tabla `JOBS`) y escriben en el archivo:
 
 | pieza | trabajo | cuando | escribe | se lee con |
@@ -8,6 +8,7 @@ Desde el 26-10-2026. Tres piezas encadenadas, que corren dentro del colector
 | 1. Nota de cada noche | `nota` (`nightscore.py`) | una vez al dia, desde las 10 UTC | `night_scores/` (y `night_publications/` en cada commit de `noche.json`) | `nightscore.latest_scores(root)` |
 | 2. Aspirante contra campeona | `techo_curva` (`curvecontest.py`) | una vez al dia, desde las 10 UTC, despues de `nota` | `roof_calibration.json` (solo si gana) y `curve_decisions/` | `curvecontest.decisions(root, "techo")` |
 | 3. Salud | `salud` (`health.py`) | cada pasada, justo antes de `archivo` | `salud.json`, bloque `salud` de `estado_colector.json`, `marcador.json` del repo de datos | `health.read(root)` o `marcador.json` |
+| 4. Curva del fotometro y modelo a 1 dia | `nube_curva` y `modelo_d1` (`curvecontest.py`) | una vez por semana, desde las 10 UTC, despues de `techo_curva` | `cloud_calibration.json` y `cloud_calibration_weathernext3.json` (solo si ganan) y `curve_decisions/` | `curvecontest.decisions(root, "fotometro")`, `"fotometro_weathernext3"`, `"modelo_d1"` |
 
 La vara de medir y las verdades son las del retroanalisis: `skill.py` (Brier,
 AUC, remuestreo por noches) y `nighttruth.py` (marco de la noche, verdades de
@@ -195,11 +196,10 @@ techo) pierde por +0,136 y otra que dice siempre 0,99 por +0,026: las dos
 | `champion_auc`, `challenger_auc` | AUC (nulo si no hay noches de las dos clases) |
 | `champion_json`, `challenger_json` | las dos curvas completas |
 
-**Para la curva del fotometro** (`calibration.py`, verdad por hora):
-`curvecontest.compare(p_vigente, p_aspirante, verdad, noche_de_cada_hora)` ya
-sirve tal cual (remuestrea por noches), y `log_decision` escribe en el mismo
-registro con `curve="fotometro"`. Falta solo el pegamento (que horas reservar y
-como ajustar la aspirante); hoy esa curva no se reentrena en el colector.
+**La curva del fotometro** usa el mismo `compare` y el mismo registro desde el
+26-10-2026: seccion 4. En `curve_decisions`, `curve` vale tambien
+`fotometro` (ECMWF 0,25), `fotometro_weathernext3` y `modelo_d1` (solo medida;
+`decision` = el modelo ganador y la tabla de los tres en `challenger_json`).
 
 ---
 
@@ -292,6 +292,169 @@ sin `ultimas_noches`. ~10 kB.
 
 ---
 
+## 4. La curva del fotometro: escala nativa, examen semanal y modelo a 1 dia
+
+**Que hace.** Una vez por semana (`nube_curva`, desde las 10 UTC, detras de
+`techo_curva`) examina la curva P(despejado | nube prevista) de `calibration.py`
+-- la que usan las noches siguientes a la de hoy, esta noche si no hay curva del
+techo, y la rama de WeatherNext -- con la regla del techo: aspirante ajustada con
+`calibration.fit` sin las ultimas K = 30 noches con verdad del fotometro; entra
+solo si su Brier horario en esas noches es menor que el de la vigente por al
+menos 0,0005 (IC90 pareado por noches, `compare`). Lo mismo para la curva de
+WeatherNext con el mismo codigo (`cloud_duel(model="weathernext3")`). Detras,
+`modelo_d1` puntua ECMWF 0,25, ICON y WeatherNext a 1 dia y lo deja en
+`curve_decisions` (`curve="modelo_d1"`) sin cambiar el modelo del producto.
+A mano: `python -m astroweather.curvecontest --nube [--modelo-d1] [--en-seco]`.
+
+| caso | decision |
+|---|---|
+| no hay curva, o la que hay es de otro modelo | `arranque_en_frio` |
+| la ultima noche del examen tiene mas de 7 dias (fotometro caido; WeatherNext sin su mes en curso, M14) | `sin_examen`: lo dice y no escribe nada |
+| menos de 15 noches en el examen | `se_queda` |
+| Brier(aspirante) - Brier(vigente) <= -0,0005 | `sustituye` |
+| si no | `se_queda` |
+
+### 4.1 La escala (M17, opcion B)
+
+`calibration.NATIVE_TCC_SINCE = 2025-11-21`: solo pasadas con `run_utc` desde
+esa fecha (el corte va por la pasada, no por la hora valida). Y desde hoy entra
+tambien la prevision viva del mismo modelo (`ecmwf_ifs025`, alcance
+`lead_h // 24`, dias 1-5; misma hora y alcance de las dos fuentes = un par): el
+retroanalisis se bajo una vez, llega al 26-08-2026 y no crece, y sin lo vivo
+una curva que se reentrena se reentrenaria siempre con lo mismo. Lo vivo guarda
+la ultima bajada de cada dia con `run_utc` a las 00 UTC, asi que su "1 dia" y el
+`previous_day1` del retroanalisis casan a unas horas, no exactos.
+
+| pares (hora x alcance con verdad del fotometro) | n |
+|---|---|
+| antes: retroanalisis desde 2024-02, sin corte (con lo que se ajusto la vigente del 30-08) | 33.799 |
+| retro + vivo, sin corte (la escala mezclada, solo control) | 36.137 |
+| **despues: retro + vivo, pasadas >= 21-11-2025** | **10.357** (2.129 horas, 271 noches; 2.338 pares vivos) |
+
+Enero de 2026 no tiene ni una hora de fotometro en el archivo.
+
+**Fuera de muestra** (deja-un-mes-fuera sobre nov-2025 -> oct-2026, como el
+examen de WeatherNext del 18-09: cada mes se predice con la curva ajustada con
+los demas; verdad = fotometro, `observed_clear_hours`, la que ya usaba el
+modulo; IC90 pareado por noches, 2.000 remuestreos):
+
+| | pares | noches | Brier nativa | Brier mezclada | Brier vigente (30-08) | nativa - vigente | nativa - mezclada |
+|---|---|---|---|---|---|---|---|
+| nov-2025 -> oct-2026 | 10.357 | 271 | 0,1372 | 0,1359 | 0,1355 | +0,0017 [-0,0006, +0,0042] | +0,0013 [-0,0004, +0,0031] |
+| solo sep-oct 2026 | 2.323 | 57 | 0,1172 | 0,1189 | 0,1194 | **-0,0022 [-0,0041, -0,0003]** | -0,0016 [-0,0033, -0,0000] |
+
+Lectura. La vigente se ajusto el 30-08 con todo hasta el 26-08: de noviembre a
+agosto esta DENTRO de muestra y por eso el anio entero la favorece; solo
+septiembre y octubre son limpios para ella, y ahi la nativa gana por poco y
+fuera del ruido. Contra la mezclada (fuera de muestra las dos) el anio entero no
+distingue. La ganancia esta en la calibracion del extremo nublado, no en
+ordenar: con 90-100 % de nube prevista estuvo despejado el 62,8 % de las horas,
+y la nativa dice 63,6 %, la mezclada 60,0 %, la vigente 58,6 % (60-90 %:
+observado 74,8 %, nativa 73,5 %, vigente 69,8 %). Con 10-30 % la nativa se pasa
+(90,1 % contra 86,7 %). El AUC del anio entero sale peor para la nativa (-0,023)
+porque al juntar las curvas de deja-un-mes-fuera, ajustadas con menos datos y
+con un peso de alcance de -0,03 por dia, el orden entre meses y alcances se
+mueve; la vigente es una sola curva con peso de alcance ~0, que ordena
+exactamente como la nube cruda.
+
+**Pendiente, M3**: la verdad sigue siendo el fotometro solo. El voto de los
+tres sensores (fotometro + allsky + CloudWatcher) solo existe desde el 29-08 y
+no da para entrenar; contra el consenso el ECMWF discrimina mucho mas
+(AUC 0,82-0,86 contra 0,65 con el fotometro, informe del 26-10).
+
+### 4.2 K = 30 y margen = 0,0005, medidos
+
+`python -m astroweather.curvecontest --simular-nube --archive <copia>`: el
+protocolo dia a dia del 01-03 al 26-10-2026 (240 dias), como el del techo. El
+Brier "noche siguiente" es el de la curva que cada protocolo tenia publicada
+sobre los pares de esa noche, que ninguna curva ha visto (206 noches y 7.212
+pares comunes; IC90 pareado por noches contra reajustar a ciegas con todo hasta
+ayer).
+
+| K | pares nublados en el examen min / mediana | ruido de reajuste \|dif\| p50 / p90 / p95 |
+|---|---|---|
+| 7 | 0 / 25 | 0,0001 / 0,0006 / 0,0011 |
+| 14 | 0 / 50 | 0,0001 / 0,0006 / 0,0009 |
+| **30** | **15 / 156** | **0,0001 / 0,0005 / 0,0009** |
+| 60 | 65 / 293 | 0,0001 / 0,0008 / 0,0010 (max 0,051) |
+
+| protocolo | Brier noche siguiente | contra a ciegas | cambios de curva en 240 dias |
+|---|---|---|---|
+| a ciegas (todo hasta ayer, cada dia) | 0,1137 | - | cada dia |
+| K = 14, margen 0,001 | 0,1141 | +0,0004 [-0,0001, +0,0010] | 8 |
+| K = 30, margen 0 | 0,1142 | +0,0005 [-0,0000, +0,0009] | 66 |
+| **K = 30, margen 0,0005** | **0,1147** | **+0,0010 [+0,0004, +0,0017]** | **7** |
+| K = 30, margen 0,001 | 0,1149 | +0,0012 [+0,0005, +0,0020] | 5 |
+| K = 30, margen 0,005 | 0,1142 | +0,0005 [-0,0005, +0,0015] | 0 |
+| K = 60, margen 0,0005 | 0,1229 | +0,0092 [+0,0040, +0,0161] | 16 |
+
+Se elige K = 30 por el criterio del techo: es el menor con horas nubladas en
+TODAS las ventanas (con 7 y 14 hay examenes sin una sola hora nublada, que solo
+miden quien dice "despejado" mas alto). K = 60 se queda atras: la serie nativa
+empieza el 21-11-2025 y reservar dos meses deja la aspirante de primavera sin
+datos. Margen = p90 del ruido de reajuste con K = 30: con 0 la curva cambia 66
+veces en 240 dias por ruido; con 0,0005, 7. Es 40 veces menor que el del techo
+(0,02) porque esta curva se ajusta con ~50 veces mas datos: con 0,02 no habria
+entrado nunca nada, tampoco el cambio de escala de M17 (-0,002).
+
+**Lo que cuesta reservar, esta vez si medible**: +0,001 de Brier la noche
+siguiente con K = 30 (IC90 que no cruza el cero), el 1 % del Brier. Es el precio
+de que lo que entra sea lo examinado. Lo que el examen compra: una regresion de
+codigo o de datos (los controles en rojo de abajo) no entra.
+
+**Semanal y no diario** (misma simulacion con solo K = 14 y 30, 209 noches
+comunes): con K = 30 y margen 0,0005, examinar cada 7 dias da 0,1179 contra
+0,1178 examinando cada dia, y 7 cambios de curva en los dos casos. El trabajo
+cuesta 19,3 s (16 s la verdad del fotometro, que crece ~1,5 s por mes de serie):
+diario sumaria esos segundos a la pasada que ya lleva `nota` y `techo_curva`
+sin cambiar nada medible.
+
+### 4.3 Con el archivo de hoy y los controles en rojo
+
+Copia del archivo del 26-10-2026, examen del 26-09 al 25-10 (30 noches):
+
+| | decision | Brier vigente / aspirante | dif [IC90] |
+|---|---|---|---|
+| ECMWF: vigente del 30-08 (mezclada) contra la nativa ajustada hasta el 25-09 | **sustituye** | 0,1442 / 0,1418 | -0,0024 [-0,0049, +0,0002] |
+| WeatherNext | `sin_examen`: su ultima noche con prevision y verdad es el 05-10 (M14) | - | - |
+
+Controles en rojo, con la nativa ya dentro y sobre las mismas 30 noches:
+
+| aspirante | decision | dif [IC90] |
+|---|---|---|
+| mezclada (retro + vivo sin corte, ajustada hasta el 25-09) | se_queda | +0,0020 [-0,0003, +0,0043] |
+| pendiente al reves (mas nube, mas despejado) | se_queda | +0,1704 [+0,1037, +0,2379] |
+| siempre 0,99 | se_queda | +0,0156 [-0,0159, +0,0476] |
+
+La mezclada pierde, pero dentro del ruido de 30 noches: el cambio de escala
+toca sobre todo las horas muy nubladas (26 % de los pares) y mueve la curva
+4 puntos ahi. En los tests (`tests/test_curva_fotometro.py`) el mismo examen
+rechaza una escala aplastada sintetica, una pendiente al reves y una curva
+plana a 0,99; y los tests se han visto fallar quitando el corte de escala y
+haciendo que el examen acepte siempre.
+
+### 4.4 Que modelo gana a 1 dia (`modelo_d1`)
+
+Deja-un-mes-fuera, cada modelo con SU curva (ajustada con sus pares de los demas
+meses, todos los alcances, escala nativa) y puntuados en las MISMAS horas: las
+que tienen los tres a 1 dia y verdad del fotometro. Con el archivo de hoy:
+1.438 horas de 200 noches, 2026-02 a 2026-10 (WeatherNext empieza en enero, que
+no tiene fotometro, y su octubre llega solo hasta el 05-10):
+
+| modelo | Brier | AUC | dif contra ECMWF [IC90] |
+|---|---|---|---|
+| WeatherNext 3 | 0,1115 | 0,813 | -0,0035 [-0,0077, +0,0008] |
+| ECMWF 0,25 | 0,1150 | 0,795 | - |
+| ICON | 0,1159 | 0,772 | +0,0009 [-0,0030, +0,0046] |
+
+Gana WeatherNext en el punto, dentro del ruido; lo mismo que el examen del
+18-09 y el informe del 26-10. **No cambia el producto**: la medida se acumula
+cada semana para decidir con un invierno delante. ICON: el corte del 21-11-2025
+se le aplica para comparar el mismo periodo; si su serie tiene un salto de
+escala propio: NO VERIFICADO.
+
+---
+
 ## Coste (medido en el escritorio, copia del archivo del 26-10-2026)
 
 | trabajo | cuando | tiempo |
@@ -299,6 +462,8 @@ sin `ultimas_noches`. ~10 kB.
 | `nota` | 1 vez al dia | 9,0 s (8,4-9,0) |
 | `techo_curva` | 1 vez al dia | 14,2 s (antes `train()` + `save()`: ~14 s; el examen anade < 1 s) |
 | `salud` | cada pasada | 0,6 s (1,8 s la primera del dia) |
+| `nube_curva` | 1 vez por semana | 19,3 s (19,2-19,4; 16 s son la verdad del fotometro desde el 21-11-2025, que crece ~1,5 s por mes) |
+| `modelo_d1` | 1 vez por semana, misma pasada | 8 s mas (27,0 s los dos juntos: comparten la verdad) |
 | `publicar` (captura) | cada commit de `noche.json` | una escritura de 2 filas |
 
 La pasada que lleva `nota` y `techo_curva` (la primera tras las 10 UTC) sube
@@ -306,3 +471,8 @@ La pasada que lleva `nota` y `techo_curva` (la primera tras las 10 UTC) sube
 son 45-47 s, esa pasada pasa a facturar 2 minutos una vez al dia (~30 min al
 mes). `salud` anade 0,6 s a cada pasada. NO medido en el runner (Linux, otra
 CPU). Sin matplotlib: ninguno de los modulos nuevos lo importa.
+
+`nube_curva` y `modelo_d1` anaden ~27 s a UNA pasada por semana (la de las
+10 UTC del dia que vencen, la misma que lleva `nota` y `techo_curva`): unos
+4 minutos facturados al mes. Diario serian ~30 al mes sin cambiar nada medible
+(seccion 4.2).

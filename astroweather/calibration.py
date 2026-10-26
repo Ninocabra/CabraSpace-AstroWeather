@@ -330,28 +330,77 @@ def observed_clear_hours(since: str = "2024-02-01", root=None) -> dict[dt.dateti
     }
 
 
-def training_pairs(truth: dict[dt.datetime, bool], root=None):
-    """(cloud %, lead in days, was clear) from the deterministic backfill."""
+# LA NUBE DEL ECMWF 0,25 GRADOS CAMBIA DE ESCALA EL 21-11-2025 (M17, medido el
+# 26-10-2026 sobre el archivo: docs/m17_nube_total_ecmwf025.md, seccion 6).
+# Hasta el 20-11-2025 el open data del ECMWF no traia `tcc` y Open-Meteo
+# calculaba el total con sus capas diagnosticadas, min(0,9 baja + 0,6 media +
+# 0,3 alta, 100): un cielo lleno de cirros salia como 30 %. Desde el 21-11-2025
+# guarda la TCC nativa (open-meteo PR #1587). En los mismos meses de invierno
+# las horas >= 99 % pasan del 1,7-3,2 % (2024-25) al 37-47 % (2025-26): un x15
+# en la fecha del PR, no un invierno mas nublado. El producto aplica la curva a
+# la TCC nativa, asi que se entrena SOLO con pasadas de esa escala. El corte va
+# por `run_utc` y no por la hora valida: la escala la decide la pasada (un
+# prev5d valido el 23-11-2025 salio de la pasada del 18-11, con la formula).
+NATIVE_TCC_SINCE = dt.date(2025, 11, 21)
+# Los alcances del retroanalisis (`_prev1d` a `_prev5d`), y los unicos con los
+# que se entrena tambien lo vivo: el dia 0 y el 6 no tienen retroanalisis con
+# el que compararse.
+BACKFILL_LEAD_DAYS = range(1, 6)
+
+
+def training_rows(truth: dict[dt.datetime, bool], root=None, *,
+                  model: str = BACKFILL_MODEL, since: dt.date | None = NATIVE_TCC_SINCE):
+    """(hora, nube %, alcance en dias, despejada) del modelo `model`.
+
+    Dos fuentes del MISMO modelo y la misma variable: su retroanalisis
+    (`<model>_prev<N>d`, alcance N) y lo que el colector guarda en vivo
+    (`<model>`, alcance `lead_h // 24`). Lo vivo entra desde el 26-10-2026: el
+    retroanalisis se bajo una vez (hasta el 26-08-2026) y no crece, asi que sin
+    lo vivo una curva que se reentrena cada dia se reentrenaria siempre con lo
+    mismo. Lo vivo guarda la ULTIMA bajada de cada dia con `run_utc` = las 00 UTC
+    de ese dia (`fetch_forecast`), y "previous_day1" es la prevision tal como
+    estaba 24 h antes: los dos alcances "1 dia" casan a unas horas. Si las dos
+    fuentes dan la misma hora y alcance, se promedian en un solo par, como las
+    pasadas de WeatherNext.
+
+    `since` filtra por `run_utc` (ver NATIVE_TCC_SINCE); None = todo, que es la
+    escala mezclada y solo sirve de control.
+    """
     connection = connect(root)
-    rows = connection.execute("""
-        SELECT valid_utc, cloud_total, model
+    prefix = model + "_prev"
+    cut = "" if since is None else f"AND run_utc >= TIMESTAMP '{since.isoformat()}'"
+    rows = connection.execute(f"""
+        SELECT valid_utc, cloud_total, model, lead_h
         FROM forecasts
         WHERE cloud_total IS NOT NULL AND member IS NULL
-          AND starts_with(model, ?)
-    """, [BACKFILL_PREFIX]).fetchall()
+          AND (starts_with(model, ?) OR model = ?) {cut}
+    """, [prefix, model]).fetchall()
 
-    pairs = []
-    for valid, cloud, model in rows:
-        if not is_backfill_of(model):
+    grouped: dict[tuple[dt.datetime, int], list[float]] = defaultdict(list)
+    for valid, cloud, name, lead_h in rows:
+        if name == model:
+            if lead_h is None:
+                continue
+            lead_days = int(lead_h) // 24
+        elif is_backfill_of(name, model):
+            lead_days = int(name[len(prefix):].rstrip("d"))
+        else:
+            continue
+        if lead_days not in BACKFILL_LEAD_DAYS:
             continue
         hour = valid.astimezone(dt.timezone.utc).replace(
             minute=0, second=0, microsecond=0, tzinfo=None)
-        clear = truth.get(hour)
-        if clear is None:
-            continue
-        lead_days = float(model[len(BACKFILL_PREFIX):].rstrip("d"))
-        pairs.append((float(cloud), lead_days, bool(clear)))
-    return pairs
+        if hour in truth:
+            grouped[(hour, lead_days)].append(float(cloud))
+    return [(hour, float(np.mean(clouds)), float(days), bool(truth[hour]))
+            for (hour, days), clouds in sorted(grouped.items())]
+
+
+def training_pairs(truth: dict[dt.datetime, bool], root=None, *,
+                   since: dt.date | None = NATIVE_TCC_SINCE):
+    """(cloud %, lead in days, was clear) del ECMWF 0,25: retroanalisis y vivo,
+    solo pasadas de la escala nativa (`training_rows`)."""
+    return [row[1:] for row in training_rows(truth, root, since=since)]
 
 
 # WeatherNext 3 tiene su PROPIA curva, en su propio fichero. No sustituye a la
@@ -380,13 +429,28 @@ def model_path(model: str = BACKFILL_MODEL, root: Path | None = None) -> Path:
 
 
 def training_pairs_weathernext(truth: dict[dt.datetime, bool], root=None):
-    """(nube %, alcance en dias, despejada) de la media de WeatherNext.
+    """(nube %, alcance en dias, despejada) de la media de WeatherNext."""
+    return [row[1:] for row in training_rows_weathernext(truth, root)]
+
+
+def model_rows(truth: dict[dt.datetime, bool], root=None, model: str = BACKFILL_MODEL,
+               since: dt.date | None = NATIVE_TCC_SINCE):
+    """(hora, nube %, alcance, despejada) de cualquier modelo con curva o con
+    retroanalisis: WeatherNext por su camino, el resto por `training_rows`."""
+    if model == WEATHERNEXT_MODEL:
+        return training_rows_weathernext(truth, root)
+    return training_rows(truth, root, model=model, since=since)
+
+
+def training_rows_weathernext(truth: dict[dt.datetime, bool], root=None):
+    """(hora, nube %, alcance en dias, despejada) de la media de WeatherNext.
 
     El alcance sale de `lead_h`, no del nombre del modelo como en el
     retroanalisis del ECMWF. Las pasadas de 00Z y 12Z validas para la misma
     hora y el mismo dia de alcance se PROMEDIAN en un solo par: son dos
     opiniones sobre la misma hora, no dos horas, y contarlas por separado
-    duplicaria el peso de las horas que caen en las dos pasadas.
+    duplicaria el peso de las horas que caen en las dos pasadas. Sin corte de
+    escala: WeatherNext empieza el 01-01-2026, todo despues del 21-11-2025.
     """
     connection = connect(root)
     rows = connection.execute(f"""
@@ -405,7 +469,7 @@ def training_pairs_weathernext(truth: dict[dt.datetime, bool], root=None):
             minute=0, second=0, microsecond=0, tzinfo=None)
         if hour in truth:
             grouped[(hour, days)].append(float(cloud))
-    return [(float(np.mean(clouds)), float(days), bool(truth[hour]))
+    return [(hour, float(np.mean(clouds)), float(days), bool(truth[hour]))
             for (hour, days), clouds in sorted(grouped.items())]
 
 
@@ -467,9 +531,13 @@ def reliability(pairs: list[tuple[float, float, bool]], calibrator: Calibrator,
     return curve
 
 
-def train(since: str = "2024-02-01", root=None,
+def train(since: str | None = None, root=None,
           model: str = BACKFILL_MODEL) -> Calibrator:
-    truth = observed_clear_hours(since, root)
+    """Ajusta y GUARDA a ciegas. El colector ya no lo usa: la curva entra solo
+    si gana el examen (`curvecontest.cloud_duel`). Queda para la linea de
+    ordenes. La verdad empieza donde empieza la escala nativa: antes no hay par
+    que la use, y calcularla desde 2024 cuesta 57 s en vez de 16."""
+    truth = observed_clear_hours(since or NATIVE_TCC_SINCE.isoformat(), root)
     if model == BACKFILL_MODEL:
         pairs = training_pairs(truth, root)
     elif model == WEATHERNEXT_MODEL:
@@ -488,10 +556,11 @@ if __name__ == "__main__":
     parser.add_argument("--model", default=BACKFILL_MODEL,
                         choices=(BACKFILL_MODEL, WEATHERNEXT_MODEL))
     parser.add_argument("--since", default=None,
-                        help="primera fecha de verdad (por defecto 2024-02-01; "
-                             "2026-01-01 para WeatherNext, que empieza ahi)")
+                        help="primera fecha de verdad (por defecto el 21-11-2025, "
+                             "NATIVE_TCC_SINCE; 2026-01-01 para WeatherNext, que empieza ahi)")
     args = parser.parse_args()
-    since = args.since or ("2026-01-01" if args.model == WEATHERNEXT_MODEL else "2024-02-01")
+    since = args.since or ("2026-01-01" if args.model == WEATHERNEXT_MODEL
+                           else NATIVE_TCC_SINCE.isoformat())
     model = train(since=since, model=args.model)
     print(f"{args.model}: entrenado con {model.trained_on} pares | tasa base {model.base_rate:.1%}")
     print(f"  curva: sigmoid({model.intercept:.3f} {model.cloud_weight:+.3f}*nube "

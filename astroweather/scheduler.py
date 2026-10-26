@@ -179,6 +179,29 @@ def _job_techo_curva():
     return summary(roof_duel())
 
 
+def _job_nube_curva():
+    """La curva P(despejado | nube) del fotometro, con la misma regla que la del
+    techo: solo cambia si la aspirante gana (`curvecontest.cloud_duel`). Dos
+    curvas: la del ECMWF 0,25 (escala nativa desde el 21-11-2025, M17) y la de
+    WeatherNext, que mientras su mes en curso no este en el archivo (M14) dice
+    que no hay examen y no toca nada."""
+    from .curvecontest import CLOUD_CURVES, cloud_duel, summary
+    partes = []
+    for model in CLOUD_CURVES:
+        record = cloud_duel(model=model)
+        partes.append(f"{model}: " + (record["reason"] if record["decision"] == "sin_examen"
+                                      else summary(record)))
+    return " || ".join(partes)
+
+
+def _job_modelo_d1():
+    """Que modelo de nube acierta mas la noche siguiente (ECMWF, ICON,
+    WeatherNext). Solo mide y lo deja en `curve_decisions`: el producto no
+    cambia de modelo hasta tener un invierno de estas medidas."""
+    from .curvecontest import rank_d1
+    return rank_d1()["reason"]
+
+
 def _job_nota():
     """La nota de la noche de ayer (y el repaso de las tres anteriores).
 
@@ -542,6 +565,17 @@ JOBS: dict[str, Trabajo] = {
     # ganar a la vigente en esas noches (`curvecontest.py`). A las 10 y no a las
     # 8 para examinar con la nota de anoche ya escrita.
     "techo_curva": Trabajo(_job_techo_curva, timedelta(hours=24), desde_hora_utc=10),
+    # La curva del fotometro (y la de WeatherNext), con la misma regla. SEMANAL y
+    # no diaria: cuesta ~20 s (16 de ellos la verdad del fotometro, que crece
+    # ~1,5 s por mes de serie) y la pasada de las 10 UTC ya lleva `nota` y
+    # `techo_curva`; una semana mas de horas son ~300 pares de ~10.000, y en la
+    # simulacion del 01-03 al 26-10 examinar cada 7 dias da lo mismo que cada dia
+    # (Brier de la noche siguiente 0,1179 contra 0,1178; 7 cambios de curva en
+    # los dos casos; docs/aprendizaje_continuo.md, seccion 4.2).
+    "nube_curva": Trabajo(_job_nube_curva, timedelta(days=7), desde_hora_utc=10),
+    # Que modelo de nube gana a 1 dia. Semanal, detras de `nube_curva`: comparte
+    # con ella la verdad del fotometro del mismo proceso (`photometer_truth`).
+    "modelo_d1": Trabajo(_job_modelo_d1, timedelta(days=7), desde_hora_utc=10),
     # Barato, diario, y es lo unico que hay entre una clave que caduca en
     # silencio y una fuente que deja de responder sin que nadie se entere.
     "credenciales": Trabajo(_job_credentials, timedelta(hours=24)),

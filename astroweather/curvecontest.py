@@ -32,10 +32,10 @@ simulado dia a dia desde el 20-09 sobre el archivo del 26-10. K_NIGHTS = 14 y
 MARGIN = 0.02 de Brier: el porque, con sus cifras, junto a las constantes.
 
 REUTILIZABLE. `compare` no sabe de techos: recibe dos vectores de probabilidad,
-la verdad y a que noche pertenece cada elemento, y devuelve la decision. La
-curva del fotometro (`calibration.py`, verdad por hora) se examinaria con la
-misma funcion pasando sus horas agrupadas por noche; `log_decision` escribe en
-el mismo registro con `curve='fotometro'`.
+la verdad y a que noche pertenece cada elemento, y devuelve la decision. Desde
+el 26-10-2026 examina tambien la curva del fotometro (`calibration.py`, verdad
+por hora; `cloud_duel`, con su propio K y margen, medidos) y la de WeatherNext,
+y `rank_d1` puntua los modelos de nube a 1 dia; todo al mismo registro.
 """
 
 from __future__ import annotations
@@ -118,6 +118,7 @@ def compare(p_champion, p_challenger, outcome, groups, *, margin: float = MARGIN
         boot = NightBootstrap(g, BOOT_RESAMPLES, BOOT_SEED)
         point, lo, hi = boot.interval(lambda i: brier(p1[i], o[i]) - brier(p0[i], o[i]), 5, 95)
         out.update({"d_brier": point, "d_brier_lo": lo, "d_brier_hi": hi})
+    d = _digits(margin)
     if cold_start or p0 is None:
         out["decision"], out["reason"] = "arranque_en_frio", "no hay curva vigente: entra la aspirante"
     elif n_groups < min_groups:
@@ -126,14 +127,20 @@ def compare(p_champion, p_challenger, outcome, groups, *, margin: float = MARGIN
                          f"{min_groups}): no hay examen, se queda la vigente")
     elif out["d_brier"] <= -margin:
         out["decision"] = "sustituye"
-        out["reason"] = (f"la aspirante gana por {-out['d_brier']:.3f} de Brier en "
-                         f"{n_groups} noches (margen {margin:.3f})")
+        out["reason"] = (f"la aspirante gana por {-out['d_brier']:.{d}f} de Brier en "
+                         f"{n_groups} noches (margen {margin:.{d}f})")
     else:
         out["decision"] = "se_queda"
         out["reason"] = (f"la aspirante no gana por el margen: diferencia "
-                         f"{out['d_brier']:+.3f} de Brier en {n_groups} noches "
-                         f"(hace falta <= {-margin:.3f})")
+                         f"{out['d_brier']:+.{d}f} de Brier en {n_groups} noches "
+                         f"(hace falta <= {-margin:.{d}f})")
     return out
+
+
+def _digits(margin) -> int:
+    """Decimales para escribir un Brier al lado de su margen: con el del techo
+    (0,02) bastan tres; con el del fotometro (0,0005) tres lo redondean a 0,001."""
+    return 3 if margin is None or margin >= 0.01 else 4
 
 
 def log_decision(record: dict, root: Path | None = None) -> Path | None:
@@ -250,6 +257,310 @@ def roof_duel(root: Path | None = None, *, now: dt.datetime | None = None,
     if write:
         log_decision(record, root)
     return record
+
+
+# --- la curva del fotometro (y la de WeatherNext) ------------------------------------
+#
+# La MISMA regla con otra curva: P(despejado | nube prevista) de `calibration.py`,
+# la que usan las noches siguientes a la de hoy (si no hay curva del techo, tambien
+# esta noche) y la rama de WeatherNext. Es HORARIA: el examen son todas las horas
+# (por alcance) de las ultimas K noches con verdad del fotometro y prevision, y el
+# IC se remuestrea por noches enteras igual que el del techo. La aspirante se
+# ajusta con el codigo de produccion (`calibration.fit`) sobre los pares ANTERIORES
+# a esas noches y solo de la escala nativa (`calibration.NATIVE_TCC_SINCE`).
+#
+# K Y MARGIN DE ESTA CURVA, MEDIDOS (`python -m astroweather.curvecontest
+# --simular-nube --archive <copia>`; tabla en docs/aprendizaje_continuo.md,
+# seccion 4): el protocolo dia a dia del 01-03 al 26-10-2026 (240 dias) sobre el
+# archivo del 26-10, como el del techo. K cuenta noches CON verdad del fotometro.
+#   * HORAS NUBLADAS EN EL EXAMEN (pares hora x alcance con el fotometro diciendo
+#     nublado). Con K = 7 y K = 14 hay ventanas con CERO (mediana 25 y 50): el
+#     examen solo mediria quien dice "despejado" mas alto. Con K = 30, minimo 15 y
+#     mediana 156. Es el mismo criterio que fijo K = 14 en el techo.
+#   * LO QUE CUESTA RESERVAR. Brier de la noche siguiente (206 noches, 7.212 pares,
+#     IC90 pareado por noches) contra reajustar a ciegas con todo hasta ayer: con
+#     K <= 30, de +0,0003 a +0,0015 -- la curva se ajusta con ~10.000 pares y 30
+#     noches mas o menos apenas la mueven. K = 60, +0,009 [+0,004, +0,016]: la
+#     serie empieza el 21-11-2025 y reservar dos meses la deja sin datos en
+#     primavera.
+#   * MARGIN = el p90 del RUIDO DE REAJUSTE con K = 30: |dif de Brier| sobre el
+#     examen entre dos aspirantes ajustadas con un dia de diferencia. p50 0,00006,
+#     p90 0,0005, p95 0,0009. Cuarenta veces menor que el del techo (0,020)
+#     porque esta curva se ajusta con ~50 veces mas datos: con el margen del techo
+#     no entraria nada, ni el cambio de escala de M17 (-0,002 fuera de muestra en
+#     sep-oct). Con margen 0 la curva cambia 66 veces en 240 dias; con 0,0005, 7;
+#     con 0,001, 5; el Brier de la noche siguiente no los distingue (+0,0005,
+#     +0,0010, +0,0012 contra a ciegas, IC90 de +-0,0007).
+CLOUD_K_NIGHTS = 30
+CLOUD_MARGIN = 0.0005
+CLOUD_MIN_NIGHTS = CLOUD_K_NIGHTS // 2
+# Un examen cuya ultima noche es mas vieja que esto no examina lo de ahora: el
+# fotometro caido, o WeatherNext, cuyo mes en curso no llega al archivo hasta
+# que cierra (M14). Se dice y no se hace nada.
+CLOUD_STALE_DAYS = 7
+CLOUD_CURVES = {"ecmwf_ifs025": "fotometro", "weathernext3": "fotometro_weathernext3"}
+# Los modelos que se puntuan para la noche siguiente (`rank_d1`).
+D1_MODELS = ("ecmwf_ifs025", "icon_seamless", "weathernext3")
+D1_LEAD_DAYS = 1.0
+
+# La verdad del fotometro cuesta 14-16 s (la ley de cielo con astropy, hora a
+# hora desde el 21-11-2025) y la usan los dos examenes y el ranking: una vez por
+# proceso y dia.
+_TRUTH_CACHE: dict = {}
+
+
+def photometer_truth(root: Path, today: dt.date | None = None) -> dict:
+    from .calibration import NATIVE_TCC_SINCE, observed_clear_hours
+    key = (str(root), today or dt.date.today())
+    if key not in _TRUTH_CACHE:
+        _TRUTH_CACHE.clear()
+        _TRUTH_CACHE[key] = observed_clear_hours(NATIVE_TCC_SINCE.isoformat(), root)
+    return _TRUTH_CACHE[key]
+
+
+def cloud_exam_split(rows, last_night: dt.date, k: int = CLOUD_K_NIGHTS):
+    """(entrenamiento, examen, noches del examen) de filas (hora, nube, alcance,
+    despejada): el examen son las ultimas `k` noches con filas hasta `last_night`
+    y el entrenamiento todo lo de antes de la primera."""
+    nights = sorted({NT.night_of(r[0]) for r in rows if NT.night_of(r[0]) <= last_night})
+    exam_nights = nights[-k:]
+    if not exam_nights:
+        return [], [], []
+    first, chosen = exam_nights[0], set(exam_nights)
+    train = [r for r in rows if NT.night_of(r[0]) < first]
+    exam = [r for r in rows if NT.night_of(r[0]) in chosen]
+    return train, exam, exam_nights
+
+
+def _cloud_scores(curve, rows):
+    return [curve.probability(c, lead * 24.0) for _, c, lead, _ in rows]
+
+
+def cloud_duel(root: Path | None = None, *, model: str = "ecmwf_ifs025",
+               now: dt.datetime | None = None, k: int = CLOUD_K_NIGHTS,
+               margin: float = CLOUD_MARGIN, challenger=None, write: bool = True,
+               rows=None, truth=None) -> dict:
+    """El examen de la curva P(despejado | nube) de `model`. Guarda la ganadora y
+    registra la decision. `challenger` fuerza una aspirante (los controles en
+    rojo); `rows` y `truth` permiten no recalcular (y los tests sin archivo)."""
+    from . import calibration as C
+    from .queries import DATA_ROOT
+    root = Path(root or DATA_ROOT)
+    now = (now or dt.datetime.now(UTC)).replace(microsecond=0)
+    path = C.model_path(model, root)
+    champion = C.Calibrator.load(path)
+    if champion is not None and champion.trained_on_model != model:
+        champion = None                   # una curva de otro modelo no defiende nada
+    if rows is None:
+        truth = truth if truth is not None else photometer_truth(root, now.date())
+        rows = C.model_rows(truth, root, model)
+    last_night = (now - dt.timedelta(days=1)).date()
+    train, exam, nights = cloud_exam_split(rows, last_night, k)
+    record = {"site_id": NERPIO.site_id, "date": now.date(), "decided_utc": now,
+              "curve": CLOUD_CURVES.get(model, f"fotometro_{model}"), "k_nights": k,
+              "margin": margin, "nights": json.dumps([str(n) for n in nights]),
+              "n_nights": len(nights),
+              "champion_fitted_at": champion.fitted_at if champion else None,
+              "champion_json": json.dumps(asdict(champion)) if champion else None}
+
+    newest = max((NT.night_of(r[0]) for r in rows), default=None)
+    if not nights or nights[-1] < last_night - dt.timedelta(days=CLOUD_STALE_DAYS):
+        why = (" (M14: el mes en curso de WeatherNext no llega al archivo hasta que "
+               "cierra)" if model == C.WEATHERNEXT_MODEL else "")
+        record.update({"decision": "sin_examen",
+                       "reason": f"sin datos recientes: la ultima noche con prevision de "
+                                 f"{model} y verdad del fotometro es {newest}{why}; "
+                                 f"no se examina ni se toca la curva"})
+        return record                     # nada que registrar: no se ha decidido nada
+
+    if challenger is None:
+        try:
+            challenger = C.fit([r[1:] for r in train], model=model)
+        except ValueError as error:
+            record.update({"decision": "se_queda",
+                           "reason": f"no se pudo ajustar la aspirante: {error}"})
+            if write:
+                log_decision(record, root)
+            return record
+    record.update({"challenger_fitted_at": challenger.fitted_at,
+                   "challenger_json": json.dumps(asdict(challenger))})
+    o = [1.0 if r[3] else 0.0 for r in exam]
+    g = [NT.night_of(r[0]).toordinal() for r in exam]
+    result = compare(_cloud_scores(champion, exam) if champion else None,
+                     _cloud_scores(challenger, exam), o, g, margin=margin,
+                     min_groups=min(CLOUD_MIN_NIGHTS, k))
+    record.update(result)
+    if result["decision"] in ("sustituye", "arranque_en_frio") and write:
+        challenger.save(path)
+    if write:
+        log_decision(record, root)
+    return record
+
+
+def rank_d1(root: Path | None = None, *, now: dt.datetime | None = None,
+            truth=None, rows: dict | None = None, write: bool = True) -> dict:
+    """Que modelo de nube acierta mas LA NOCHE SIGUIENTE (alcance 1 dia), con el
+    examen de WeatherNext del 18-09: deja-un-mes-fuera, cada modelo con SU curva
+    (`calibration.fit` sobre sus pares de los demas meses, todos los alcances,
+    escala nativa) y puntuados en las MISMAS horas, las que tienen los tres
+    modelos a 1 dia y verdad del fotometro. Diferencias pareadas por noches
+    contra el ECMWF, que es el que usa el producto.
+
+    Solo MIDE: no cambia el modelo del producto. Se registra en
+    `curve_decisions` con `curve='modelo_d1'` y `decision` = el ganador; la
+    tabla de los tres va en `challenger_json`."""
+    from . import calibration as C
+    from .queries import DATA_ROOT
+    root = Path(root or DATA_ROOT)
+    now = (now or dt.datetime.now(UTC)).replace(microsecond=0)
+    if rows is None:
+        truth = truth if truth is not None else photometer_truth(root, now.date())
+        rows = {m: C.model_rows(truth, root, m) for m in D1_MODELS}
+    lead1 = {m: {r[0]: r for r in rows[m] if r[2] == D1_LEAD_DAYS} for m in D1_MODELS}
+    common = sorted(set.intersection(*[set(v) for v in lead1.values()]))
+    month = lambda h: (h.year, h.month)           # noqa: E731
+    months = sorted({month(h) for h in common})
+    record = {"site_id": NERPIO.site_id, "date": now.date(), "decided_utc": now,
+              "curve": "modelo_d1", "nights": json.dumps([f"{y}-{m:02d}" for y, m in months])}
+    if len(months) < 2:
+        record.update({"decision": "sin_examen", "n_nights": 0,
+                       "reason": f"{len(months)} meses con los tres modelos a 1 dia: no hay "
+                                 f"deja-un-mes-fuera"})
+        return record
+    p = {m: [] for m in D1_MODELS}
+    o, g = [], []
+    for ym in months:
+        hours = [h for h in common if month(h) == ym]
+        for m in D1_MODELS:
+            curve = C.fit([r[1:] for r in rows[m] if month(r[0]) != ym], model=m)
+            p[m].extend(_cloud_scores(curve, [lead1[m][h] for h in hours]))
+        o.extend(1.0 if lead1[D1_MODELS[0]][h][3] else 0.0 for h in hours)
+        g.extend(NT.night_of(h).toordinal() for h in hours)
+    p = {m: np.asarray(v) for m, v in p.items()}
+    o, g = np.asarray(o), np.asarray(g)
+    boot = NightBootstrap(g, BOOT_RESAMPLES, BOOT_SEED)
+    ref = D1_MODELS[0]
+    table = {}
+    for m in D1_MODELS:
+        d = boot.interval(lambda i, m=m: brier(p[m][i], o[i]) - brier(p[ref][i], o[i]), 5, 95)
+        table[m] = {"brier": brier(p[m], o), "auc": auc(p[m], o), "p_media": float(p[m].mean()),
+                    "d_brier_vs_ecmwf": d[0], "d_brier_ic90": [d[1], d[2]]}
+    best = min(D1_MODELS, key=lambda m: table[m]["brier"])
+    rival = min((m for m in D1_MODELS if m != ref), key=lambda m: table[m]["brier"])
+    lo, hi = table[rival]["d_brier_ic90"]
+    clear = "fuera del ruido" if (hi < 0 or lo > 0) else "dentro del ruido (el IC90 cruza el cero)"
+    record.update({
+        "decision": best, "n_nights": boot.n_nights,
+        "reason": (f"a 1 dia gana {best} en Brier sobre {len(o)} horas de {boot.n_nights} noches "
+                   f"({months[0][0]}-{months[0][1]:02d} a {months[-1][0]}-{months[-1][1]:02d}); "
+                   f"el mejor rival del ECMWF, {rival}, {table[rival]['d_brier_vs_ecmwf']:+.4f} "
+                   f"[{lo:+.4f}, {hi:+.4f}], {clear}. Solo medida: el producto no cambia"),
+        "champion_brier": table[ref]["brier"], "champion_auc": table[ref]["auc"],
+        "challenger_brier": table[rival]["brier"], "challenger_auc": table[rival]["auc"],
+        "d_brier": table[rival]["d_brier_vs_ecmwf"], "d_brier_lo": lo, "d_brier_hi": hi,
+        "champion_fitted_at": ref, "challenger_fitted_at": rival,
+        "challenger_json": json.dumps({"horas": len(o), "tasa_base": float(o.mean()),
+                                       "modelos": table}, default=float)})
+    if write:
+        log_decision(record, root)
+    return record
+
+
+def simulate_cloud(archive: Path, *, ks=(7, 14, 30, 60),
+                   margins=(0.0, 0.0005, 0.001, 0.002, 0.005, 0.02),
+                   first_day: dt.date = dt.date(2026, 3, 1),
+                   last_day: dt.date = dt.date(2026, 10, 26), truth=None,
+                   every: int = 1) -> dict:
+    """El protocolo de la curva del fotometro dia a dia sobre el archivo, como
+    `simulate` para el techo: ruido de reajuste, horas nubladas del examen,
+    cambios de curva y el Brier de LA NOCHE SIGUIENTE (que ninguna curva ha visto)
+    contra reajustar a ciegas con todo hasta ayer. `every` = examinar solo uno de
+    cada `every` dias (7: el trabajo semanal); la noche siguiente se puntua
+    todos los dias. No escribe nada."""
+    from . import calibration as C
+    truth = truth if truth is not None else photometer_truth(archive)
+    rows = C.model_rows(truth, archive, C.BACKFILL_MODEL)
+    by_night: dict[dt.date, list] = {}
+    for r in rows:
+        by_night.setdefault(NT.night_of(r[0]), []).append(r)
+    nights_all = sorted(by_night)
+    fits: dict = {}
+
+    def fit_before(night: dt.date):
+        if night not in fits:
+            try:
+                fits[night] = C.fit([r[1:] for n in nights_all if n < night for r in by_night[n]])
+            except ValueError:             # el principio de la serie: sin pares
+                fits[night] = None
+        return fits[night]
+
+    days = [first_day + dt.timedelta(days=i) for i in range((last_day - first_day).days + 1)]
+    errors: dict[str, dict[dt.date, np.ndarray]] = {"ciega (todo hasta ayer)": {}}
+    out: dict = {"null": {}, "cloudy_in_exam": {}, "swaps": {}}
+    for k in ks:
+        champions = {m: None for m in margins}
+        swaps = {m: 0 for m in margins}
+        for m in margins:
+            errors[f"K={k} margen={m:g}"] = {}
+        nulls, cloudy = [], []
+        for day in days:
+            _, exam, nights = cloud_exam_split(rows, day - dt.timedelta(days=1), k)
+            if len(nights) < k:
+                continue
+            challenger = fit_before(nights[0])
+            twin = fit_before(nights[0] - dt.timedelta(days=1))
+            if challenger is None:
+                continue
+            cloudy.append(sum(1 for r in exam if not r[3]))
+            o = np.array([1.0 if r[3] else 0.0 for r in exam])
+            g = [NT.night_of(r[0]).toordinal() for r in exam]
+            p1 = np.array(_cloud_scores(challenger, exam))
+            if twin is not None:
+                nulls.append(brier(p1, o) - brier(np.array(_cloud_scores(twin, exam)), o))
+            target = by_night.get(day)
+            if target:
+                ot = np.array([1.0 if r[3] else 0.0 for r in target])
+                if day not in errors["ciega (todo hasta ayer)"]:
+                    blind = fit_before(day)
+                    errors["ciega (todo hasta ayer)"][day] = (
+                        np.array(_cloud_scores(blind, target)) - ot) ** 2
+            exam_day = (day - first_day).days % every == 0
+            for m in margins:
+                champ = champions[m]
+                if champ is not None and not exam_day:
+                    result = {"decision": "sin_examen"}
+                else:
+                    p0 = np.array(_cloud_scores(champ, exam)) if champ else None
+                    result = compare(p0, p1, o, g, margin=m,
+                                     min_groups=min(CLOUD_MIN_NIGHTS, k))
+                if result["decision"] in ("sustituye", "arranque_en_frio"):
+                    swaps[m] += champ is not None
+                    champions[m] = challenger
+                if target:
+                    errors[f"K={k} margen={m:g}"][day] = (
+                        np.array(_cloud_scores(champions[m], target)) - ot) ** 2
+        a = np.abs(nulls)
+        out["null"][k] = ({"n": len(a), "abs_p50": float(np.percentile(a, 50)),
+                           "abs_p90": float(np.percentile(a, 90)),
+                           "abs_p95": float(np.percentile(a, 95)), "abs_max": float(a.max())}
+                          if len(a) else None)
+        out["cloudy_in_exam"][k] = ({"min": int(min(cloudy)), "median": float(np.median(cloudy)),
+                                     "windows": len(cloudy)} if cloudy else None)
+        for m in margins:
+            out["swaps"][f"K={k} margen={m:g}"] = swaps[m]
+    common = sorted(set.intersection(*[set(e) for e in errors.values() if e]))
+    flat = lambda e: np.concatenate([e[d] for d in common])   # noqa: E731
+    g = np.concatenate([[i] * len(errors["ciega (todo hasta ayer)"][d])
+                        for i, d in enumerate(common)])
+    ref = flat(errors["ciega (todo hasta ayer)"])
+    boot = NightBootstrap(g, BOOT_RESAMPLES, BOOT_SEED)
+    out["realized"] = {"nights": len(common), "pairs": int(len(ref)), "by": {}}
+    for name, e in errors.items():
+        x = flat(e)
+        out["realized"]["by"][name] = {
+            "brier": float(x.mean()),
+            "vs_ciega": boot.interval(lambda i, x=x: float(np.mean(x[i] - ref[i])), 5, 95)}
+    return out
 
 
 # --- de donde salen K y MARGIN ---------------------------------------------------------
@@ -373,7 +684,9 @@ def _label(k: int, margin: float, refit: bool) -> str:
 
 
 def summary(record: dict) -> str:
-    def f(x, d=3):
+    digits = _digits(record.get("margin"))
+
+    def f(x, d=digits):
         return "-" if x is None or (isinstance(x, float) and not np.isfinite(x)) else f"{x:.{d}f}"
     return (f"{record['decision']}: {record['reason']} | Brier vigente "
             f"{f(record.get('champion_brier'))} / aspirante {f(record.get('challenger_brier'))}"
@@ -391,7 +704,32 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--data-repo", type=Path, default=None)
     parser.add_argument("--en-seco", action="store_true",
                         help="examina y dice que haria, sin guardar curva ni registro")
+    parser.add_argument("--nube", action="store_true",
+                        help="el examen de las curvas del fotometro (ECMWF y WeatherNext)")
+    parser.add_argument("--modelo-d1", action="store_true",
+                        help="puntua ECMWF, ICON y WeatherNext para la noche siguiente")
+    parser.add_argument("--simular-nube", action="store_true",
+                        help="el protocolo de la curva del fotometro dia a dia "
+                             "(de donde salen CLOUD_K_NIGHTS y CLOUD_MARGIN)")
+    parser.add_argument("--cada", type=int, default=1,
+                        help="con --simular-nube: examinar uno de cada N dias")
+    parser.add_argument("--k", type=int, nargs="*", default=None,
+                        help="con --simular-nube: los K a probar")
     args = parser.parse_args(argv)
+    if args.simular_nube or args.nube or args.modelo_d1:
+        from .queries import DATA_ROOT
+        NT.astropy_offline()
+        root = args.archive or DATA_ROOT
+        if args.simular_nube:
+            kw = {"ks": tuple(args.k)} if args.k else {}
+            print(json.dumps(simulate_cloud(root, every=args.cada, **kw), indent=1,
+                             default=str))
+        if args.nube:
+            for model in CLOUD_CURVES:
+                print(model, "->", summary(cloud_duel(root, model=model, write=not args.en_seco)))
+        if args.modelo_d1:
+            print(rank_d1(root, write=not args.en_seco)["reason"])
+        return 0
     if args.simular:
         from .archivepush import repo_path as archive_repo_path
         from .webpublish import repo_path as data_repo_path

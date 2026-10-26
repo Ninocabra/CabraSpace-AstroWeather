@@ -12,6 +12,53 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 26-10-2026 (2) — La curva del fotometro se reentrena sola, en su escala, y solo entra si gana
+
+Paso 3 del aprendizaje continuo. Detalle y tablas: `docs/aprendizaje_continuo.md`,
+seccion 4; M17 marcado como aplicado (opcion B) en `docs/m17_nube_total_ecmwf025.md`.
+
+**Escala (M17, opcion B).** `calibration.NATIVE_TCC_SINCE = 2025-11-21`:
+`training_rows` / `training_pairs` solo usan pasadas del ECMWF 0,25 con
+`run_utc` desde el dia en que Open-Meteo empezo a guardar la TCC nativa. Entra
+tambien la prevision VIVA del mismo modelo (alcance `lead_h // 24`, dias 1-5):
+el retroanalisis no crece y sin ella reentrenar no aprenderia nada. Pares:
+33.799 (retroanalisis desde 2024-02, mezclado) -> 10.357 (271 noches). Fuera de
+muestra (deja-un-mes-fuera nov-2025 -> oct-2026, IC90 por noches): en
+sep-oct 2026, donde la vigente del 30-08 tambien esta fuera de muestra, la
+nativa gana por -0,0022 [-0,0041, -0,0003]; en el anio entero contra la
+mezclada no se distingue (+0,0013 [-0,0004, +0,0031]). La ganancia es la
+calibracion del extremo nublado (90-100 % de nube: observado 62,8 %, nativa
+63,6 %, vigente 58,6 %). La verdad sigue siendo el fotometro: M3 (voto de los
+tres sensores) pendiente, el consenso solo existe desde el 29-08.
+
+**Aspirante contra vigente para esta curva** (`curvecontest.cloud_duel`,
+trabajo `nube_curva`, SEMANAL desde las 10 UTC). K = 30 noches con fotometro
+(la menor con horas nubladas en todas las ventanas de la simulacion del 01-03
+al 26-10: con 7 y 14 hay examenes sin ninguna) y margen 0,0005 de Brier (p90
+del ruido de reajuste con K = 30; con margen 0 la curva cambiaba 66 veces en
+240 dias, con 0,0005, 7). Reservar cuesta +0,001 de Brier la noche siguiente
+contra reajustar a ciegas. Semanal porque examinar cada dia da lo mismo
+(0,1178 contra 0,1179, 7 cambios en ambos) y el trabajo cuesta 19 s (27 s con `modelo_d1`). La misma
+funcion examina la curva de WeatherNext; hoy dice `sin_examen` (sus datos
+acaban el 05-10, M14) y no toca nada. **Con el archivo de hoy**: `sustituye`
+(nativa contra la vigente del 30-08, -0,0024 [-0,0049, +0,0002] en 30 noches). **Controles en rojo**
+sobre las mismas noches: la mezclada (+0,0020), la pendiente al reves (+0,170)
+y una curva plana a 0,99 (+0,016) salen rechazadas; en los tests, ademas, una
+escala aplastada sintetica, y los tests se vieron fallar quitando el corte y
+forzando el examen a aceptar.
+
+**Modelo a 1 dia** (`curvecontest.rank_d1`, trabajo `modelo_d1`, semanal).
+Deja-un-mes-fuera con la curva de cada modelo sobre las mismas horas: 1.438 h,
+200 noches (02 a 10-2026). WeatherNext 0,1115, ECMWF 0,1150, ICON 0,1159;
+WeatherNext -0,0035 [-0,0077, +0,0008] contra el ECMWF, dentro del ruido.
+Solo se registra (`curve_decisions`, `curve="modelo_d1"`): el producto no
+cambia de modelo.
+
+**Tests**: `tests/test_curva_fotometro.py` (13, sin red);
+`test_backfill_history_models.py` actualizado (el vivo del ECMWF ya cuenta).
+
+---
+
 ## 26-10-2026 — El producto se puntua solo: nota diaria, aspirante contra campeona y salud
 
 Tres piezas en el colector para que lo que midio el retroanalisis de hoy a mano

@@ -175,3 +175,23 @@ punto 3 del apartado 3 pasa de PLAUSIBLE a **MEDIDO**, y la opción B queda
 recomendada para `calibration.py` (curva del fotómetro). La curva del techo (M1)
 **no** está afectada: se entrena solo con previsiones vivas desde 08-2026, todas
 en la escala nativa.
+
+## 7. Opción B aplicada (26-10-2026)
+
+`calibration.NATIVE_TCC_SINCE = 2025-11-21`: `training_rows` / `training_pairs`
+solo usan pasadas con `run_utc` desde esa fecha (el corte va por la pasada: un
+`prev5d` válido el 23-11-2025 salió de la pasada del 18-11, con la fórmula).
+Además entra la previsión viva del mismo modelo (`ecmwf_ifs025`, alcance
+`lead_h // 24`, días 1-5), porque el retroanálisis se bajó una vez y no crece.
+La curva ya no se guarda a ciegas: entra solo si gana el examen semanal
+(`curvecontest.cloud_duel`, trabajo `nube_curva`). Cifras, examen y controles:
+`docs/aprendizaje_continuo.md`, sección 4.
+
+| | pares | horas | noches |
+|---|---|---|---|
+| antes (retroanálisis desde 2024-02, escala mezclada) | 33.799 | — | — |
+| después (retro + vivo, pasadas ≥ 21-11-2025) | 10.357 | 2.129 | 271 |
+
+Fuera de muestra la ganancia es pequeña y está en la calibración del extremo
+nublado, no en ordenar mejor: con 90-100 % de nube prevista el cielo estuvo
+despejado el 62,8 % de las horas; la curva nativa dice 63,6 %, la vigente 58,6 %.

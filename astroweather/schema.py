@@ -300,8 +300,11 @@ CURVE_DECISION_SCHEMA = pa.schema(
         pa.field("site_id", pa.string()),
         pa.field("date", pa.date32()),                   # dia de la decision
         pa.field("decided_utc", pa.timestamp("s", tz="UTC")),
-        pa.field("curve", pa.string()),                  # 'techo' | 'fotometro'
-        pa.field("decision", pa.string()),               # sustituye | se_queda | arranque_en_frio
+        # 'techo' | 'fotometro' (ECMWF 0,25) | 'fotometro_weathernext3' |
+        # 'modelo_d1' (solo medida: que modelo gana a 1 dia; desde el 26-10-2026)
+        pa.field("curve", pa.string()),
+        # sustituye | se_queda | arranque_en_frio; en 'modelo_d1', el ganador
+        pa.field("decision", pa.string()),
         pa.field("reason", pa.string()),
         pa.field("k_nights", pa.int16()),
         pa.field("margin", pa.float32()),
