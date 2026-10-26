@@ -148,3 +148,30 @@ Pendiente, cuando haya red hacia Open-Meteo: pedir 2–3 días recientes para Ne
 (38.16583, −2.32672, `elevation=1650`) con `models=ecmwf_ifs025` y `models=ecmwf_ifs`
 y las cuatro variables, para medir la incoherencia fuera del archivo; y pedir a
 previous-runs un día de 2025 y otro de 2026 para ver el cambio de escala en origen.
+
+## 6. Medido sobre el archivo (26-10-2026, escritorio)
+
+`tools/m17_nube_total.py --root ../AstroWeather-Archive`:
+
+| Comprobación | Resultado | Lectura |
+|---|---|---|
+| total < máx(capas), `ecmwf_ifs` | 1,9 % de 10.080 h | reproduce el 2 % |
+| total < máx(capas), `ecmwf_ifs025` | 49,7 % de 9.744 h | reproduce el 50 % |
+| total de ifs025 = fórmula 0,9/0,6/0,3 | 21,7 % | lejos de 100 %: el total vivo es la TCC nativa |
+| retroanálisis antes del 21-11-2025 | 3,7 % de horas ≥ 99 %, media 27,5 | |
+| retroanálisis desde el 21-11-2025 | 21,1 % de horas ≥ 99 %, media 46,1 | **salto de escala** |
+
+Control estacional (el «antes» tiene dos veranos y el «después» un invierno):
+mismos meses de cada año, horas ≥ 99 % / nube media.
+
+| | dic | ene | feb |
+|---|---|---|---|
+| 2024-25 | 1,7 % / 26,5 | 3,2 % / 38,8 | 2,4 % / 33,3 |
+| 2025-26 | 40,9 % / 67,6 | 47,3 % / 75,0 | 37,4 % / 63,9 |
+
+Un ×15 en los cubiertos, justo en la fecha del PR #1587 de Open-Meteo, no es un
+invierno más nublado: es el paso de la fórmula a la TCC nativa. Con esto el
+punto 3 del apartado 3 pasa de PLAUSIBLE a **MEDIDO**, y la opción B queda
+recomendada para `calibration.py` (curva del fotómetro). La curva del techo (M1)
+**no** está afectada: se entrena solo con previsiones vivas desde 08-2026, todas
+en la escala nativa.
