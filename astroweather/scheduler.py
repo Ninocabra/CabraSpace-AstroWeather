@@ -269,7 +269,7 @@ def _job_aemet():
 
 
 def _job_tess():
-    """Pide SOLO el hueco: de la ultima medida archivada hasta ahora.
+    """Pide SOLO los huecos de los ultimos dias (`fetch_tess.top_up`).
 
     Antes se re-pedia el MES ENTERO cada dia (`start` = dia 1, `resume=False`).
     Funcionaba, pero reescribia ~40.000 filas repetidas diarias -- que la vista
@@ -277,6 +277,10 @@ def _job_tess():
     maquina estaba encendida a su hora. La noche del 28-08-2026 no lo estuvo y
     esa noche se quedo sin una sola fila de fotometro, mientras STARS4ALL la
     servia entera.
+
+    Y pedir desde la ultima archivada tampoco bastaba: `tess_vivo` la adelanta
+    cada pocos minutos, y lo que caia entre dos pasadas del vivo no se pedia
+    nunca (octubre de 2026: 103 de 245 horas oscuras con fotometro).
     """
     from .workers import fetch_tess
     return fetch_tess.top_up(NERPIO)

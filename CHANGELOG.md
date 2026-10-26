@@ -12,6 +12,31 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 26-10-2026 — El fotometro se rellena por huecos, no desde la ultima medida (M12)
+
+El retroanalisis de lo previsto frente a lo real encontro que la verdad terreno
+de nubes tenia agujeros: en octubre de 2026 solo **103 de 245 horas oscuras**
+tenian fotometro `stars289`, y STARS4ALL las servia.
+
+**Causa:** `fetch_tess.top_up` pedia desde la ULTIMA medida archivada menos dos
+horas. `tess_vivo` escribe la ultima hora y media cada pocos minutos, asi que
+esa ultima medida siempre era reciente y lo que caia entre dos pasadas del
+vivo (PC apagado, runner que no arranca) no se pedia nunca.
+
+**Arreglo:** `top_up` mira los ultimos `VENTANA_DIAS = 4` dias enteros, busca
+en el archivo los tramos de mas de 5 min sin muestra y pide solo esos (los que
+quedan a menos de 1 h se piden juntos). Cuatro dias cubren un fin de semana con
+el colector caido (~72 h, mas un dia de periodo del trabajo `tess`); un apagon
+mas largo se pide desde la ultima archivada, como antes. Pedir la ventana entera
+habria reescrito ~5.700 filas repetidas cada dia; por huecos, una pasada sin
+agujeros no escribe ni pide nada.
+
+**Tests** (`tests/test_tess_top_up.py`, sin red, STARS4ALL doblado): la noche
+entre dos pasadas del vivo queda completa (510 de 510 minutos; el codigo
+anterior dejaba 31) y la segunda pasada escribe 0 filas (el anterior reescribia
+121). Sin comprobar contra STARS4ALL real: la red de la sesion no llegaba al
+servicio.
+
 ## 08-09-2026 (tarde) — H_a no se puede calibrar, y no es falta de datos
 
 Intento de cerrar el pendiente historico: medir `AEROSOL_SCALE_HEIGHT_M`, el
