@@ -12,6 +12,24 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 27-10-2026 — M7, M8 y M16 del retroanalisis (`docs/verificacion_2026-10-26.md`, seccion 10)
+
+**M7. La fila archivada dice que curva la produjo.** `workers/archive_prediction.py`
+cargaba la curva del FOTOMETRO y archivaba su version en todas las filas, aunque
+desde el 04-09 esta noche saliera de la curva del techo y desde el 25-09 la
+siguiente de la de WeatherNext. Ahora la curva la dice `tonight.report`, que es
+quien la elige (`NightReport.curve_model`, `curve_fitted_at`, junto a
+`cloud_truth`), y cada fila del modelo `astroweather` lleva tres columnas nuevas
+del esquema: `curve_truth` ("techo" | "fotometro"), `curve_model` y
+`curve_fitted_at`; `provider_model_version` pasa a nombrar la curva usada
+(`astroweather/<modelo>@<fitted_at>`). Compatibilidad: lo archivado antes no
+tiene las columnas y sale nulo (`union_by_name`); un archivo en el que aun no
+hay ningun fichero nuevo ni siquiera las tiene, y quien las lea pregunta antes
+con `queries.has_column` (lo hace `hindcast.Data.ours`).
+`hindcast.Curves.classify` LEE el regimen cuando la fila lo trae y solo lo
+reconstruye para las filas viejas. Tests: `tests/test_archive_prediction.py`
+(6 nuevos, vistos en rojo con el codigo anterior).
+
 ## 26-10-2026 (2) — La curva del fotometro se reentrena sola, en su escala, y solo entra si gana
 
 Paso 3 del aprendizaje continuo. Detalle y tablas: `docs/aprendizaje_continuo.md`,

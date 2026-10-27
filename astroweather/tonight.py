@@ -72,6 +72,11 @@ class NightReport:
     # (un informe armado a mano) la noche no se acota y todo cuenta como antes.
     dusk_astronomical: dt.datetime | None = None
     dawn_astronomical: dt.datetime | None = None
+    # La curva que produjo `clear_probability` (M7): el modelo con que se
+    # ajusto y su `fitted_at`. Junto con `cloud_truth`, es lo que la fila
+    # archivada (`workers/archive_prediction.py`) guarda de cada hora.
+    curve_model: str | None = None
+    curve_fitted_at: str | None = None
 
     @property
     def dark_weights(self) -> list[float]:
@@ -391,6 +396,8 @@ def report(day: dt.datetime | None = None, site: Site = NERPIO, root=None) -> Ni
         cloud_truth=cloud_truth,
         dusk_astronomical=night.dusk_astronomical,
         dawn_astronomical=night.dawn_astronomical,
+        curve_model=getattr(calibrator, "trained_on_model", None) if calibrator else None,
+        curve_fitted_at=getattr(calibrator, "fitted_at", None) if calibrator else None,
     )
 
 

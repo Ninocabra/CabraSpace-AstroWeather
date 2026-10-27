@@ -89,6 +89,13 @@ FORECAST_VALUES = [
     pa.field("mag_sky_est", pa.float32()),
     pa.field("p_raw", pa.float32()),
     pa.field("p_calibrated", pa.float32()),
+    # De que curva salio `p_calibrated` (M7, 27-10-2026): su verdad terreno
+    # ("techo" | "fotometro"), el modelo de nube con que se ajusto y su
+    # `fitted_at` tal cual lo guarda el JSON de la curva. Solo las filas del
+    # modelo `astroweather`; lo archivado antes no las tiene y sale nulo.
+    pa.field("curve_truth", pa.string()),
+    pa.field("curve_model", pa.string()),
+    pa.field("curve_fitted_at", pa.string()),
 ]
 
 FORECAST_SCHEMA = pa.schema(FORECAST_KEYS + FORECAST_VALUES + PROVENANCE_FIELDS)

@@ -29,7 +29,6 @@ import argparse
 import datetime as dt
 
 from ..archive import utcnow, write_canonical
-from ..calibration import Calibrator
 from ..ephem import night_for
 from ..site import NERPIO, Site
 from ..tonight import report
@@ -43,13 +42,22 @@ def rows_for(day: dt.datetime, site: Site = NERPIO, root=None) -> list[dict]:
     if not night_report.hours:
         return []
 
-    calibrator = Calibrator.load()
     run = utcnow()
     # De que curva salio. `fitted_at` es lo que distingue dos predicciones
     # identicas hechas con calibradores distintos, que es justo lo que hay que
     # poder separar al auditar.
-    version = (f"{MODEL}/{calibrator.trained_on_model}@{calibrator.fitted_at}"
-               if calibrator else f"{MODEL}/sin-calibrar")
+    #
+    # LA CURVA LA DICE EL INFORME, que es quien la eligio (M7, 27-10-2026).
+    # Hasta entonces aqui se cargaba la del FOTOMETRO y se archivaba su version
+    # en todas las filas, aunque desde el 04-09 el numero de esta noche saliera
+    # de la curva del techo y desde el 25-09 el de la siguiente de la de
+    # WeatherNext: el retroanalisis del 26-10 tuvo que reconstruir el regimen
+    # de cada fila comparando numeros (`hindcast.Curves.classify`).
+    truth = night_report.cloud_truth
+    curve_model = night_report.curve_model
+    fitted_at = night_report.curve_fitted_at
+    version = (f"{MODEL}/{curve_model}@{fitted_at}"
+               if curve_model and fitted_at else f"{MODEL}/sin-calibrar")
 
     rows = []
     for hour in night_report.hours:
@@ -75,6 +83,9 @@ def rows_for(day: dt.datetime, site: Site = NERPIO, root=None) -> list[dict]:
                       if hour.cloud_total is not None else None),
             "p_calibrated": hour.clear_probability,
             "provider_model_version": version,
+            "curve_truth": truth,
+            "curve_model": curve_model,
+            "curve_fitted_at": fitted_at,
             "retrieved_at": run,
         })
     return rows

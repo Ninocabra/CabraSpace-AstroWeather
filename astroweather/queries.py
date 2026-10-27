@@ -285,6 +285,15 @@ def night_series(start, end, site_id: str = "nerpio",
     return salida
 
 
+def has_column(connection: duckdb.DuckDBPyConnection, view: str, column: str) -> bool:
+    """¿Existe `column` en `view`? Una columna nueva del esquema no existe en el
+    archivo hasta que se escribe el primer fichero que la lleva
+    (`union_by_name` solo une lo que hay), y pedirla antes es un error de
+    DuckDB, no un nulo. Quien lea columnas recien anadidas pregunta aqui."""
+    names = {row[0] for row in connection.execute(f"DESCRIBE {view}").fetchall()}
+    return column in names
+
+
 def summary(root: Path | None = None) -> dict[str, int]:
     """Row counts after deduplication -- what the archive actually holds."""
     connection = connect(root)
