@@ -318,12 +318,22 @@ A mano: `python -m astroweather.curvecontest --nube [--modelo-d1] [--en-seco]`.
 
 `calibration.NATIVE_TCC_SINCE = 2025-11-21`: solo pasadas con `run_utc` desde
 esa fecha (el corte va por la pasada, no por la hora valida). Y desde hoy entra
-tambien la prevision viva del mismo modelo (`ecmwf_ifs025`, alcance
-`lead_h // 24`, dias 1-5; misma hora y alcance de las dos fuentes = un par): el
-retroanalisis se bajo una vez, llega al 26-08-2026 y no crece, y sin lo vivo
-una curva que se reentrena se reentrenaria siempre con lo mismo. Lo vivo guarda
-la ultima bajada de cada dia con `run_utc` a las 00 UTC, asi que su "1 dia" y el
-`previous_day1` del retroanalisis casan a unas horas, no exactos.
+tambien la prevision viva del mismo modelo (`ecmwf_ifs025`, dias 1-5; misma
+hora y alcance de las dos fuentes = un par): el retroanalisis se bajo una vez,
+llega al 26-08-2026 y no crece, y sin lo vivo una curva que se reentrena se
+reentrenaria siempre con lo mismo. Su "1 dia" y el `previous_day1` del
+retroanalisis casan a unas horas, no exactos.
+
+**Desde el 27-10-2026 (M16) lo vivo entra POR RECOGIDA**: su alcance d es lo
+que habia a las 15 UTC de d dias antes de la noche (`asof.AsOf.issued`), no la
+ultima recogida de la etiqueta con `lead_h // 24`, que para una hora de
+madrugada era la recogida de las 23 UTC de la vispera. Cambia la nube en 1.777
+de 2.357 pares vivos, pero la curva se mueve menos de 0,003 de probabilidad y
+el examen del 26-10 decide lo mismo (`docs/m16_curva_fotometro.md`). Las cifras
+de esta seccion (4.1-4.4) se midieron con la vista y no se han rehecho, salvo
+dos: sep-oct nativa contra vigente pasa de -0,0022 a -0,0019 [-0,0037,
+-0,0002], y en 4.4 WeatherNext le saca al ECMWF -0,0046 [-0,0091, +0,0002] en
+vez de -0,0035 (el ECMWF a 1 dia, 0,1150 -> 0,1172).
 
 | pares (hora x alcance con verdad del fotometro) | n |
 |---|---|

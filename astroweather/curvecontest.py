@@ -269,6 +269,18 @@ def roof_duel(root: Path | None = None, *, now: dt.datetime | None = None,
 # ajusta con el codigo de produccion (`calibration.fit`) sobre los pares ANTERIORES
 # a esas noches y solo de la escala nativa (`calibration.NATIVE_TCC_SINCE`).
 #
+# LO QUE SE PUNTUA ES LO QUE SE SABIA AL PUBLICAR (M16, 27-10-2026). Los pares del
+# examen salen de `calibration.model_rows`, igual que los del ajuste, y la prevision
+# viva de un modelo de Open-Meteo entra ahi POR RECOGIDA: la que habia a las 15 UTC
+# de `alcance` dias antes de la noche. Hasta hoy entraba por la vista deduplicada,
+# cuyo "1 dia" de una hora de madrugada era la recogida de las 23 UTC de la vispera:
+# el examen puntuaba a las dos curvas con una nube que nadie pudo publicar, y a la
+# aspirante, ajustada con esa misma nube, en su propio terreno. Medido sobre el
+# archivo del 27-10 (docs/m16_curva_fotometro.md): el examen del 26-10 decide lo
+# mismo (sustituye; -0,00239 con la vista, -0,00223 por recogida) y el examen dia a
+# dia del 28-09 al 27-10 coincide en 29 de 30 dias. WeatherNext no cambia: sus
+# filas llevan su pasada de verdad y no varian entre recogidas.
+#
 # K Y MARGIN DE ESTA CURVA, MEDIDOS (`python -m astroweather.curvecontest
 # --simular-nube --archive <copia>`; tabla en docs/aprendizaje_continuo.md,
 # seccion 4): el protocolo dia a dia del 01-03 al 26-10-2026 (240 dias) sobre el

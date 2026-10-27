@@ -56,6 +56,7 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import minimize
 
+from .asof import raw_forecast_asof
 from .moonscatter import IN_FIELD_DEG as MOONSCATTER_IN_FIELD_DEG
 from .queries import DATA_ROOT, connect
 from .skymodel import predict
@@ -354,46 +355,80 @@ def training_rows(truth: dict[dt.datetime, bool], root=None, *,
 
     Dos fuentes del MISMO modelo y la misma variable: su retroanalisis
     (`<model>_prev<N>d`, alcance N) y lo que el colector guarda en vivo
-    (`<model>`, alcance `lead_h // 24`). Lo vivo entra desde el 26-10-2026: el
-    retroanalisis se bajo una vez (hasta el 26-08-2026) y no crece, asi que sin
-    lo vivo una curva que se reentrena cada dia se reentrenaria siempre con lo
-    mismo. Lo vivo guarda la ULTIMA bajada de cada dia con `run_utc` = las 00 UTC
-    de ese dia (`fetch_forecast`), y "previous_day1" es la prevision tal como
-    estaba 24 h antes: los dos alcances "1 dia" casan a unas horas. Si las dos
+    (`<model>`). Lo vivo entra desde el 26-10-2026: el retroanalisis se bajo
+    una vez (hasta el 26-08-2026) y no crece, asi que sin lo vivo una curva que
+    se reentrena cada dia se reentrenaria siempre con lo mismo. Si las dos
     fuentes dan la misma hora y alcance, se promedian en un solo par, como las
     pasadas de WeatherNext.
 
-    `since` filtra por `run_utc` (ver NATIVE_TCC_SINCE); None = todo, que es la
-    escala mezclada y solo sirve de control.
+    LO VIVO, POR RECOGIDA (M16, 27-10-2026). Su alcance d es lo que habia en el
+    archivo a las 15 UTC de d dias antes de que empezara la noche de la hora
+    (`asof.AsOf.issued`): lo que el producto podia publicar para esa noche con
+    d dias de antelacion. Hasta hoy salia de la vista deduplicada con
+    `lead_h // 24`, y como `run_utc` es el DIA de la recogida a las 00Z
+    (`fetch_forecast`) y la vista se queda con la ultima recogida del dia, el
+    "1 dia" de una hora de madrugada era la recogida de las 23 UTC de la
+    vispera: tres horas antes de la hora prevista. Medido sobre el archivo del
+    27-10: la nube cambia en 1777 de 2357 pares vivos (mediana 8 puntos, p90
+    51). La curva apenas se mueve (menos de 0,003 de probabilidad) porque lo
+    vivo es un cuarto de los pares y la verdad del fotometro no distingue esa
+    fuga; el examen `nube_curva`, que puntua con estas mismas filas, pasa a
+    medir lo que se sabia al publicar (docs/m16_curva_fotometro.md).
+
+    `since` filtra por `run_utc` (ver NATIVE_TCC_SINCE), tambien lo vivo; None
+    = todo, que es la escala mezclada y solo sirve de control.
     """
+    root = Path(root) if root is not None else DATA_ROOT
     connection = connect(root)
     prefix = model + "_prev"
     cut = "" if since is None else f"AND run_utc >= TIMESTAMP '{since.isoformat()}'"
     rows = connection.execute(f"""
-        SELECT valid_utc, cloud_total, model, lead_h
+        SELECT valid_utc, cloud_total, model
         FROM forecasts
         WHERE cloud_total IS NOT NULL AND member IS NULL
-          AND (starts_with(model, ?) OR model = ?) {cut}
-    """, [prefix, model]).fetchall()
+          AND starts_with(model, ?) {cut}
+    """, [prefix]).fetchall()
 
     grouped: dict[tuple[dt.datetime, int], list[float]] = defaultdict(list)
-    for valid, cloud, name, lead_h in rows:
-        if name == model:
-            if lead_h is None:
-                continue
-            lead_days = int(lead_h) // 24
-        elif is_backfill_of(name, model):
-            lead_days = int(name[len(prefix):].rstrip("d"))
-        else:
+    for valid, cloud, name in rows:
+        if not is_backfill_of(name, model):
             continue
+        lead_days = int(name[len(prefix):].rstrip("d"))
         if lead_days not in BACKFILL_LEAD_DAYS:
             continue
         hour = valid.astimezone(dt.timezone.utc).replace(
             minute=0, second=0, microsecond=0, tzinfo=None)
         if hour in truth:
             grouped[(hour, lead_days)].append(float(cloud))
+    for hour, lead_days, cloud in live_rows_issued(connection, root, model, truth, since):
+        grouped[(hour, lead_days)].append(cloud)
     return [(hour, float(np.mean(clouds)), float(days), bool(truth[hour]))
             for (hour, days), clouds in sorted(grouped.items())]
+
+
+def live_rows_issued(connection, root: Path, model: str, hours,
+                     since: dt.date | None = NATIVE_TCC_SINCE):
+    """(hora, alcance en dias, nube %) de la prevision VIVA de `model` para las
+    horas de `hours`, alcances `BACKFILL_LEAD_DAYS`: la recogida mas reciente
+    anterior a las 15 UTC de `alcance` dias antes de su noche (`AsOf.issued`,
+    la misma pregunta que el marcador y la curva del techo). Sin recogida
+    anterior al corte no hay par, y una recogida vieja (el colector parado)
+    entra con el alcance del corte, igual que la publico el producto. Las filas
+    sin `retrieved_at` no se pueden fechar y no entran (`asof.raw_forecast_asof`).
+    `since` corta por la pasada que la produjo, como en el retroanalisis."""
+    if not hours:
+        return
+    first = (dt.datetime(since.year, since.month, since.day, tzinfo=dt.timezone.utc)
+             if since is not None else min(hours).replace(tzinfo=dt.timezone.utc))
+    table = raw_forecast_asof(connection, root, model, first)
+    for hour in sorted(table.by_hour):
+        if hour not in hours:
+            continue
+        for lead_days in BACKFILL_LEAD_DAYS:
+            value = table.issued(hour, lead_days)
+            if value is None or (since is not None and value[4].date() < since):
+                continue
+            yield hour, lead_days, float(value[0])
 
 
 def training_pairs(truth: dict[dt.datetime, bool], root=None, *,

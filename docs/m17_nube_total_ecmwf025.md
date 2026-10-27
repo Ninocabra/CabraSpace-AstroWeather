@@ -181,8 +181,10 @@ en la escala nativa.
 `calibration.NATIVE_TCC_SINCE = 2025-11-21`: `training_rows` / `training_pairs`
 solo usan pasadas con `run_utc` desde esa fecha (el corte va por la pasada: un
 `prev5d` válido el 23-11-2025 salió de la pasada del 18-11, con la fórmula).
-Además entra la previsión viva del mismo modelo (`ecmwf_ifs025`, alcance
-`lead_h // 24`, días 1-5), porque el retroanálisis se bajó una vez y no crece.
+Además entra la previsión viva del mismo modelo (`ecmwf_ifs025`, días 1-5), porque
+el retroanálisis se bajó una vez y no crece; desde el 27-10-2026 (M16), por recogida:
+lo que había a las 15 UTC de d días antes de la noche, no `lead_h // 24` de la vista
+(`docs/m16_curva_fotometro.md`; la ganancia de sep-oct pasa de −0,0022 a −0,0019).
 La curva ya no se guarda a ciegas: entra solo si gana el examen semanal
 (`curvecontest.cloud_duel`, trabajo `nube_curva`). Cifras, examen y controles:
 `docs/aprendizaje_continuo.md`, sección 4.

@@ -68,16 +68,25 @@ def test_el_corte_de_escala_va_por_la_pasada_y_no_por_la_hora(tmp_path):
 
 
 def test_lo_vivo_entra_con_su_alcance_y_una_hora_es_un_par(tmp_path):
-    """El vivo del 27-10 a las 00 UTC para el 28-10 a las 22 es alcance 1 (46 h);
-    si el retroanalisis da la misma hora y alcance, se promedian. El dia 0 y el 6
-    no tienen retroanalisis con el que compararse y no entran."""
+    """Lo vivo recogido el 27-10 a las 10 UTC es lo que habia a las 15 UTC de la
+    vispera de la noche del 28-10: alcance 1 (desde M16, por recogida y no por
+    `lead_h // 24`; tests/test_m16_curva_fotometro.py). Si el retroanalisis da
+    la misma hora y alcance, se promedian. El dia 0 (recogido el 28-10) no
+    tiene retroanalisis con el que compararse y no entra; lo recogido ya de
+    noche no lo pudo publicar nadie."""
     hora = dt.datetime(2026, 10, 28, 22, tzinfo=UTC)
+
+    def vivo(model, cloud, retrieved):
+        fila = _fila(model, hora, cloud, run=retrieved.replace(hour=0))
+        fila["retrieved_at"] = retrieved
+        return fila
+
     raiz = _archivo(tmp_path, [
-        _fila("ecmwf_ifs025", hora, 60.0, run=dt.datetime(2026, 10, 27, tzinfo=UTC)),
+        vivo("ecmwf_ifs025", 60.0, dt.datetime(2026, 10, 27, 10, tzinfo=UTC)),
         _fila("ecmwf_ifs025_prev1d", hora, 40.0, run=dt.datetime(2026, 10, 27, tzinfo=UTC)),
-        _fila("ecmwf_ifs025", hora, 99.0, run=dt.datetime(2026, 10, 28, tzinfo=UTC)),   # dia 0
-        _fila("ecmwf_ifs025", hora, 11.0, run=dt.datetime(2026, 10, 22, tzinfo=UTC)),   # dia 6
-        _fila("icon_seamless", hora, 5.0, run=dt.datetime(2026, 10, 27, tzinfo=UTC)),
+        vivo("ecmwf_ifs025", 99.0, dt.datetime(2026, 10, 28, 10, tzinfo=UTC)),   # dia 0
+        vivo("ecmwf_ifs025", 11.0, dt.datetime(2026, 10, 28, 23, tzinfo=UTC)),   # ya de noche
+        vivo("icon_seamless", 5.0, dt.datetime(2026, 10, 27, 10, tzinfo=UTC)),
     ])
     filas = C.training_rows({hora.replace(tzinfo=None): True}, raiz)
     assert [(c, lead, ok) for _, c, lead, ok in filas] == [(50.0, 1.0, True)]

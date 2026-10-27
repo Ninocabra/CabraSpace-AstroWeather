@@ -12,6 +12,53 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 27-10-2026 (2) — M16 en la curva del fotometro: entrenar y examinar con lo publicable
+
+Detalle, tablas y noches: `docs/m16_curva_fotometro.md`; herramienta
+`tools/m16_curva_fotometro.py` (solo lee el archivo, ~1,5 min).
+
+**El cambio.** `calibration.training_rows` lee la prevision VIVA del modelo
+(`ecmwf_ifs025`; ICON cuando lo pide `modelo_d1`) por recogida: su alcance d es
+lo que habia a las 15 UTC de d dias antes de la noche (`asof.AsOf.issued`, via
+la funcion nueva `calibration.live_rows_issued`), no la ultima recogida de la
+etiqueta con `lead_h // 24`. El retroanalisis sigue entrando por su nombre y el
+corte de escala de M17 vale tambien para lo vivo. Una fila viva sin
+`retrieved_at` ya no entra (en el archivo real no hay ninguna). El examen
+`nube_curva` (`curvecontest.cloud_duel`), `modelo_d1` y `simulate_cloud` lo
+heredan sin tocarlos: puntuan con las mismas filas (`model_rows`). WeatherNext
+no cambia (sus filas llevan su pasada y no varian entre recogidas: 0 de 75.888).
+
+**Medido antes de cambiar** (archivo `0e365e96`):
+- Control: la nube cambia en 1.777 de 2.357 pares vivos (mediana 8 puntos, p90
+  51); la recogida de la vista es mas reciente que el corte en el 96 % de los
+  pares de cada alcance, y el "1 dia" de una hora de madrugada se recogio 3 h
+  antes de la hora (p10).
+- El examen del 26-10 23:31Z, reproducido exacto con la vista (-0,00239
+  [-0,00492, +0,00017], la misma aspirante a 4 decimales), decide lo mismo por
+  recogida: sustituye, -0,00223 [-0,00462, +0,00019]. Examen dia a dia del
+  28-09 al 27-10: la misma decision 29 de 30 dias (el 09-10, en el filo del
+  margen, cambia).
+- Fuera de muestra (prequencial semanal 01-09 -> 25-10, nube de las 15 UTC), la
+  curva por recogida contra la vieja: +0,00015 [+0,00002, +0,00030] contra el
+  fotometro (el mismo +0,00016 con la nube barajada: es nivel), +0,00005 contra
+  el consenso, -0,00002 contra el voto de la noche, -0,00021 [-0,00041, -0,00003]
+  contra el techo. Como mucho 0,0026 de P(despejado) en una noche.
+- Control en rojo: una fuga perfecta (la nube viva = la verdad) sale peor por
+  +0,0034 [+0,0016, +0,0055]; la fuga maxima real (la recogida justo antes de
+  la hora) no se ve (-0,00038 [-0,00080, +0,00002]). La fuga SI se ve en la
+  evaluacion: la misma curva puntuada noche a noche con la nube de la vista
+  parece mejor contra el fotometro por 0,0066 [+0,0017, +0,0127].
+- Arrastra: `modelo_d1` (archivo local, 1.438 h) ECMWF a 1 dia 0,1150 -> 0,1172
+  y WeatherNext -0,0035 -> -0,0046 [-0,0091, +0,0002] contra el ECMWF; M17
+  sep-oct nativa contra vigente -0,0022 -> -0,0019 [-0,0037, -0,0002].
+
+**La curva de produccion NO se ha tocado**: entra por el examen semanal. Tests:
+`tests/test_m16_curva_fotometro.py` (5; cuatro vistos en rojo con el codigo
+anterior: la vista daba al examen un Brier de 0,78 donde lo publicable da 0,03;
+el quinto, el corte de escala de lo vivo, es una guarda);
+`test_curva_fotometro.py` y `test_backfill_history_models.py` actualizados (sus
+filas vivas llevan ahora `retrieved_at`).
+
 ## 27-10-2026 — M7, M8 y M16 del retroanalisis (`docs/verificacion_2026-10-26.md`, seccion 10)
 
 **M7. La fila archivada dice que curva la produjo.** `workers/archive_prediction.py`

@@ -158,10 +158,13 @@ def test_ecmwf_training_pairs_ignore_every_other_backfill(tmp_path):
         _fila("icon_seamless_prev2d", 90.0),
         _fila("gfs_seamless_prev5d", 80.0),
         _fila("meteofrance_seamless_prev1d", 70.0),
-        # The live run of the SAME model does count since 26-10-2026 (lead
-        # lead_h // 24): the backfill was downloaded once and does not grow, so a
-        # curve retrained every week needs it (calibration.training_rows).
-        _fila("ecmwf_ifs025", 60.0, lead_h=30),
+        # The live run of the SAME model does count since 26-10-2026: the
+        # backfill was downloaded once and does not grow, so a curve retrained
+        # every week needs it (calibration.training_rows). Since M16 (27-10)
+        # its lead is BY RETRIEVAL: fetched on 08-03 at 10 UTC, it is what was
+        # known at 15 UTC the day before the night of 09-03, lead 1.
+        {**_fila("ecmwf_ifs025", 60.0, lead_h=30),
+         "retrieved_at": dt.datetime(2026, 3, 8, 10, tzinfo=dt.timezone.utc)},
         _fila("weathernext3", 50.0, lead_h=50),
     ])
     assert C.training_pairs({HORA: True}, raiz) == [(60.0, 1.0, True), (10.0, 2.0, True)]
