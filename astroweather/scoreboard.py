@@ -38,9 +38,10 @@ from collections import defaultdict
 
 import numpy as np
 
+from .asof import raw_ensemble_asof, raw_forecast_asof
 from .calibration import (WEATHERNEXT_LEAD_DAYS, WEATHERNEXT_MODEL, Calibrator,
                           is_backfill_of, model_path, observed_clear_hours)
-from .queries import connect
+from .queries import DATA_ROOT, connect
 
 # Below this a score is noise. 200 hours is roughly a season of usable nights
 # here, and it is stated in the report rather than hidden.
@@ -96,6 +97,52 @@ def _lead_days(model: str, lead_hours: int) -> int:
     return int(lead_hours) // 24
 
 
+# Los alcances, en dias, que se le piden a un modelo vivo de Open-Meteo:
+# `fetch_forecast` baja 7 dias.
+LIVE_LEAD_DAYS = range(0, 7)
+
+
+def _labelled_by_day(model: str) -> bool:
+    """¿Es un modelo vivo de Open-Meteo, cuyo `run_utc` es el DIA de la recogida
+    a las 00Z y no su inicializacion (`workers/fetch_forecast.py`)? Los
+    retroanalisis llevan el alcance en el nombre, WeatherNext su pasada de
+    verdad y `astroweather` (nuestra fila archivada) el instante en que se
+    emitio: esos tres se leen de la vista, como siempre."""
+    return not (_is_backfill(model) or model.startswith("weathernext")
+                or model == "astroweather")
+
+
+def _live_pairs(connection, root, models, ensembles, truth: dict,
+                since: dt.datetime) -> dict:
+    """Los modelos vivos, por alcance y POR RECOGIDA (M16, 27-10-2026).
+
+    Antes salian de la vista deduplicada con `lead_h // 24`: el "dia 0" era la
+    recogida de las 21-23 UTC, con la noche empezada, y las horas de despues de
+    medianoche caian en el "dia 1" de la misma recogida. Ahora el alcance d de
+    una hora es lo que habia en el archivo a las 15 UTC de d dias antes de que
+    empezara su noche (`AsOf.issued`), la misma pregunta que se le hace a la
+    curva del techo. La media del EPS va aparte (`<modelo>_eps`): antes caia
+    en la misma fila que el determinista.
+    """
+    pairs: dict[tuple, list[tuple[dt.datetime, float]]] = defaultdict(list)
+    tables = [(m, m, raw_forecast_asof(connection, root, m, since), True)
+              for m in sorted(models)]
+    tables += [(m, f"{m}_eps", raw_ensemble_asof(connection, root, m, since), False)
+               for m in sorted(ensembles)]
+    for _, name, table, is_cloud in tables:
+        for hour in table.by_hour:
+            if hour not in truth:
+                continue
+            for days in LIVE_LEAD_DAYS:
+                value = table.issued(hour, days)
+                if value is None:
+                    continue
+                # El determinista trae la nube (%); el EPS, ya la P(despejado).
+                p = 1.0 - float(value[0]) / 100.0 if is_cloud else float(value[0])
+                pairs[(name, days)].append((hour, p))
+    return pairs
+
+
 def cloud_scores(root=None, since: str = "2024-02-01") -> dict:
     """Score every model that predicted cloud cover against the photometer."""
     truth = observed_clear_hours(since=since, root=root)
@@ -107,9 +154,13 @@ def cloud_scores(root=None, since: str = "2024-02-01") -> dict:
         SELECT model, lead_h, valid_utc, cloud_total, member
         FROM forecasts WHERE cloud_total IS NOT NULL
     """).fetchall()
+    live_models = {m for m, _, _, _, member in rows
+                   if member is None and _labelled_by_day(m)}
+    ensemble_models = {m for m, _, _, _, member in rows if member is not None}
 
-    # Ensemble members are averaged into one probability per (model, lead, hour);
-    # a deterministic run contributes its own single value.
+    # Ensemble members are averaged into one probability per retrieval and hour
+    # (`asof.raw_ensemble_asof`), scored as `<model>_eps`; a deterministic run
+    # contributes its own single value.
     calibrator = Calibrator.load()
     # La curva de WeatherNext es suya: solo se aplica a SU media y en los
     # alcances con los que se valido. La etiqueta no empieza por "calibrado" a
@@ -118,31 +169,33 @@ def cloud_scores(root=None, since: str = "2024-02-01") -> dict:
     wn_calibrator = Calibrator.load(model_path(WEATHERNEXT_MODEL, root))
     if wn_calibrator is not None and wn_calibrator.trained_on_model != WEATHERNEXT_MODEL:
         wn_calibrator = None
-    ensemble: dict[tuple, list[float]] = defaultdict(list)
     single: dict[tuple, list[tuple[dt.datetime, float]]] = defaultdict(list)
     for model, lead, valid, cloud, member in rows:
         hour = _hour(valid)
         if hour not in truth:
             continue
+        # Lo vivo de Open-Meteo y los miembros del EPS se leen por recogida
+        # (`_live_pairs`), no por la etiqueta de pasada de la vista.
+        if member is not None or model in live_models:
+            continue
         days = _lead_days(model, lead)
-        if member is None:
-            single[(model, days)].append((hour, 1.0 - float(cloud) / 100.0))
-        else:
-            ensemble[(model, days, hour)].append(1.0 - float(cloud) / 100.0)
+        single[(model, days)].append((hour, 1.0 - float(cloud) / 100.0))
         # Our own calibrated probability, scored as one more competitor. It is
         # the raw number of the same model passed through the logistic fit, so
         # the difference between the two rows IS what the calibration adds.
         # SOLO sobre el retroanalisis del ECMWF: la curva es suya, y la de ICON
         # o GFS con ella encima seria corregir numeros que no son los suyos.
-        if calibrator is not None and member is None and is_backfill_of(model):
+        if calibrator is not None and is_backfill_of(model):
             single[("calibrado (nuestro)", days)].append(
                 (hour, calibrator.probability(float(cloud), days * 24.0)))
-        if (wn_calibrator is not None and member is None
+        if (wn_calibrator is not None
                 and model == WEATHERNEXT_MODEL and days in WEATHERNEXT_LEAD_DAYS):
             single[(f"{WEATHERNEXT_MODEL}_calibrado", days)].append(
                 (hour, wn_calibrator.probability(float(cloud), days * 24.0)))
-    for (model, days, hour), values in ensemble.items():
-        single[(model, days)].append((hour, float(np.mean(values))))
+    since_dt = dt.datetime.fromisoformat(since).replace(tzinfo=dt.timezone.utc)
+    for key, pairs in _live_pairs(connection, root or DATA_ROOT, live_models,
+                                  ensemble_models, truth, since_dt).items():
+        single[key].extend(pairs)
 
     # Baselines on the truth alone: climatology is the base rate, persistence is
     # "the same hour last night". Both are free, and a forecast that does not
@@ -339,6 +392,9 @@ def report(root=None) -> str:
               and not entry["model"].startswith("calibrado")]
     if others:
         lines.append("  MULTIMODELO (empezo a archivarse el 27-08-2026)")
+        lines.append("    Modelos vivos de Open-Meteo: 'd dia(s)' = lo que habia en el archivo")
+        lines.append("    a las 15 UTC de d dias antes de que empezara la noche (por recogida,")
+        lines.append("    M16); WeatherNext, dias desde su pasada; *_eps, la media del EPS.")
         for entry in others[:12]:
             flag = "" if entry["enough"] else "   <-- muestra insuficiente, no se rankea"
             lines.append("    %-22s %d dia(s)  n=%5d  Brier=%.4f%s"

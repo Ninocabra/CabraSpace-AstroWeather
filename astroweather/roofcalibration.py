@@ -75,7 +75,7 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import minimize, minimize_scalar
 
-from .asof import raw_forecast_asof
+from .asof import ISSUE_CUTOFF_HOUR_UTC, raw_forecast_asof  # noqa: F401
 from .calibration import BACKFILL_MODEL, Calibrator
 from .ephem import ASTRONOMICAL, sun_positions
 from .queries import DATA_ROOT, connect
@@ -114,9 +114,10 @@ DARK_SUN_ALTITUDE = ASTRONOMICAL
 MIN_HOURS_FOR_SLOPE = 30
 MIN_HOURS_PER_MONTH = 200
 BACKFILL_PREV1D = BACKFILL_MODEL + "_prev1d"
-# La prevision "de esa tarde": la ultima pasada emitida antes de esta hora UTC
-# del dia en que empieza la noche. Es la que ve quien decide si sube.
-ISSUE_CUTOFF_HOUR_UTC = 15
+# La prevision "de esa tarde": la ultima RECOGIDA anterior a
+# `ISSUE_CUTOFF_HOUR_UTC` (15) del dia en que empieza la noche. Es la que ve
+# quien decide si sube. La constante y la cuenta viven en `asof.py` desde M16
+# (27-10-2026); se reexporta aqui porque `hindcast` la importa de este modulo.
 BOOTSTRAP_ROUNDS = 300
 
 
@@ -272,10 +273,7 @@ def hourly_pairs(root: Path | None = None,
     for hour, (_, open_fraction), altitude in zip(hours, roof, altitudes):
         if altitude >= DARK_SUN_ALTITUDE:
             continue
-        night = (hour - dt.timedelta(hours=12)).date()
-        cutoff = dt.datetime(night.year, night.month, night.day,
-                             ISSUE_CUTOFF_HOUR_UTC, tzinfo=utc)
-        value = cloud.at(hour.astimezone(utc).replace(tzinfo=None), cutoff)
+        value = cloud.issued(hour.astimezone(utc).replace(tzinfo=None))
         if value is not None:
             pairs.append((hour, float(value[0]), float(open_fraction)))
     return pairs

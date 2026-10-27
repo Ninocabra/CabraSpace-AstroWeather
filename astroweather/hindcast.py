@@ -75,7 +75,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .asof import NWP_LATENCY, AsOf, raw_forecast_asof  # noqa: F401
+from .asof import NWP_LATENCY, AsOf, raw_ensemble_asof, raw_forecast_asof  # noqa: F401
 # La vara de medir y las verdades viven desde el 26-10-2026 en dos modulos
 # comunes, porque la nota diaria (`nightscore.py`) y la aspirante de la curva
 # (`curvecontest.py`) tienen que medir EXACTAMENTE igual que este informe. Se
@@ -234,17 +234,8 @@ class Data:
         return raw_forecast_asof(self.con, self.archive, model, since)
 
     def eps_asof(self, since: dt.datetime) -> "AsOf":
-        base = (self.archive / "forecasts").as_posix()
-        rows = self.con.execute(f"""
-            SELECT retrieved_at, valid_utc, avg(1 - cloud_total / 100.0),
-                   avg(CASE WHEN cloud_total < 20 THEN 1.0 ELSE 0.0 END), count(DISTINCT member)
-            FROM read_parquet('{base}/**/*.parquet', union_by_name=true)
-            WHERE model = 'ecmwf_ifs025' AND member IS NOT NULL
-              AND cloud_total IS NOT NULL AND valid_utc >= ?
-            GROUP BY 1, 2
-        """, [since]).fetchall()
-        return AsOf((aware(ret), hour_key(v), (float(m), float(f)))
-                    for ret, v, m, f, n in rows if n >= 40)
+        # Desde M16 (27-10-2026) la lectura vive en `asof.py`: el marcador la usa igual.
+        return raw_ensemble_asof(self.con, self.archive, "ecmwf_ifs025", since)
 
 
     def published(self) -> list[dict]:
@@ -1262,6 +1253,7 @@ M1_DONE = '**HECHA el 26-10-2026** (CHANGELOG): curva horaria de dos parámetros
 M6_DONE = '**HECHA el 26-10-2026** (CHANGELOG): solo cuentan, para la ventana, la probabilidad de abrir y las horas esperadas, las casillas con el Sol < −18° a la media hora (la constante de M1); la casilla que cruza −18° cuenta en proporción, así que la suma no puede pasar de la noche astronómica. Rejilla y JSON publicados igual (campo nuevo `horas_utilizables_rejilla`, aditivo). Medido con `python -m astroweather.hindcast --m6` sobre las 42 noches del 05-09 al 25-10 (control: sin M6 reproduce m1_resultados.json con diferencia 0): horas esperadas mayores que la noche astronómica en 17 de 42 noches (hasta ×1.28) → 0 (máximo ×0.89); ventanas fuera de la noche astronómica 13 → 0; en las 207 publicaciones (esta noche y la siguiente), ventanas que acaban tras el orto 13 + 26 → 0. NO cambia ningún veredicto de las 42 noches (Brier 0.119 → 0.122, +0.003 [−0.003, +0.011]; acierto 0.83 igual): el 28-09 sigue siendo falsa alarma (0.89 → 0.85, ventana 06-08 → 03:00-04:35 UTC), 27-09 y 19-10 no se mueven. Las horas esperadas bajan de sesgo −1.7 [−2.9, −0.5] a −4.0 [−5.2, −2.7] h contra las horas de techo de la tabla, que incluyen la apertura en crepúsculo; contra las horas abiertas con el Sol < −18° (24 noches con lecturas) de +0.6 [−0.7, +1.9] a −1.9 [−3.1, −0.7] h: la curva de M1 es conservadora (tope 0.89) y las horas de crepúsculo lo tapaban. Cifras: `verificacion_2026-10-26/m6_resultados.json`.'
 M7_DONE = '**HECHA el 27-10-2026** (CHANGELOG): la curva la dice `tonight.report`, que es quien la elige, y cada fila de `astroweather` lleva `curve_truth`, `curve_model` y `curve_fitted_at` (columnas nuevas, nulas en lo archivado antes); `provider_model_version` nombra la curva usada. `Curves.classify` lee el régimen cuando la fila lo trae y solo lo reconstruye en las filas viejas.'
 M8_DONE = '**HECHA el 27-10-2026** (CHANGELOG): `p_despejado` se queda (la web lo lee) y cada hora lleva al lado `p_techo_abierto` o `p_cielo_despejado` según la verdad terreno de su noche; el JSON publica `campos_hora` con el significado de cada campo, y el README lo tabula.'
+M16_DONE = '**HECHA el 27-10-2026** (CHANGELOG): la regla vive en `asof.py` (`AsOf.issued`, `AVAILABLE_AT_SQL`, la media del EPS por recogida). El marcador puntúa los modelos vivos de Open-Meteo y el EPS por recogida (ECMWF 0,25 crudo, D0: Brier 0,2247 → 0,2557, AUC 0,702 → 0,659: la vista era optimista); `queries.connect(as_of=...)` pregunta la vista a una hora. La curva del techo ya elegía por recogida desde M1 y no cambia (275 pares idénticos antes y después; con la vista cambiarían 155). Pendiente: la previsión viva que entra en `calibration.training_pairs`.'
 
 
 def _legacy_roof_pairs(con) -> list[tuple[dt.datetime, float, float]]:
@@ -3045,7 +3037,7 @@ def render_report(R: dict, fig_dir: str) -> str:
     # ------------------------------------------------------------------ 10
     w("## 10. Mejoras propuestas")
     w("")
-    w("Implementadas: M1 y M6 (26-10-2026); M7 y M8 (27-10-2026). El resto, no. «Validable ya» = medido aquí fuera de muestra; "
+    w("Implementadas: M1 y M6 (26-10-2026); M7, M8 y M16 (27-10-2026). El resto, no. «Validable ya» = medido aquí fuera de muestra; "
       "«necesita noches» = la evidencia es descriptiva o de pocas noches.")
     w("")
     if wif:
@@ -3154,7 +3146,8 @@ def render_report(R: dict, fig_dir: str) -> str:
       f"pendiente de la curva del techo se ajusta con nube recogida ya de noche) y "
       f"`scoreboard.py:127` (los plazos de los modelos en vivo están mal rotulados). Medido: la "
       f"vista coincide con lo que de verdad se usó en el {ac.get('dedup_exact', 0):.0%} de las "
-      f"horas. Arreglo: elegir por `retrieved_at <= corte` y no por la etiqueta. **Validable ya.**")
+      f"horas. Arreglo: elegir por `retrieved_at <= corte` y no por la etiqueta. **Validable ya.** "
+      + M16_DONE)
     w(f"**M17. El total del ECMWF de 0,25° no casa con sus capas** "
       f"({lc.get('ecmwf_ifs025', {}).get('total_below_max_layer', 0):.0%} de las filas con la total "
       f"por debajo de su capa mayor, contra {lc.get('ecmwf_ifs', {}).get('total_below_max_layer', 0):.0%} "

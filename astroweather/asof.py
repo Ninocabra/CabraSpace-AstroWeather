@@ -13,9 +13,13 @@ uso el producto solo en el 56 %; esta reconstruccion, en el 100 %.
 
 Aqui se lee el Parquet CRUDO y, para cada hora prevista, se guarda la serie de
 recogidas en orden de `retrieved_at`: `AsOf.at(hora, instante)` devuelve la mas
-reciente anterior al instante. Lo usan el retroanalisis (`hindcast.py`) y la
-curva del techo (`roofcalibration.py`), que se entrena con la nube que habia al
-corte de la tarde y no con la de la noche ya empezada.
+reciente anterior al instante, y `AsOf.issued(hora, d)` la que habia a las
+`ISSUE_CUTOFF_HOUR_UTC` de d dias antes de que empezara su noche. Lo usan el
+retroanalisis (`hindcast.py`), la curva del techo (`roofcalibration.py`), que
+se entrena con la nube que habia al corte de la tarde y no con la de la noche
+ya empezada, y desde M16 (27-10-2026) el marcador (`scoreboard.py`). La vista
+de `queries.connect(as_of=...)` aplica la misma regla de disponibilidad
+(`AVAILABLE_AT_SQL`) para quien pregunte en SQL.
 """
 
 from __future__ import annotations
@@ -28,6 +32,35 @@ from pathlib import Path
 UTC = dt.timezone.utc
 # Una pasada 00Z de los modelos globales esta en Open-Meteo unas 6-7 h despues.
 NWP_LATENCY = dt.timedelta(hours=7)
+# La hora de la tarde a la que se pregunta "que se sabia de esta noche": la de
+# la pasada de la tarde del producto. Supuesta, NO medida (seccion 9 del
+# informe del 26-10). Vivia en `roofcalibration.py`; desde M16 (27-10-2026) la
+# comparten la curva del techo y el marcador.
+ISSUE_CUTOFF_HOUR_UTC = 15
+
+# CUANDO ESTUVO DISPONIBLE UNA FILA, en SQL: la misma regla para la lectura del
+# Parquet crudo de aqui abajo y para la vista de `queries.connect(as_of=...)`.
+# Fuera de WeatherNext, la recogida; WeatherNext, por su pasada mas el retraso
+# (agosto y septiembre llegaron con el relleno del 17-09, y su recogida no dice
+# cuando se pudo saber).
+AVAILABLE_AT_SQL = (
+    "CASE WHEN starts_with(model, 'weathernext') "
+    f"THEN run_utc + INTERVAL {int(NWP_LATENCY.total_seconds() // 3600)} HOUR "
+    "ELSE retrieved_at END")
+
+
+def night_of(hour: dt.datetime) -> dt.date:
+    """La noche de una hora: la fecha del dia en que EMPEZO (antes de las 12
+    UTC, la de la vispera). La misma cuenta que `queries.nights`."""
+    return (hour - dt.timedelta(hours=12)).date()
+
+
+def issue_cutoff(night: dt.date, lead_days: int = 0,
+                 hour: int = ISSUE_CUTOFF_HOUR_UTC) -> dt.datetime:
+    """El instante al que se pregunta por la noche `night` con `lead_days` de
+    antelacion: las `hour` UTC de `lead_days` dias antes de que empiece."""
+    day = night - dt.timedelta(days=lead_days)
+    return dt.datetime(day.year, day.month, day.day, hour, tzinfo=UTC)
 
 
 def _aware(t: dt.datetime) -> dt.datetime:
@@ -59,27 +92,47 @@ class AsOf:
         i = bisect_right(stamps, _aware(when)) - 1
         return self.by_hour[hour][i][1] if i >= 0 else None
 
+    def issued(self, hour: dt.datetime, lead_days: int = 0):
+        """Lo que habia de `hour` al corte de la tarde de su noche, `lead_days`
+        dias antes: la pregunta "la pasada anterior a las 15 UTC"."""
+        return self.at(hour, issue_cutoff(night_of(hour), lead_days))
+
 
 def raw_forecast_asof(connection, root: Path, model: str, since: dt.datetime) -> AsOf:
     """Nube total y capas de `model`, recogida a recogida, desde el Parquet crudo.
 
     Cada valor es (total, baja, media, alta, run_utc) y la clave, la hora
-    prevista como datetime UTC naive. Fuera de WeatherNext, las filas sin
-    `retrieved_at` no se pueden fechar y no entran.
+    prevista como datetime UTC naive. La disponibilidad de cada fila es
+    `AVAILABLE_AT_SQL`: fuera de WeatherNext, las filas sin `retrieved_at` no
+    se pueden fechar y no entran.
     """
     base = (root / "forecasts").as_posix()
     rows = connection.execute(f"""
-        SELECT DISTINCT retrieved_at, run_utc, valid_utc, cloud_total, cloud_low,
-               cloud_mid, cloud_high
+        SELECT DISTINCT {AVAILABLE_AT_SQL} AS available_at, run_utc, valid_utc,
+               cloud_total, cloud_low, cloud_mid, cloud_high
         FROM read_parquet('{base}/**/*.parquet', union_by_name=true)
         WHERE model = ? AND member IS NULL AND cloud_total IS NOT NULL AND valid_utc >= ?
     """, [model, since]).fetchall()
-    if model.startswith("weathernext"):
-        # WeatherNext lleva su hora de inicializacion de verdad, pero agosto y
-        # septiembre llegaron con el relleno del 17-09: se fecha la
-        # disponibilidad por la pasada mas su retraso, no por la recogida.
-        return AsOf((_aware(run) + NWP_LATENCY, _hour_key(v),
-                     (float(t), lo, mi, hi, _aware(run)))
-                    for ret, run, v, t, lo, mi, hi in rows)
-    return AsOf((_aware(ret), _hour_key(v), (float(t), lo, mi, hi, _aware(run)))
-                for ret, run, v, t, lo, mi, hi in rows if ret is not None)
+    return AsOf((_aware(at), _hour_key(v), (float(t), lo, mi, hi, _aware(run)))
+                for at, run, v, t, lo, mi, hi in rows if at is not None)
+
+
+def raw_ensemble_asof(connection, root: Path, model: str, since: dt.datetime,
+                      min_members: int = 40) -> AsOf:
+    """La media del EPS de `model`, recogida a recogida: cada valor es
+    (P(despejado) media = 1 - nube media, fraccion de miembros con < 20 % de
+    nube). Una recogida con menos de `min_members` miembros (una bajada a
+    medias) no entra. Lo usan el retroanalisis y el marcador."""
+    base = (root / "forecasts").as_posix()
+    rows = connection.execute(f"""
+        SELECT {AVAILABLE_AT_SQL} AS available_at, valid_utc,
+               avg(1 - cloud_total / 100.0),
+               avg(CASE WHEN cloud_total < 20 THEN 1.0 ELSE 0.0 END),
+               count(DISTINCT member)
+        FROM read_parquet('{base}/**/*.parquet', union_by_name=true)
+        WHERE model = ? AND member IS NOT NULL AND cloud_total IS NOT NULL
+          AND valid_utc >= ?
+        GROUP BY 1, 2
+    """, [model, since]).fetchall()
+    return AsOf((_aware(at), _hour_key(v), (float(m), float(f)))
+                for at, v, m, f, n in rows if at is not None and n >= min_members)

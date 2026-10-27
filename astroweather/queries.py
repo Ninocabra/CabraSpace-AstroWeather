@@ -23,8 +23,16 @@ import duckdb
 DATA_ROOT = Path(__file__).resolve().parent.parent / "data"
 
 
-def connect(root: Path | None = None) -> duckdb.DuckDBPyConnection:
-    """Open a connection with deduplicated views over the Parquet archive."""
+def connect(root: Path | None = None,
+            as_of: dt.datetime | None = None) -> duckdb.DuckDBPyConnection:
+    """Open a connection with deduplicated views over the Parquet archive.
+
+    `as_of` (M16, 27-10-2026): la vista `forecasts` ve solo lo que ya estaba
+    disponible en ese instante (`asof.AVAILABLE_AT_SQL`: la recogida; en
+    WeatherNext, la pasada mas su retraso). Sin el, la ultima recogida de cada
+    etiqueta, que es lo que se sabe AHORA y lo que necesita el producto.
+    """
+    from .asof import AVAILABLE_AT_SQL
     base = (root or DATA_ROOT).as_posix()
     connection = duckdb.connect()
     # Everything in the archive is UTC; without this DuckDB hands rows back in
@@ -45,6 +53,16 @@ def connect(root: Path | None = None) -> duckdb.DuckDBPyConnection:
         ) WHERE rank = 1
     """)
 
+    # LA ETIQUETA DE PASADA NO ES LA PASADA (M16). Para los modelos de
+    # Open-Meteo `run_utc` es el DIA truncado a 00Z (`workers/fetch_forecast`),
+    # y cada recogida del dia trae la pasada mas reciente que sirva Open-Meteo:
+    # sin `as_of`, esta vista se queda con la de las 21-23 UTC. Para preguntar
+    # "que se sabia a las 15 UTC", `connect(as_of=...)` o, hora a hora, `asof.py`.
+    cutoff = ""
+    if as_of is not None:
+        stamp = (as_of if as_of.tzinfo else as_of.replace(tzinfo=dt.timezone.utc))
+        cutoff = (f"WHERE {AVAILABLE_AT_SQL} <= "
+                  f"TIMESTAMPTZ '{stamp.astimezone(dt.timezone.utc).isoformat()}'")
     connection.execute(f"""
         CREATE VIEW forecasts AS
         SELECT * EXCLUDE (rank) FROM (
@@ -53,6 +71,7 @@ def connect(root: Path | None = None) -> duckdb.DuckDBPyConnection:
                 ORDER BY retrieved_at DESC
             ) AS rank
             FROM read_parquet('{base}/forecasts/**/*.parquet', union_by_name=true)
+            {cutoff}
         ) WHERE rank = 1
     """)
 

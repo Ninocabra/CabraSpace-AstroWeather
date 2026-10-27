@@ -41,6 +41,42 @@ los cuatro campos de probabilidad. Tabla en el README («Donde sale el
 producto»). Grep en `Pagina Web`: solo `astroweather.js:639` lee
 `p_despejado`, y nada recorre las claves de la hora; los campos nuevos no
 rompen nada. Tests: `tests/test_webexport.py` (4 nuevos, vistos en rojo).
+Sobre el archivo real (`webexport.build(root=AstroWeather-Archive)`, noches
+27 y 28-10, las dos con la curva del techo): 30 horas, `p_despejado` =
+`p_techo_abierto` en todas. La rama de WeatherNext (`p_cielo_despejado`) solo
+la cubre el test: el archivo local no tiene WeatherNext despues del 06-10.
+
+**M16. Lo que se sabia a las 15 UTC, por `retrieved_at`.** `asof.py` es ahora
+el unico sitio de la regla: `ISSUE_CUTOFF_HOUR_UTC` (se muda desde
+`roofcalibration`, que la reexporta), `night_of`, `issue_cutoff`,
+`AsOf.issued(hora, d)`, `AVAILABLE_AT_SQL` (recogida; WeatherNext, pasada + 7 h)
+y `raw_ensemble_asof` (media del EPS por recogida; `hindcast.Data.eps_asof` la
+usa). Quien lo usa:
+- `scoreboard.cloud_scores`: los modelos vivos de Open-Meteo y la media del EPS
+  se puntuan por recogida (alcance d = lo que habia a las 15 UTC de d dias antes
+  de la noche), no por `lead_h // 24` de la vista. La media del EPS sale aparte
+  (`ecmwf_ifs025_eps`): antes se promediaba con el determinista en la misma fila.
+  WeatherNext, los retroanalisis y `astroweather` siguen saliendo de la vista
+  (sus etiquetas si son su pasada). Sobre el archivo real, ECMWF 0,25 crudo
+  contra el fotometro: D0 Brier 0,2247 -> 0,2557 y AUC 0,702 -> 0,659; D1
+  0,2208 -> 0,2836. La vista mezclaba la recogida de la noche y la media del
+  EPS: el marcador vivo era optimista. Las filas que no pasan por recogida
+  (WeatherNext, `astroweather`) salen identicas: el control.
+- `queries.connect(as_of=...)`: la vista `forecasts` solo ve lo disponible en
+  ese instante (misma `AVAILABLE_AT_SQL`). Sin `as_of`, igual que antes.
+- `roofcalibration.hourly_pairs`: ya elegia por recogida desde M1 (26-10); ahora
+  pregunta con `AsOf.issued`. **La curva del techo NO cambia**: sobre el archivo
+  real, los 275 pares hora-nube-techo salen identicos antes y despues (y las
+  cinco series crudas de `asof` y la del EPS, identicas entrada a entrada).
+  Control de que la comparacion discrimina: con la vista deduplicada (el metodo
+  de antes de M1, `hindcast._legacy_roof_pairs`) cambia la nube en 155 de esos
+  275 pares. No hacia falta interruptor: no hay cambio de curva que medir.
+Fuera, a proposito: `calibration.training_pairs` (la curva del fotometro) mete
+la prevision VIVA del ECMWF por la vista con `lead_h // 24` (dias 1-5): tiene
+el mismo defecto, pero cambiarlo mueve la curva del fotometro y pasa por el
+examen `nube_curva`; queda como pendiente con su medida por hacer. Tests:
+`tests/test_m16_retrieved_at.py` (7, vistos en rojo con el codigo anterior: el
+marcador daba D0 Brier 0,0025 -la recogida de las 23 UTC- donde toca 0,64).
 
 ## 26-10-2026 (2) — La curva del fotometro se reentrena sola, en su escala, y solo entra si gana
 
