@@ -326,7 +326,7 @@ jobs:
           for suelto in cloud_calibration.json cloud_calibration_weathernext3.json \
                         roof_calibration.json \
                         open_hours_nerpio.json roof_climatology.json \
-                        sky_floor.json estado_colector.json; do
+                        sky_floor.json seeing_terciles.json estado_colector.json; do
             # `if`, no `[ -f ] && cp`: con `bash -e` un test que falla en la
             # ultima vuelta del bucle tumba el paso entero, y que falte un
             # fichero de estado la primera vez es NORMAL.

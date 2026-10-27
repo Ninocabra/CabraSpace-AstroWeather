@@ -194,6 +194,13 @@ def _job_nube_curva():
     return " || ".join(partes)
 
 
+def _job_seeing_terciles():
+    """Los cortes del tercil de seeing, de la distribucion del modelo en el ultimo
+    anio (M9, `seeingterciles.py`)."""
+    from .seeingterciles import refit
+    return refit()
+
+
 def _job_modelo_d1():
     """Que modelo de nube acierta mas la noche siguiente (ECMWF, ICON,
     WeatherNext). Solo mide y lo deja en `curve_decisions`: el producto no
@@ -576,6 +583,8 @@ JOBS: dict[str, Trabajo] = {
     # Que modelo de nube gana a 1 dia. Semanal, detras de `nube_curva`: comparte
     # con ella la verdad del fotometro del mismo proceso (`photometer_truth`).
     "modelo_d1": Trabajo(_job_modelo_d1, timedelta(days=7), desde_hora_utc=10),
+    # Los terciles del seeing (M9). Semanal: una semana mas son 7 noches de 365.
+    "seeing_terciles": Trabajo(_job_seeing_terciles, timedelta(days=7), desde_hora_utc=10),
     # Barato, diario, y es lo unico que hay entre una clave que caduca en
     # silencio y una fuente que deja de responder sin que nadie se entere.
     "credenciales": Trabajo(_job_credentials, timedelta(hours=24)),

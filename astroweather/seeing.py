@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from functools import lru_cache
 
 import numpy as np
 
@@ -57,10 +58,36 @@ HV_MID_COEFFICIENT = 2.7e-16
 
 # Pressure levels used for the jet wind, and their typical heights ASL.
 JET_LEVELS_HPA = (500, 300, 250, 200)
-# Terciles of predicted seeing, from the model's own distribution over the
-# archive rather than from round numbers.
+# Terciles of predicted seeing. The live cuts come from the model's own
+# distribution over the last year (`seeingterciles.py`, refitted weekly into
+# `seeing_terciles.json`, M9, 27-10-2026). These two are only the FALLBACK when
+# that file is missing or implausible: on 27-10-2026 they no longer were the
+# model's terciles at all ("favorable" 58 of 58 nights).
 TERCILE_GOOD = 1.35
 TERCILE_POOR = 1.90
+
+
+@lru_cache(maxsize=1)
+def current_terciles() -> tuple[float, float]:
+    """(good, poor) from `seeing_terciles.json`, or the fallback constants."""
+    try:
+        import json
+        from .archive import DATA_ROOT
+        from .seeingterciles import MIN_NIGHTS, TERCILES_FILE
+        path = DATA_ROOT / TERCILES_FILE
+        if path.exists():
+            record = json.loads(path.read_text(encoding="utf-8"))
+            good, poor = float(record["good"]), float(record["poor"])
+            if 0.3 < good < poor < 5.0 and int(record.get("nights", 0)) >= MIN_NIGHTS:
+                return good, poor
+    except Exception:
+        pass
+    return TERCILE_GOOD, TERCILE_POOR
+
+
+# The real reader, kept under a second name: the test suite pins
+# `current_terciles` to the fallback so no test depends on this machine's file.
+_current_terciles_from_file = current_terciles
 
 
 def jet_wind(winds_by_level: dict[int, float],
@@ -114,9 +141,10 @@ class Turbulence:
     @property
     def tercile(self) -> str:
         """What gets published: the regime, not the decimal."""
-        if self.seeing_arcsec <= TERCILE_GOOD:
+        good, poor = current_terciles()
+        if self.seeing_arcsec <= good:
             return "favorable"
-        if self.seeing_arcsec >= TERCILE_POOR:
+        if self.seeing_arcsec >= poor:
             return "desfavorable"
         return "normal"
 

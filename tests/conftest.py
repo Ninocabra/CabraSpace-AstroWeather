@@ -36,3 +36,16 @@ def _log_de_tests_aparte(tmp_path, monkeypatch):
         if isinstance(handler, logging.FileHandler):
             handler.close()
             logging.getLogger().removeHandler(handler)
+
+
+# LOS TERCILES DEL SEEING NO SE LEEN DEL `data/` DE ESTA MAQUINA (M9, 27-10-2026).
+# Desde que se ajustan solos (`seeingterciles.py`), `seeing_terciles.json` cambia
+# cada semana; un test que dependa del fichero local daria un resultado en cada
+# PC. Por defecto, los cortes fijos de respaldo; quien quiera probar el fichero
+# usa `seeing._current_terciles_from_file`.
+@pytest.fixture(autouse=True)
+def _terciles_fijos(monkeypatch):
+    from astroweather import seeing
+    monkeypatch.setattr(seeing, "current_terciles",
+                        lambda: (seeing.TERCILE_GOOD, seeing.TERCILE_POOR))
+    yield

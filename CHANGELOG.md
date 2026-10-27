@@ -12,6 +12,26 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 27-10-2026 (3) — M9: los terciles del seeing salen del propio modelo y se recalculan solos
+
+**Medido.** El seeing previsto va de 0,91" a 1,49" en 62 noches (26-08 a 26-10):
+lo domina la constante de capa limite (0,90" con jet nulo) y el chorro solo
+anade 0,11" a 20 m/s y 0,39" a 40 m/s. Los cortes fijos 1,35"/1,90" pedian un jet
+de ~43/~63 m/s, que no hubo ninguna noche: "favorable" 58 de 58.
+
+**Cambio (opcion A, decidida por Nino).** `seeingterciles.py`: cada noche se resume
+como el seeing de la mediana del jet de sus horas de noche (19-05 UTC) y los cortes
+son los percentiles 33,3 y 66,7 del ultimo anio. Trabajo semanal `seeing_terciles`
+(desde las 10 UTC), guardado en `seeing_terciles.json`, que viaja al archivo
+(`archivepush.LOOSE`, `colector.yml`). `seeing.current_terciles()` lo lee; con el
+fichero ausente, raro o con menos de 30 noches, vuelven los cortes fijos de
+respaldo. Hoy: 0,957"/1,009" -> 21 favorables, 20 normales, 21 desfavorables en las
+62 noches pasadas. Aviso honesto: entre los dos cortes hay 0,05"; el tercil
+ORDENA las noches por el chorro, no mide segundos de arco (sin FWHM local). En
+invierno, con mas chorro, los cortes subiran solos a medida que entren noches.
+Los tests fijan los cortes de respaldo (`conftest._terciles_fijos`) para no
+depender del fichero de cada PC. Tests: `tests/test_m9_terciles_seeing.py` (8).
+
 ## 27-10-2026 (2) — M13: la allsky va por el reloj de Espana
 
 **Causa medida.** La allsky de AstroCamp deja de dar estrellas cada madrugada a
