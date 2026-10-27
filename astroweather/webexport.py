@@ -46,8 +46,12 @@ TOP_TARGETS = 3
 DEFAULT_PATH = DATA_ROOT / "web" / "noche.json"
 
 
-def _hour(hour, serie: dict | None = None, site: Site | None = None) -> dict:
+def _hour(hour, serie: dict | None = None, site: Site | None = None,
+          truth: str | None = None) -> dict:
     """Una hora de la noche. Con seeing y transparencia SUYOS si se tienen.
+
+    `truth` es la verdad terreno de la curva de ESTA noche
+    (`NightReport.cloud_truth`): decide como se llama la probabilidad (M8).
 
     Hasta el 31-08-2026 el seeing y la transparencia solo salian por noche:
     un tercil y un AOD, la mediana de la ventana entera. Y las dos cosas se
@@ -63,11 +67,21 @@ def _hour(hour, serie: dict | None = None, site: Site | None = None) -> dict:
     # La nube cruda de WeatherNext NO se publica: sus terminos solo permiten
     # difundir lo derivado (la probabilidad, el veredicto), no el dato.
     cruda_publicable = not (getattr(hour, "cloud_model", None) or "").startswith("weathernext")
+    p = (round(hour.clear_probability, 3)
+         if hour.clear_probability is not None else None)
     salida = {
         "t_utc": hour.t_utc.isoformat(),
         "nubes_previstas": hour.cloud_total if cruda_publicable else None,
-        "p_despejado": (round(hour.clear_probability, 3)
-                        if hour.clear_probability is not None else None),
+        # EL NOMBRE VIEJO SE QUEDA (M8, 27-10-2026). Desde el 05-09 el numero
+        # de esta noche sale de la curva del techo y es la probabilidad de que
+        # el techo este ABIERTO, no de cielo despejado; la noche siguiente
+        # (WeatherNext) si es de cielo despejado. La web publica
+        # (`astroweather.js`, `nubeHora`) lee `p_despejado`, asi que no se
+        # renombra: se anade al lado el campo con el nombre de lo que de verdad
+        # es, y el otro sale nulo. Significado de cada uno: `campos_hora`.
+        "p_despejado": p,
+        "p_techo_abierto": p if truth == "techo" else None,
+        "p_cielo_despejado": p if truth == "fotometro" else None,
         "p_utilizable": round(hour.usable_probability, 3),
         "limita": hour.limiting,
         "seguro_para_abrir": hour.safety.safe_to_open,
@@ -152,6 +166,25 @@ def _atribucion() -> list[dict]:
                      "lo derivado de ellos."),
              "cita": WEATHERNEXT_CITATION,
              "terminos": WEATHERNEXT_TERMS_URL}]
+
+
+# El significado de las probabilidades de cada hora, publicado una vez en el
+# JSON (M8, 27-10-2026). Con tildes: se lee en la pagina o en el JSON crudo.
+CAMPOS_HORA = {
+    "p_despejado": ("Nombre de legado, se mantiene porque la web lo lee. Es la "
+                    "probabilidad de la curva de esa noche, sea cual sea su verdad "
+                    "terreno (ver `verdad_terreno` de la noche): desde el 05-09-2026, "
+                    "esta noche es P(techo abierto) y la siguiente P(cielo despejado). "
+                    "Siempre igual a `p_techo_abierto` o a `p_cielo_despejado`."),
+    "p_techo_abierto": ("Probabilidad de que el techo de AstroCamp esté ABIERTO a esa "
+                        "hora, con la curva calibrada contra el techo real. Nulo si la "
+                        "noche no usa esa curva."),
+    "p_cielo_despejado": ("Probabilidad de cielo despejado a esa hora, con la curva "
+                          "calibrada contra el fotómetro (la de WeatherNext o la de "
+                          "respaldo). Nulo si la noche usa la curva del techo."),
+    "p_utilizable": ("La probabilidad de arriba multiplicada por 0,85 por cada riesgo "
+                     "en vigilancia, y cero si una puerta de seguridad la bloquea."),
+}
 
 
 def _definicion_probabilidad(truth: str | None = None) -> str:
@@ -312,7 +345,8 @@ def _night(day: dt.datetime, site: Site, root=None, *,
         "mejor_ventana": ({"desde": window[0].isoformat(),
                            "hasta": window[1].isoformat(),
                            "p_media": round(window[2], 3)} if window else None),
-        "horas": [_hour(h, serie_horaria, site) for h in night_report.hours],
+        "horas": [_hour(h, serie_horaria, site, night_report.cloud_truth)
+                  for h in night_report.hours],
         # Y la pregunta 2.
         "cielo": {
             "mag_cenit_mas_oscuro": round(darkest, 2) if darkest else None,
@@ -1030,6 +1064,8 @@ def build(site: Site = NERPIO, *, nights: int = 2, root=None) -> dict:
             "altitud_m": site.site_elevation,
         },
         "noches": salidas,
+        # Que es cada probabilidad de `noches[].horas[]`, dentro del JSON (M8).
+        "campos_hora": CAMPOS_HORA,
         "atribucion": _atribucion(),
         # Lo que los sensores del sitio dicen AHORA. No es prevision y no se
         # mezcla con ella: va con su antiguedad delante para que la pagina

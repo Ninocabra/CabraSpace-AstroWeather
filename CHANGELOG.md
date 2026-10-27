@@ -30,6 +30,18 @@ con `queries.has_column` (lo hace `hindcast.Data.ours`).
 reconstruye para las filas viejas. Tests: `tests/test_archive_prediction.py`
 (6 nuevos, vistos en rojo con el codigo anterior).
 
+**M8. `p_despejado` no siempre es P(despejado).** Desde el 05-09 el numero de
+esta noche sale de la curva del techo (P(techo abierto)); el de la siguiente,
+de la de WeatherNext (P(cielo despejado)). `p_despejado` NO se renombra ni se
+quita: la web publica lo lee (`Pagina Web/astroweather.js`, `nubeHora`, como
+`1 - p_despejado` cuando no hay nube cruda). Cada hora lleva al lado
+`p_techo_abierto` o `p_cielo_despejado` segun la `verdad_terreno` de su noche
+(el otro, nulo), y el JSON publica una vez `campos_hora` con el significado de
+los cuatro campos de probabilidad. Tabla en el README («Donde sale el
+producto»). Grep en `Pagina Web`: solo `astroweather.js:639` lee
+`p_despejado`, y nada recorre las claves de la hora; los campos nuevos no
+rompen nada. Tests: `tests/test_webexport.py` (4 nuevos, vistos en rojo).
+
 ## 26-10-2026 (2) — La curva del fotometro se reentrena sola, en su escala, y solo entra si gana
 
 Paso 3 del aprendizaje continuo. Detalle y tablas: `docs/aprendizaje_continuo.md`,

@@ -1261,6 +1261,7 @@ M1_OLD = "anterior reajustada"
 M1_DONE = '**HECHA el 26-10-2026** (CHANGELOG): curva horaria de dos parámetros, horas de noche astronómica, nube disponible a las 15 UTC por `retrieved_at` (`asof.py`), umbral de 20 noches. Con el instrumento de este informe y el código de producción (`python -m astroweather.hindcast --m1`): veredicto Brier 0.159 → 0.119 (−0.040 [−0.082, +0.001]; arrancando en 8 noches, −0.068 [−0.111, −0.023]), horas esperadas −3.5 → −1.7 h, pero 2 de las 7 noches cerradas pasan a falsa alarma (27-09 y 19-10). Cifras y figura: `verificacion_2026-10-26/m1_resultados.json`, `verificacion_2026-10-26/m1_curva_techo.png`.'
 M6_DONE = '**HECHA el 26-10-2026** (CHANGELOG): solo cuentan, para la ventana, la probabilidad de abrir y las horas esperadas, las casillas con el Sol < −18° a la media hora (la constante de M1); la casilla que cruza −18° cuenta en proporción, así que la suma no puede pasar de la noche astronómica. Rejilla y JSON publicados igual (campo nuevo `horas_utilizables_rejilla`, aditivo). Medido con `python -m astroweather.hindcast --m6` sobre las 42 noches del 05-09 al 25-10 (control: sin M6 reproduce m1_resultados.json con diferencia 0): horas esperadas mayores que la noche astronómica en 17 de 42 noches (hasta ×1.28) → 0 (máximo ×0.89); ventanas fuera de la noche astronómica 13 → 0; en las 207 publicaciones (esta noche y la siguiente), ventanas que acaban tras el orto 13 + 26 → 0. NO cambia ningún veredicto de las 42 noches (Brier 0.119 → 0.122, +0.003 [−0.003, +0.011]; acierto 0.83 igual): el 28-09 sigue siendo falsa alarma (0.89 → 0.85, ventana 06-08 → 03:00-04:35 UTC), 27-09 y 19-10 no se mueven. Las horas esperadas bajan de sesgo −1.7 [−2.9, −0.5] a −4.0 [−5.2, −2.7] h contra las horas de techo de la tabla, que incluyen la apertura en crepúsculo; contra las horas abiertas con el Sol < −18° (24 noches con lecturas) de +0.6 [−0.7, +1.9] a −1.9 [−3.1, −0.7] h: la curva de M1 es conservadora (tope 0.89) y las horas de crepúsculo lo tapaban. Cifras: `verificacion_2026-10-26/m6_resultados.json`.'
 M7_DONE = '**HECHA el 27-10-2026** (CHANGELOG): la curva la dice `tonight.report`, que es quien la elige, y cada fila de `astroweather` lleva `curve_truth`, `curve_model` y `curve_fitted_at` (columnas nuevas, nulas en lo archivado antes); `provider_model_version` nombra la curva usada. `Curves.classify` lee el régimen cuando la fila lo trae y solo lo reconstruye en las filas viejas.'
+M8_DONE = '**HECHA el 27-10-2026** (CHANGELOG): `p_despejado` se queda (la web lo lee) y cada hora lleva al lado `p_techo_abierto` o `p_cielo_despejado` según la verdad terreno de su noche; el JSON publica `campos_hora` con el significado de cada campo, y el README lo tabula.'
 
 
 def _legacy_roof_pairs(con) -> list[tuple[dt.datetime, float, float]]:
@@ -3044,7 +3045,7 @@ def render_report(R: dict, fig_dir: str) -> str:
     # ------------------------------------------------------------------ 10
     w("## 10. Mejoras propuestas")
     w("")
-    w("Implementadas: M1 y M6 (26-10-2026); M7 (27-10-2026). El resto, no. «Validable ya» = medido aquí fuera de muestra; "
+    w("Implementadas: M1 y M6 (26-10-2026); M7 y M8 (27-10-2026). El resto, no. «Validable ya» = medido aquí fuera de muestra; "
       "«necesita noches» = la evidencia es descriptiva o de pocas noches.")
     w("")
     if wif:
@@ -3112,7 +3113,7 @@ def render_report(R: dict, fig_dir: str) -> str:
       "WeatherNext. Guardar verdad + modelo + `fitted_at` de la curva usada. **Validable ya** "
       "(sin esto, este informe tuvo que reconstruir el régimen). " + M7_DONE)
     w("**M8. Nombre del campo.** `webexport.py:69` publica como `p_despejado` una P(techo "
-      "abierto) desde el 05-09. Renombrar o documentar en el JSON. **Validable ya.**")
+      "abierto) desde el 05-09. Renombrar o documentar en el JSON. **Validable ya.** " + M8_DONE)
     w(f"**M9. Re-derivar los terciles de seeing.** `seeing.py:62-63` (1,35\" / 1,90\"): "
       f"«favorable» {seeing.get('favorable', 0)} de {sum(seeing.values())} noches; el modelo cambió "
       f"(el jet por hora, 01-09) y los cortes ya no son sus terciles. **Validable ya** contra la "

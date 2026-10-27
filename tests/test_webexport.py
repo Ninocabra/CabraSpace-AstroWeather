@@ -226,3 +226,50 @@ def test_con_la_curva_del_fotometro_se_avisa_de_que_no_es_el_techo(monkeypatch):
     assert payload["confianza"]["verdad_terreno"] == "fotometro"
     assert payload["confianza"]["curva_techo"] is None
     assert "no contra el techo real" in " ".join(payload["confianza"]["avisos"])
+
+
+# --- M8 (verificacion 26-10-2026): `p_despejado` es una P(techo abierto) -------
+
+def _hora(p=0.73):
+    from astroweather.gates import evaluate
+    from astroweather.tonight import HourForecast
+    t = dt.datetime(2026, 10, 27, 23, tzinfo=dt.timezone.utc)
+    return HourForecast(t_utc=t, cloud_total=20.0, clear_probability=p,
+                        usable_probability=p or 0.0, moon_altitude=0.0,
+                        safety=evaluate(t_utc=t, hours_ahead=8.0), calibrated=True)
+
+
+def test_con_la_curva_del_techo_la_hora_publica_p_techo_abierto():
+    """Desde el 05-09 el numero de esta noche sale de la curva del techo: es
+    la probabilidad de que el techo este ABIERTO, no de cielo despejado. El
+    nombre viejo se queda (la web lo lee) y el nuevo dice lo que es."""
+    hora = webexport._hour(_hora(), truth="techo")
+    assert hora["p_despejado"] == 0.73               # legado, sin tocar
+    assert hora["p_techo_abierto"] == 0.73
+    assert hora["p_cielo_despejado"] is None
+
+
+def test_con_la_curva_del_fotometro_la_hora_publica_p_cielo_despejado():
+    """La noche siguiente (WeatherNext) y la curva de respaldo SI son de cielo
+    despejado: llamarlo p_techo_abierto seria el mismo error al reves."""
+    hora = webexport._hour(_hora(), truth="fotometro")
+    assert hora["p_despejado"] == 0.73
+    assert hora["p_cielo_despejado"] == 0.73
+    assert hora["p_techo_abierto"] is None
+
+
+def test_sin_curva_ninguno_de_los_dos_inventa_un_numero():
+    hora = webexport._hour(_hora(p=None), truth=None)
+    assert hora["p_despejado"] is None
+    assert hora["p_techo_abierto"] is None and hora["p_cielo_despejado"] is None
+
+
+def test_el_json_dice_que_significa_cada_campo_de_probabilidad(monkeypatch):
+    """La regla del fichero: nada sale sin decir que es. El significado viaja
+    dentro del JSON, una vez, para los tres nombres."""
+    monkeypatch.setattr(webexport, "_night", lambda *a, **k: _noche([]))
+    campos = webexport.build(nights=1)["campos_hora"]
+    assert {"p_despejado", "p_techo_abierto", "p_cielo_despejado",
+            "p_utilizable"} <= set(campos)
+    assert "techo" in campos["p_techo_abierto"].lower()
+    assert "legado" in campos["p_despejado"].lower()

@@ -197,6 +197,20 @@ historial de lo que dijimos **es el `git log` de ese fichero**, porque siempre
 se sobrescribe la misma ruta; y un commit significa que cambió la previsión, no
 que volvimos a calcularla.
 
+**Las probabilidades de cada hora** (`noches[].horas[]`; el significado viaja
+también dentro del JSON, en `campos_hora`):
+
+| campo | qué es |
+|---|---|
+| `p_despejado` | Nombre de legado (la web lo lee): la probabilidad de la curva de esa noche, sea cual sea su verdad (`verdad_terreno` de la noche). Desde el 05-09-2026, esta noche es P(techo abierto) y la siguiente P(cielo despejado). |
+| `p_techo_abierto` | P(techo de AstroCamp abierto), curva calibrada contra el techo real. Nulo si la noche no usa esa curva. |
+| `p_cielo_despejado` | P(cielo despejado), curva calibrada contra el fotómetro (WeatherNext o la de respaldo). Nulo si la noche usa la del techo. |
+| `p_utilizable` | La de arriba × 0,85 por cada riesgo en vigilancia; 0 si una puerta de seguridad la bloquea. |
+
+`p_despejado` es siempre igual a uno de los dos campos nuevos (añadidos el
+27-10-2026, M8). No se renombra: la web pública lo usa para pintar la nube
+cuando no se puede publicar la cruda de WeatherNext.
+
 `webpublish` necesita el clon del repo de datos: por defecto lo busca al lado
 de éste (`../AstroWeather-Data`), o donde diga `ASTROWEATHER_DATA_REPO`. En una
 máquina que no lo tenga, no publica y no falla. **El raw de terceros no se

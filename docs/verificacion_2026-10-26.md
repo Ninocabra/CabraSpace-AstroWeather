@@ -423,7 +423,7 @@ Quedan dos cosas fuera de esta limpieza, y se declaran. Una: el umbral del 50 % 
 
 ## 10. Mejoras propuestas
 
-Implementadas: M1 y M6 (26-10-2026); M7 (27-10-2026). El resto, no. «Validable ya» = medido aquí fuera de muestra; «necesita noches» = la evidencia es descriptiva o de pocas noches.
+Implementadas: M1 y M6 (26-10-2026); M7 y M8 (27-10-2026). El resto, no. «Validable ya» = medido aquí fuera de muestra; «necesita noches» = la evidencia es descriptiva o de pocas noches.
 
 **M1. Curva del techo: ajuste horario de los dos parámetros, ya, y solo con horas oscuras.** `roofcalibration.py:71` (`NIGHTS_FOR_HOURLY_REFIT = 60`), `:298-306` (el cruce sale de `crossing_from_months`) y `:208` (las horas 18-05 UTC meten el crepúsculo, cuando el techo está cerrado por horario y no por tiempo). Evidencia: tope de 0.61-0.77 con 0 % de nube; hora a hora, cuando dice 0.64-0.73 el techo estaba abierto el 96%-98% de las horas; horas esperadas -3.6 h; el veredicto con la curva horaria prequencial baja el Brier -0.067 [-0.110, -0.023]. Ganancia esperada: probabilidad de abrir calibrada (Brier ~0.09 en vez de ~0.15) y horas esperadas sin el déficit. **Validable ya** (hecho aquí); vigilar el AUC, que bajó -0.07 por las primeras curvas planas. **HECHA el 26-10-2026** (CHANGELOG): curva horaria de dos parámetros, horas de noche astronómica, nube disponible a las 15 UTC por `retrieved_at` (`asof.py`), umbral de 20 noches. Con el instrumento de este informe y el código de producción (`python -m astroweather.hindcast --m1`): veredicto Brier 0.159 → 0.119 (−0.040 [−0.082, +0.001]; arrancando en 8 noches, −0.068 [−0.111, −0.023]), horas esperadas −3.5 → −1.7 h, pero 2 de las 7 noches cerradas pasan a falsa alarma (27-09 y 19-10). Cifras y figura: `verificacion_2026-10-26/m1_resultados.json`, `verificacion_2026-10-26/m1_curva_techo.png`.
 
@@ -439,7 +439,7 @@ Implementadas: M1 y M6 (26-10-2026); M7 (27-10-2026). El resto, no. «Validable 
 
 **M7. Que la fila archivada diga qué curva la produjo.** `workers/archive_prediction.py:51`: la versión es siempre la del fotómetro aunque el número salga de la del techo o de WeatherNext. Guardar verdad + modelo + `fitted_at` de la curva usada. **Validable ya** (sin esto, este informe tuvo que reconstruir el régimen). **HECHA el 27-10-2026** (CHANGELOG): la curva la dice `tonight.report`, que es quien la elige, y cada fila de `astroweather` lleva `curve_truth`, `curve_model` y `curve_fitted_at` (columnas nuevas, nulas en lo archivado antes); `provider_model_version` nombra la curva usada. `Curves.classify` lee el régimen cuando la fila lo trae y solo lo reconstruye en las filas viejas.
 
-**M8. Nombre del campo.** `webexport.py:69` publica como `p_despejado` una P(techo abierto) desde el 05-09. Renombrar o documentar en el JSON. **Validable ya.**
+**M8. Nombre del campo.** `webexport.py:69` publica como `p_despejado` una P(techo abierto) desde el 05-09. Renombrar o documentar en el JSON. **Validable ya.** **HECHA el 27-10-2026** (CHANGELOG): `p_despejado` se queda (la web lo lee) y cada hora lleva al lado `p_techo_abierto` o `p_cielo_despejado` según la verdad terreno de su noche; el JSON publica `campos_hora` con el significado de cada campo, y el README lo tabula.
 
 **M9. Re-derivar los terciles de seeing.** `seeing.py:62-63` (1,35" / 1,90"): «favorable» 58 de 58 noches; el modelo cambió (el jet por hora, 01-09) y los cortes ya no son sus terciles. **Validable ya** contra la propia distribución archivada; contra el cielo, sin FWHM no.
 
