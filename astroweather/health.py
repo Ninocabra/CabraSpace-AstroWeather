@@ -88,8 +88,13 @@ SENSOR_DAYS = 7
 # 100 a 1.300 antes); del 19 al 25-10 solo 2 (la camara llega a las 04 UTC con
 # 79-216 estrellas en las demas): el corte de M13 no se ve esta semana. Una nube
 # que entra a la misma hora y se queda hasta el alba noche tras noche es
-# rarisima; la camara apagada, no. Aviso con 3 o mas de 7. No es rojo: la
-# verdad ya ignora esas horas (`nighttruth.ALLSKY_HOURS`).
+# rarisima; la camara apagada, no.
+#
+# Desde el 27-10-2026 el corte HABITUAL no avisa: es la camara de AstroCamp
+# parando a su hora del reloj local (04:54-06:13 en 45 noches; el 25-10 salto
+# una hora en UTC con el cambio de hora), y la verdad ya lo esquiva
+# (`nighttruth.allsky_hour_valid`, hasta las 05:00 locales). Avisa el corte que
+# cae DENTRO de esa ventana, con 3 o mas de 7: eso si se come verdad. No es rojo.
 ALLSKY_NIGHTS = 7
 ALLSKY_CUT_WARN = 3
 ALLSKY_CUT_FRACTION = 0.05
@@ -277,13 +282,22 @@ def allsky_cut_block(root: Path, now: dt.datetime) -> dict:
             else:
                 break
         if start is not None:
-            cuts.append(start.hour)
-    level = "aviso" if len(cuts) >= ALLSKY_CUT_WARN else "ok"
-    hour = max(set(cuts), key=cuts.count) if cuts else None
+            cuts.append(start)
+    early = [c for c in cuts if NT.allsky_hour_valid(c)]
+    level = "aviso" if len(early) >= ALLSKY_CUT_WARN else "ok"
+    local = [NT.aware(c).astimezone(NT.ALLSKY_TZ).hour for c in cuts]
+    hour = max(set(local), key=local.count) if local else None
+    if early:
+        motivo = (f"{len(early)} de {looked} noches sin estrellas antes de las "
+                  f"{NT.ALLSKY_LAST_LOCAL_HOUR:02d}:00 locales: se come horas de verdad")
+    elif cuts:
+        motivo = (f"corte habitual de la camara hacia las {hour:02d} locales en {len(cuts)} de "
+                  f"{looked} noches, fuera de la ventana de verdad")
+    else:
+        motivo = "sin cortes de madrugada"
     return {"nivel": level, "noches_miradas": looked, "noches_con_corte": len(cuts),
-            "hora_corte_utc": hour,
-            "motivo": (f"sin estrellas (<5 % de lo anterior) desde las {hour:02d} UTC en {len(cuts)} de {looked} noches "
-                       f"con cielo visto antes" if cuts else "sin cortes de madrugada")}
+            "noches_con_corte_temprano": len(early), "hora_corte_local": hour,
+            "motivo": motivo}
 
 
 # --- la decision de la curva ----------------------------------------------------------

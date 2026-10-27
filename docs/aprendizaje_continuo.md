@@ -263,7 +263,7 @@ ultimos cuatro dias (446, 178, 205 lecturas) es el hueco de `top_up` (M12).
    "cloudwatcher": {"...": "igual"}, "estacion": {}, "fotometro": {}, "allsky": {}
   },
   "allsky_corte": {"nivel": "ok", "noches_miradas": 7, "noches_con_corte": 2,
-                   "hora_corte_utc": 3, "motivo": "..."},
+                   "noches_con_corte_temprano": 0, "hora_corte_local": 5, "motivo": "..."},
   "curva_techo": {"nivel": "ok", "motivo": "...", "fecha_utc": "2026-10-26T22:11:09+00:00",
                   "decision": "sustituye", "razon": "...", "k_noches": 14, "margen": 0.02,
                   "noches_examinadas": 14, "brier_vigente": 0.147, "brier_aspirante": 0.092,

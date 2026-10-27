@@ -33,6 +33,7 @@ import json
 import subprocess
 from collections import defaultdict
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 
 UTC = dt.timezone.utc
@@ -40,11 +41,21 @@ UTC = dt.timezone.utc
 # La decision de subir se toma por la tarde: la publicacion vigente a esta hora.
 DECISION_HOUR_UTC = 16
 OPEN_HOURS_MIN = 2.0          # "abrio" = al menos la ventana de dos horas del veredicto
-# Allsky: horas validas (desde las 03 UTC la camara da 0 estrellas cada noche,
-# medido en las 15 noches limpias: p90 = 9 a las 03, 0 a las 04) y umbral, el
-# valle de la distribucion de medianas horarias (5 horas entre 73 y 109
-# estrellas contra 49-85 por intervalo por encima de 239).
-ALLSKY_HOURS = (19, 20, 21, 22, 23, 0, 1, 2)
+# Allsky: horas validas y umbral. El umbral es el valle de la distribucion de
+# medianas horarias (5 horas entre 73 y 109 estrellas contra 49-85 por intervalo
+# por encima de 239).
+#
+# LAS HORAS VAN POR EL RELOJ DE ESPANA, NO POR UTC (M13, 27-10-2026). La camara
+# de AstroCamp deja de dar estrellas cada madrugada a una hora del reloj local:
+# medido en las 45 noches limpias del 02-09 al 25-10, el corte cae entre las
+# 04:54 y las 06:13 hora local (mediana 05:26), y el 25-10, con el cambio de
+# hora, salto de las 03:44 a las 04:49 UTC: una hora justa en UTC y ninguna en
+# el reloj. Hasta hoy la ventana era 19-02 UTC fija, que en verano son las 21-04
+# locales pero desde el 25-10 tiraba la hora 03 UTC (04 local) con 332 y 410
+# estrellas las dos primeras noches. Cuenta la casilla horaria que TERMINA a las
+# 05:00 locales o antes; el principio lo pone la noche cerrada (Sol < -18).
+ALLSKY_TZ = ZoneInfo("Europe/Madrid")
+ALLSKY_LAST_LOCAL_HOUR = 5
 ALLSKY_CLEAR_STARS = 100
 OPEN_HOURS_FILE = "open_hours_nerpio.json"
 
@@ -176,6 +187,14 @@ def night_hours(frame: dict) -> list[dt.datetime]:
 
 # --- las tres verdades de nubes y su consenso ------------------------------------
 
+def allsky_hour_valid(h: dt.datetime) -> bool:
+    """La casilla horaria que empieza en `h` termina antes del corte local de la
+    camara (`ALLSKY_LAST_LOCAL_HOUR`). Las horas de tarde siempre valen: quien
+    las acota es la noche cerrada."""
+    local = aware(h).astimezone(ALLSKY_TZ)
+    return not (ALLSKY_LAST_LOCAL_HOUR < local.hour + 1 <= 12)
+
+
 def sensor_truths(photometer: dict[dt.datetime, bool],
                   cw_raw: dict[dt.datetime, tuple[float, int]],
                   sky_raw: dict[dt.datetime, float],
@@ -184,7 +203,8 @@ def sensor_truths(photometer: dict[dt.datetime, bool],
     """Fotometro, CloudWatcher, allsky y consenso, hora a hora (True = despejado).
 
     `keep(h)` acota el periodo. El CloudWatcher y la allsky solo cuentan en noche
-    cerrada (Sol < -18 a la media hora); la allsky ademas solo de 19 a 03 UTC. El
+    cerrada (Sol < -18 a la media hora); la allsky ademas solo hasta las 05:00
+    locales (`allsky_hour_valid`). El
     consenso es la mayoria de las disponibles, con al menos dos y sin empate: es
     un constructo pragmatico y se declara como tal.
     """
@@ -196,7 +216,7 @@ def sensor_truths(photometer: dict[dt.datetime, bool],
         "cloudwatcher": {h: f >= 0.5 for h, (f, n) in cw_raw.items()
                          if deep(h) and keep(h)},
         "allsky": {h: s >= ALLSKY_CLEAR_STARS for h, s in sky_raw.items()
-                   if deep(h) and h.hour in ALLSKY_HOURS and keep(h)},
+                   if deep(h) and allsky_hour_valid(h) and keep(h)},
     }
     consensus = {}
     for h in set(T["fotometro"]) | set(T["cloudwatcher"]) | set(T["allsky"]):

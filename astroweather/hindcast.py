@@ -82,7 +82,7 @@ from .asof import NWP_LATENCY, AsOf, raw_ensemble_asof, raw_forecast_asof  # noq
 # importan con su nombre de siempre para que nada de aqui cambie.
 from .skill import RESAMPLES, SEED, NightBootstrap, auc, brier, bss, sigmoid  # noqa: F401
 from .nighttruth import (  # noqa: F401
-    ALLSKY_CLEAR_STARS, ALLSKY_HOURS, DECISION_HOUR_UTC, OPEN_HOURS_MIN, aware,
+    ALLSKY_CLEAR_STARS, DECISION_HOUR_UTC, allsky_hour_valid, OPEN_HOURS_MIN, aware,
     file_history, gated_usable, git, hour_ephemeris, hour_key, night_frames, night_of,
     parse_publication, pick_publication, sensor_truths)
 from . import nighttruth as _truth
@@ -470,7 +470,7 @@ def analyse(archive: Path = ARCHIVE, data_repo: Path = DATA_REPO,
                         for k, v in T.items()}
 
     # distribucion de la allsky (de donde sale el umbral)
-    values = np.array([s for h, s in sky_raw.items() if deep(h) and h.hour in ALLSKY_HOURS])
+    values = np.array([s for h, s in sky_raw.items() if deep(h) and allsky_hour_valid(h)])
     bands = [(0, 30), (30, 100), (100, 300), (300, 1e9)]
     R["allsky_bands"] = [(lo, hi, int(((values >= lo) & (values < hi)).sum())) for lo, hi in bands]
 

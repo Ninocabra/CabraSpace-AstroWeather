@@ -12,6 +12,26 @@ La especificación vigente es **`astroweather_cabraspace_v8_SPEC.md`** (solo est
 
 ---
 
+## 27-10-2026 (2) — M13: la allsky va por el reloj de Espana
+
+**Causa medida.** La allsky de AstroCamp deja de dar estrellas cada madrugada a
+una hora del RELOJ LOCAL: en 45 noches limpias (02-09 a 25-10) el corte cae entre
+las 04:54 y las 06:13 locales (mediana 05:26), y el 25-10, con el cambio de hora,
+salto de las 03:44 a las 04:49 UTC (una hora justa en UTC, ninguna en el reloj).
+No es rocio ni exposicion: es su horario. La ventana de verdad era fija en UTC
+(19-02) y desde el cambio de hora tiraba la casilla de las 03 UTC, que tuvo 332 y
+410 estrellas las dos primeras noches.
+
+**Cambio.** `nighttruth.allsky_hour_valid`: vale la casilla que termina a las
+05:00 locales (Europe/Madrid) o antes; el principio lo sigue poniendo la noche
+cerrada. Sustituye a `ALLSKY_HOURS` (tambien en `hindcast`). En verano da lo
+mismo que antes; en invierno entra la casilla de las 03 UTC (y la de las 18 UTC
+cuando ya es noche cerrada). El aviso de salud `allsky_corte` deja de saltar por
+el corte habitual y solo avisa si la camara se apaga DENTRO de esa ventana
+(`noches_con_corte_temprano`, `hora_corte_local`; desaparece `hora_corte_utc`).
+Tests: `tests/test_m13_allsky_hora_local.py` (6, los 6 en rojo con el codigo
+anterior).
+
 ## 27-10-2026 (2) — M16 en la curva del fotometro: entrenar y examinar con lo publicable
 
 Detalle, tablas y noches: `docs/m16_curva_fotometro.md`; herramienta
