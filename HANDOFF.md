@@ -1,5 +1,57 @@
 # HANDOFF — CabraSpace AstroWeather
 
+## CIERRE 27-10-2026 (PC_CABRA, Opus 5.5 solo; en paralelo, otra sesión hizo M7/M8/M16)
+
+### 1. Estado git
+- Motor `main`, todo subido. Cabeza `0b08b1e`.
+  - Commits de esta sesión: `53393b0` M13 y `0b08b1e` M9.
+  - Commits de la otra sesión: `53e05dd` M7, `ac4d151` M8, `d9fca9c` y `4cf3341` M16.
+- Batería: **1299 passed** sobre lo subido.
+- Archivo y datos: no se han tocado (solo `pull`).
+
+### 2. En una pantalla
+- **Noche 26/27-10: acierto.**
+  - Real: despejada (los tres sensores) y techo abierto unas 11 h, 7,8 h de ellas en noche astronómica.
+  - Publicado la tarde del 26: Abierto, P = 0,72, todavía con la curva vieja, que se cambió a las 22 UTC.
+  - Publicado la víspera: Abierto, P = 0,97.
+- **La web ya publica con M1 y M6:** para la noche del 27, P(abrir) = 0,874 y 6,0 h esperadas sobre 10,3 h de noche astronómica.
+- **Salud a 13 noches:**
+  - misma tarde: acierto 0,85 (BSS +0,39);
+  - víspera: acierto 0,92 (BSS +0,66);
+  - «siempre Abierto» acierta 0,69.
+- **«Curva del techo sin decisión registrada» NO es un fallo.** El runner de las 22:00 del 26 corría `1d1b9a5`, anterior al aprendizaje continuo, y reentrenó la curva sin examen. El primer examen real es el 27 a las 22 UTC.
+- **M13, resuelto.** La allsky corta a su hora del reloj local (04:54-06:13 locales en 45 noches). El 25-10 saltó una hora en UTC con el cambio de hora.
+  - La ventana de verdad pasa a hora local, hasta las 05:00 (`nighttruth.allsky_hour_valid`).
+  - El aviso de salud solo salta si el corte cae dentro de esa ventana.
+- **M9, aplicado con la opción A, que eligió Nino.** Terciles propios del último año, recalculados cada semana (`seeingterciles.py`, trabajo `seeing_terciles`, fichero `seeing_terciles.json` en el archivo).
+  - Hoy: 0,957″ / 1,009″, que reparten las 62 noches en 21/20/21. Antes salía «favorable» 58 de 58.
+  - El tercil ordena las noches por el chorro; no mide segundos de arco.
+
+### 3. Hipótesis refutadas (27-10)
+- «La allsky se apaga por rocío o exposición»: no. Corta a una hora fija del reloj local y saltó exactamente una hora en UTC con el cambio de hora.
+- «Los cortes 1,35/1,90″ son los terciles del modelo»: el seeing previsto va de 0,91 a 1,49″ (domina la constante A, que da 0,90″ sin jet). Esos cortes piden 43 y 63 m/s de chorro, y el p90 es 33.
+
+### 4. Pendientes (misma numeración que el 26/27)
+1. **Paso 4, el marcador en la web.** Lo valida Nino.
+2. **Mirar en el runner real:**
+   - el primer examen de `techo_curva` (27-10, 22 UTC), en `curve_decisions` y en `salud.curva_techo`;
+   - el primer `seeing_terciles.json` (pasada desde las 10 UTC) y la etiqueta en la web;
+   - que `salud.allsky_corte` diga «corte habitual … fuera de la ventana» en «ok»;
+   - que los sensores salgan del «aviso» del 26-10, que solo tuvo lecturas desde las 20:30.
+3. M7, M8 y M16: **HECHOS** por la otra sesión (27-10).
+4. Horas esperadas cortas tras M6 (−1,9 h por noche): revisar con más noches.
+5. M2, M3 y M4: necesitan invierno.
+6. M9 y M13: **HECHOS** (27-10). Queda **M10**, el sesgo del cielo más oscuro, de 0,13 mag.
+7. Retroanálisis en enero (M18).
+8. Salto de escala de ICON: NO VERIFICADO.
+9. Minutos de Actions en noviembre. Desde el 26-10 a las 20:30 hay una pasada cada 30 min, en verde.
+
+### 5. Para el ojo de Nino
+- Web: la etiqueta de seeing debe alternar entre favorable, normal y desfavorable después del recálculo de las 10 UTC. Con lo que hay hoy, el 31-10 saldría «desfavorable» (chorro de 30 m/s).
+- Informe con M9 y M13 marcados: `C:\Users\ninoc\Documents\PixInsight\CabraSpace\Astroweather Cabraspace\docs\verificacion_2026-10-26.md`
+
+---
+
 ## CIERRE 26/27-10-2026 (PC_CABRA, Opus 5.5 coordinando; agentes opus-xhigh, opus-high, sonnet-high; 2 sesiones en la nube)
 
 ### 1. Estado git
