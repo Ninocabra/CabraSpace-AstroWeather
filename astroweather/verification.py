@@ -383,7 +383,9 @@ def report(root=None) -> str:
     lines.append("  (0 = perfecto, 0.25 = tirar una moneda; menos es mejor)")
     if clouds:
         for score in clouds[:8]:
-            lines.append(f"    {score['model']:26s} lead {score['lead_h']:>3}h  "
+            # lead_h puede ser NULL (ecmwf_ifs025_pastdays: se desconoce).
+            lead = "  ?" if score["lead_h"] is None else f"{score['lead_h']:>3}"
+            lines.append(f"    {score['model']:26s} lead {lead}h  "
                          f"n={score['n']:>4}  Brier={score['brier']:.3f}")
     else:
         lines.append(f"    NO se puntua: clear_flag muere en 2021 (el sensor de AstroCamp")

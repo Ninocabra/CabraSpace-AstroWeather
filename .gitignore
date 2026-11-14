@@ -13,6 +13,10 @@ data/raw/*
 !data/raw/site=nerpio/
 data/raw/site=nerpio/*
 !data/raw/site=nerpio/source=openmeteo_ensemble/
+# Y el rescate por `past_days` (14-11-2026, tras las pasadas perdidas del 11 al
+# 14): es el unico raw que queda de esas horas. Va aparte, con su propia fuente,
+# porque NO es una pasada: ver `workers/backfill_ensemble_past.py`.
+!data/raw/site=nerpio/source=openmeteo_ensemble_past_days/
 *.nc
 *.grib
 *.grib2
