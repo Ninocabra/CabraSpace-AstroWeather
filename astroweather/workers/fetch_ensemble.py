@@ -20,6 +20,7 @@ import requests
 
 from ..archive import store_raw, utcnow, write_canonical
 from ..invariants import check_eps_members
+from ..normalize import PRECIP_CLAMPED_FLAG, clamp_small_negative
 from ..site import NERPIO, Site
 
 ENDPOINT = "https://ensemble-api.open-meteo.com/v1/ensemble"
@@ -68,6 +69,7 @@ def to_rows(payload: dict[str, Any], site: Site, retrieved_at: datetime) -> list
         return hourly.get(key) or [None] * len(times)
 
     rows: list[dict] = []
+    clamped = 0
     for member in range(EPS_MEMBERS := 51):
         clouds = series("cloud_cover", member)
         precip = series("precipitation", member)
@@ -75,6 +77,11 @@ def to_rows(payload: dict[str, Any], site: Site, retrieved_at: datetime) -> list
             cloud = clouds[index]
             if cloud is None:
                 continue
+            # Open-Meteo da a veces -0.1 mm en algun miembro (artefacto
+            # numerico). Un negativo pequeno se recorta a 0 y se marca; uno
+            # grande sigue llegando al validador de escritura.
+            rain, was_clamped = clamp_small_negative(precip[index])
+            clamped += was_clamped
             rows.append(
                 {
                     "site_id": site.site_id,
@@ -84,7 +91,7 @@ def to_rows(payload: dict[str, Any], site: Site, retrieved_at: datetime) -> list
                     "lead_h": int((valid - run_utc).total_seconds() // 3600),
                     "member": member,
                     "cloud_total": float(cloud),
-                    "precipitation": precip[index],
+                    "precipitation": rain,
                     "provider_model_version": MODEL,
                     "provider_grid_lat": payload.get("latitude"),
                     "provider_grid_lon": payload.get("longitude"),
@@ -96,8 +103,12 @@ def to_rows(payload: dict[str, Any], site: Site, retrieved_at: datetime) -> list
                     "interpolated": True,
                     "retrieved_at": retrieved_at,
                     "license_tag": LICENSE_TAG,
+                    "quality_flags": PRECIP_CLAMPED_FLAG if was_clamped else None,
                 }
             )
+    if clamped:
+        print(f"[fetch_ensemble] {clamped} precipitation values in "
+              f"[-0.5, 0) clamped to 0.0 (provider numerical artifact)")
     return rows
 
 

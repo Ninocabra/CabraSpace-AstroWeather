@@ -37,6 +37,7 @@ import requests
 
 from ..archive import store_raw, utcnow, write_canonical
 from ..invariants import check_wind_units
+from ..normalize import clamp_small_negative
 from ..site import NERPIO, Site
 
 ENDPOINT = "https://previous-runs-api.open-meteo.com/v1/forecast"
@@ -101,6 +102,7 @@ def to_rows(payload: dict, site: Site, retrieved_at: datetime,
     for lead_days in LEAD_DAYS:
         by_time: dict[datetime, dict] = {}
         clamped: set[datetime] = set()
+        precip_clamped: set[datetime] = set()
         for variable, column in VARIABLES.items():
             series = hourly.get(f"{variable}_previous_day{lead_days}")
             if series is None:
@@ -120,6 +122,11 @@ def to_rows(payload: dict, site: Site, retrieved_at: datetime,
                 if column.startswith("cloud_") and not 0.0 <= value <= 100.0                         and -CLOUD_ROUNDING_SLACK <= value <= 100.0 + CLOUD_ROUNDING_SLACK:
                     value = min(100.0, max(0.0, value))
                     clamped.add(valid)
+                if column == "precipitation":
+                    # Artefacto numerico (-0.1 mm); ver normalize.py.
+                    value, was_clamped = clamp_small_negative(value)
+                    if was_clamped:
+                        precip_clamped.add(valid)
                 by_time.setdefault(valid, {})[column] = value
 
         for valid, values in by_time.items():
@@ -147,7 +154,8 @@ def to_rows(payload: dict, site: Site, retrieved_at: datetime,
                 "retrieved_at": retrieved_at,
                 "license_tag": LICENSE_TAG,
                 "quality_flags": (f"previous_runs;lead_days={lead_days};run_hour_assumed_00z"
-                                  + (";cloud_clamped_to_range" if valid in clamped else "")),
+                                  + (";cloud_clamped_to_range" if valid in clamped else "")
+                                  + (";precip_clamped_to_zero" if valid in precip_clamped else "")),
             })
     return rows
 

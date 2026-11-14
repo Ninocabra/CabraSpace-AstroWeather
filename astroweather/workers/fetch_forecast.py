@@ -22,6 +22,7 @@ from typing import Any
 import requests
 
 from ..archive import store_raw, utcnow, write_canonical
+from ..normalize import PRECIP_CLAMPED_FLAG, clamp_small_negative
 from ..invariants import check_elevation_request, check_wind_units
 from ..site import NERPIO, Site
 
@@ -101,9 +102,11 @@ def _rows(payload: dict, site: Site, models, retrieved_at: datetime) -> list[dic
     run_utc = times[0]
     single = len(models) == 1
     rows: list[dict] = []
+    clamped_total = 0
 
     for model in models:
         row_by_time: dict[datetime, dict] = {}
+        clamped: set[datetime] = set()
         for variable, column in COLUMNS.items():
             key = variable if single else f"{variable}_{model}"
             series = hourly.get(key)
@@ -115,7 +118,14 @@ def _rows(payload: dict, site: Site, models, retrieved_at: datetime) -> list[dic
                 value = series[index]
                 if value is None:
                     continue
-                row_by_time.setdefault(valid, {})[column] = float(value)
+                value = float(value)
+                if column == "precipitation":
+                    # Artefacto numerico del proveedor (-0.1 mm); ver normalize.py.
+                    value, was_clamped = clamp_small_negative(value)
+                    if was_clamped:
+                        clamped.add(valid)
+                        clamped_total += 1
+                row_by_time.setdefault(valid, {})[column] = value
 
         for valid, values in row_by_time.items():
             rows.append(
@@ -138,8 +148,12 @@ def _rows(payload: dict, site: Site, models, retrieved_at: datetime) -> list[dic
                     "interpolated": False,
                     "retrieved_at": retrieved_at,
                     "license_tag": LICENSE_TAG,
+                    "quality_flags": PRECIP_CLAMPED_FLAG if valid in clamped else None,
                 }
             )
+    if clamped_total:
+        print(f"[fetch_forecast] {clamped_total} precipitation values in "
+              f"[-0.5, 0) clamped to 0.0 (provider numerical artifact)")
     return rows
 
 

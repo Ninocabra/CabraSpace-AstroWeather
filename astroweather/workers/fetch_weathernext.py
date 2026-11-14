@@ -17,6 +17,7 @@ from typing import Any
 
 from ..archive import store_raw, utcnow, write_canonical
 from ..invariants import check_wind_units
+from ..normalize import clamp_small_negative
 from ..site import NERPIO, Site
 
 ENDPOINT_KIND = "earthengine"
@@ -510,8 +511,9 @@ def _rows(
 
                 precip_m = item.get(f"total_precipitation_1hr_{stat}")
                 if precip_m is not None:
+                    precip_mm, _ = clamp_small_negative(float(precip_m) * 1000.0)
                     row["precipitation"] = round(
-                        float(precip_m) * 1000.0, DECIMALS["precipitation"]
+                        precip_mm, DECIMALS["precipitation"]
                     )
 
                 p_pa = item.get(f"mean_sea_level_pressure_{stat}")
