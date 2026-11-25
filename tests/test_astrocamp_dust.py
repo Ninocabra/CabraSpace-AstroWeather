@@ -187,6 +187,27 @@ def test_el_guardian_salta_si_el_eje_cambia_de_escala(tmp_path):
         polvo.digitiza(destino, DIBUJADO)
 
 
+VACIO = Path(__file__).parent / "fixtures" / "astrocamp_dust_vacio_20261125T1740Z.png"
+
+
+def test_el_grafico_vacio_es_sensor_sin_datos_y_no_cambio_de_escala():
+    """PNG real del 25-11-2026: AstroCamp sin datos de polvo.
+
+    matplotlib reescala los ejes de un grafico vacio y el guardian lo tomaba
+    por un cambio de escala. Tiene que seguir sin publicar, pero diciendo que
+    el sensor no manda datos.
+    """
+    with pytest.raises(polvo.SensorSinDatos, match="vacio"):
+        polvo.digitiza(VACIO, dt.datetime(2026, 11, 25, 17, 40, tzinfo=dt.timezone.utc))
+
+
+def test_una_curva_pegada_al_cero_no_se_toma_por_grafico_vacio(tmp_path):
+    """El caso que el detector de vacio podria comerse: aire limpisimo."""
+    _, serie, _ = _digitaliza_imagen(_inyecta(np.full(N, 0.5)), tmp_path)
+
+    assert np.isfinite(serie).mean() > 0.9
+
+
 def test_el_guardian_salta_si_cambia_el_tamano_del_grafico(tmp_path):
     destino = tmp_path / "encogido.png"
     Image.open(FIXTURE).resize((1024, 768)).save(destino)

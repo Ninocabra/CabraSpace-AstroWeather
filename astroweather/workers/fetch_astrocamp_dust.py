@@ -106,6 +106,24 @@ class GeometriaCambiada(RuntimeError):
     """
 
 
+class SensorSinDatos(RuntimeError):
+    """AstroCamp publica el grafico VACIO: su sensor no esta mandando datos.
+
+    Medido el 25-11-2026: sin datos, matplotlib dibuja el marco con la leyenda,
+    reescala el eje Y a -5..100 (10 marcas) y el de tiempos a -0,04..0,04. El
+    guardian lo leia como `GeometriaCambiada` y mandaba a recalibrar un
+    digitalizador que estaba bien. Es un fallo del proveedor, no nuestro: se
+    sigue sin publicar nada y se reintenta, pero diciendo lo que pasa.
+    """
+
+
+# La unica tinta azul de un grafico vacio es la muestra de la leyenda: 240 px
+# de linea y 0 de relleno (PNG del 25-11-2026). Una curva real, aun pegada al
+# cero, es una linea de ~990 px de largo y 2-3 de grueso (~2500 px o mas).
+PX_AZUL_LEYENDA_MAX = 600
+PX_RELLENO_VACIO_MAX = 50
+
+
 def _grupos(indices: np.ndarray) -> np.ndarray:
     """Centro de cada racha de pixeles contiguos (una marca son 2-3 pixeles)."""
     if len(indices) == 0:
@@ -145,6 +163,16 @@ def digitiza(png: str | Path | bytes, last_modified: dt.datetime):
     else:
         imagen = Image.open(png)
     a = np.asarray(imagen.convert("RGB")).astype(int)
+
+    # --- grafico vacio: va ANTES del guardian, que si no lo confunde con un
+    # cambio de escala (el vacio reescala los ejes a su manera)
+    px_linea = int(np.all(np.abs(a - AZUL_LINEA) < 40, axis=2).sum())
+    px_relleno = int(np.all(np.abs(a - AZUL_RELLENO) < 30, axis=2).sum())
+    if px_linea <= PX_AZUL_LEYENDA_MAX and px_relleno <= PX_RELLENO_VACIO_MAX:
+        raise SensorSinDatos(
+            f"AstroCamp publica el grafico de polvo vacio (dibujado "
+            f"{last_modified:%Y-%m-%d %H:%M} UTC): su sensor no manda datos; "
+            f"azul {px_linea} px de linea y {px_relleno} de relleno, solo la leyenda")
 
     # --- la caja del eje: filas y columnas casi enteras de pixel oscuro
     oscuro = a.sum(2) < 200
